@@ -124,7 +124,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	// 如果客户端使用 OpenAI 协议但模型名称是 Claude 系列，标记强制走 Anthropic 适配器
 	if relayFormat == types.RelayFormatOpenAI && isClaudeModel(relayInfo.OriginModelName) {
-		logger.LogInfo(c, fmt.Sprintf("detected Claude model %q via OpenAI protocol, forcing Anthropic adaptor", relayInfo.OriginModelName))
+		logger.LogInfo(c, fmt.Sprintf("[协议切换] 模型 %q 为 Claude 系列，客户端请求路径 /v1/chat/completions (OpenAI协议)，强制切换为 Anthropic 协议 (/v1/messages)", relayInfo.OriginModelName))
 		c.Set(string(constant.ContextKeyForceAnthropicAPI), true)
 	}
 
