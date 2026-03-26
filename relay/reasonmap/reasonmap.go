@@ -33,7 +33,7 @@ func OpenAIFinishReasonToClaudeStopReason(finishReason string) string {
 		return "max_tokens"
 	case constant.FinishReasonContentFilter:
 		return "refusal"
-	case "tool_calls":
+	case "tool_calls", "function_call":
 		return "tool_use"
 	default:
 		return finishReason
