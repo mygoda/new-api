@@ -14,7 +14,7 @@
 # 环境变量:
 #   IMAGE_NAME    镜像名称 (默认: new-api)
 #   IMAGE_TAG     镜像标签 (默认: git commit hash)
-#   PORT          对外端口 (默认: 3000)
+#   PORT          对外端口 (默认: 3010)
 #   DB_TYPE       数据库类型: postgres / mysql / sqlite (默认: sqlite)
 #   DB_DSN        自定义数据库 DSN (覆盖 DB_TYPE 的默认值)
 #   REDIS_URL     Redis 连接串 (默认: 不使用 Redis)
@@ -181,7 +181,7 @@ services:
     restart: always
     command: --log-dir /app/logs
     ports:
-      - "${PORT}:3000"
+      - "${PORT}:3010"
     volumes:
       - ${DATA_DIR}:/data
       - ${LOG_DIR}:/app/logs
@@ -191,7 +191,7 @@ $([ -n "$depends_on" ] && echo -e "$depends_on" || true)
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/status | grep -o 'success' || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3010/api/status | grep -o 'success' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -256,7 +256,7 @@ do_run_standalone() {
     docker run -d \
         --name "$COMPOSE_PROJECT" \
         --restart always \
-        -p "${PORT}:3000" \
+        -p "${PORT}:3010" \
         -v "${DATA_DIR}:/data" \
         -v "${LOG_DIR}:/app/logs" \
         "${env_args[@]}" \
@@ -271,17 +271,28 @@ do_down() {
     compose_cmd="$(get_compose_cmd)"
 
     if [ -n "$compose_cmd" ] && [ -f "$SCRIPT_DIR/docker-compose.deploy.yml" ]; then
-        $compose_cmd -f docker-compose.deploy.yml -p "$COMPOSE_PROJECT" down
+        # 只停止并移除 new-api 服务，不影响 postgres/redis 等其他服务
+        $compose_cmd -f docker-compose.deploy.yml -p "$COMPOSE_PROJECT" stop new-api
+        $compose_cmd -f docker-compose.deploy.yml -p "$COMPOSE_PROJECT" rm -f new-api
     else
         docker rm -f "$COMPOSE_PROJECT" 2>/dev/null || true
     fi
-    info "服务已停止"
+    info "new-api 服务已停止"
 }
 
 do_restart() {
-    info "重启服务..."
-    do_down
-    do_up
+    info "重启 new-api 服务..."
+    local compose_cmd
+    compose_cmd="$(get_compose_cmd)"
+
+    if [ -n "$compose_cmd" ] && [ -f "$SCRIPT_DIR/docker-compose.deploy.yml" ]; then
+        # 只重启 new-api 服务，不影响 postgres/redis 等其他服务
+        $compose_cmd -f docker-compose.deploy.yml -p "$COMPOSE_PROJECT" up -d --no-deps --force-recreate new-api
+    else
+        docker rm -f "$COMPOSE_PROJECT" 2>/dev/null || true
+        do_run_standalone
+    fi
+    info "new-api 服务已重启"
 }
 
 do_logs() {
@@ -322,7 +333,7 @@ show_help() {
     echo "  help       显示此帮助"
     echo ""
     echo "环境变量:"
-    echo "  PORT=3000          对外端口"
+    echo "  PORT=3010          对外端口"
     echo "  DB_TYPE=sqlite     数据库: postgres / mysql / sqlite"
     echo "  DB_DSN=...         自定义数据库 DSN (覆盖 DB_TYPE)"
     echo "  REDIS_URL=...      Redis 连接串"
@@ -330,7 +341,7 @@ show_help() {
     echo "  IMAGE_TAG=...      镜像标签 (默认: git hash)"
     echo ""
     echo "示例:"
-    echo "  ./deploy.sh                                      # SQLite, 端口 3000"
+    echo "  ./deploy.sh                                      # SQLite, 端口 3010"
     echo "  PORT=8080 ./deploy.sh                            # SQLite, 端口 8080"
     echo "  DB_TYPE=postgres ./deploy.sh                     # PostgreSQL + 自动启动 PG 容器"
     echo "  DB_DSN='postgres://u:p@host/db' ./deploy.sh up   # 自定义外部数据库"
