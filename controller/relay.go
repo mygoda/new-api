@@ -122,6 +122,12 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
+	// 如果客户端使用 OpenAI 协议但模型名称是 Claude 系列，标记强制走 Anthropic 适配器
+	if relayFormat == types.RelayFormatOpenAI && isClaudeModel(relayInfo.OriginModelName) {
+		logger.LogInfo(c, fmt.Sprintf("detected Claude model %q via OpenAI protocol, forcing Anthropic adaptor", relayInfo.OriginModelName))
+		c.Set(string(constant.ContextKeyForceAnthropicAPI), true)
+	}
+
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.
@@ -644,4 +650,13 @@ func shouldRetryTaskRelay(c *gin.Context, channelId int, taskErr *dto.TaskError,
 		return false
 	}
 	return true
+}
+
+// isClaudeModel 检查模型名称是否为 Claude 系列模型
+func isClaudeModel(model string) bool {
+	m := strings.ToLower(model)
+	return strings.Contains(m, "claude") ||
+		strings.Contains(m, "opus") ||
+		strings.Contains(m, "sonnet") ||
+		strings.Contains(m, "haiku")
 }

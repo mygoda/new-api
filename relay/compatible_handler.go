@@ -26,15 +26,6 @@ import (
 func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
 	info.InitChannelMeta(c)
 
-	// 如果客户端使用 OpenAI 协议但模型名称是 Claude 相关，强制使用 Anthropic 协议适配器
-	if info.RelayFormat == types.RelayFormatOpenAI &&
-		info.ApiType != constant.APITypeAnthropic &&
-		isClaudeModel(info.UpstreamModelName) {
-		logger.LogInfo(c, fmt.Sprintf("detected Claude model %q via OpenAI protocol (channelType=%d, originalApiType=%d), forcing Anthropic adaptor",
-			info.UpstreamModelName, info.ChannelType, info.ApiType))
-		info.ApiType = constant.APITypeAnthropic
-	}
-
 	textReq, ok := info.Request.(*dto.GeneralOpenAIRequest)
 	if !ok {
 		return types.NewErrorWithStatusCode(fmt.Errorf("invalid request type, expected dto.GeneralOpenAIRequest, got %T", info.Request), types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
@@ -225,11 +216,3 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	return nil
 }
 
-// isClaudeModel 检查模型名称是否为 Claude 系列模型
-func isClaudeModel(model string) bool {
-	m := strings.ToLower(model)
-	return strings.Contains(m, "claude") ||
-		strings.Contains(m, "opus") ||
-		strings.Contains(m, "sonnet") ||
-		strings.Contains(m, "haiku")
-}

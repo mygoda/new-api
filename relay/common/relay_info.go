@@ -176,6 +176,12 @@ func (info *RelayInfo) InitChannelMeta(c *gin.Context) {
 	paramOverride := common.GetContextKeyStringMap(c, constant.ContextKeyChannelParamOverride)
 	headerOverride := common.GetContextKeyStringMap(c, constant.ContextKeyChannelHeaderOverride)
 	apiType, _ := common.ChannelType2APIType(channelType)
+
+	// 路由层标记：OpenAI 协议下 Claude 系列模型强制走 Anthropic 适配器
+	if common.GetContextKeyBool(c, constant.ContextKeyForceAnthropicAPI) && apiType != constant.APITypeAnthropic {
+		apiType = constant.APITypeAnthropic
+	}
+
 	channelMeta := &ChannelMeta{
 		ChannelType:          channelType,
 		ChannelId:            common.GetContextKeyInt(c, constant.ContextKeyChannelId),

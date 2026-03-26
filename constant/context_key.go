@@ -65,4 +65,7 @@ const (
 
 	// ContextKeyLanguage stores the user's language preference for i18n
 	ContextKeyLanguage ContextKey = "language"
+
+	// ContextKeyForceAnthropicAPI 当 OpenAI 协议请求的模型为 Claude 系列时，强制使用 Anthropic 适配器
+	ContextKeyForceAnthropicAPI ContextKey = "force_anthropic_api"
 )
