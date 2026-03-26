@@ -41,7 +41,7 @@ cd "$SCRIPT_DIR"
 # ─── 默认值 ───
 IMAGE_NAME="${IMAGE_NAME:-new-api}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')}"
-PORT="${PORT:-3000}"
+PORT="${PORT:-3010}"
 DB_TYPE="${DB_TYPE:-sqlite}"
 REDIS_URL="${REDIS_URL:-}"
 SESSION_SECRET="${SESSION_SECRET:-$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32 2>/dev/null || echo 'change-me-in-production')}"
