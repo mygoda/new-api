@@ -30,6 +30,8 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	if info.RelayFormat == types.RelayFormatOpenAI &&
 		info.ApiType != constant.APITypeAnthropic &&
 		isClaudeModel(info.UpstreamModelName) {
+		logger.LogInfo(c, fmt.Sprintf("detected Claude model %q via OpenAI protocol (channelType=%d, originalApiType=%d), forcing Anthropic adaptor",
+			info.UpstreamModelName, info.ChannelType, info.ApiType))
 		info.ApiType = constant.APITypeAnthropic
 	}
 
