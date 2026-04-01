@@ -15,6 +15,7 @@ import (
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -446,7 +447,7 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 
 	reqId := common.GetContextKeyString(c, common.RequestIdKey)
 	if reqId == "" {
-		reqId = common.GetTimeString() + common.GetRandomString(8)
+		reqId = "req-" + uuid.New().String()
 	}
 	info := &RelayInfo{
 		Request: request,

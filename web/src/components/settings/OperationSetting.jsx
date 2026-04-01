@@ -63,6 +63,7 @@ const OperationSetting = () => {
 
     /* 日志设置 */
     LogConsumeEnabled: false,
+    DorisLogEnabled: false,
 
     /* 监控设置 */
     ChannelDisableThreshold: 0,

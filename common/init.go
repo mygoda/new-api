@@ -124,6 +124,17 @@ func InitEnv() {
 	SearchRateLimitEnable = GetEnvOrDefaultBool("SEARCH_RATE_LIMIT_ENABLE", true)
 	SearchRateLimitNum = GetEnvOrDefault("SEARCH_RATE_LIMIT", 10)
 	SearchRateLimitDuration = int64(GetEnvOrDefault("SEARCH_RATE_LIMIT_DURATION", 60))
+
+	DorisHost = GetEnvOrDefaultString("DORIS_HOST", "")
+	DorisPort = GetEnvOrDefault("DORIS_PORT", 8030)
+	DorisUser = GetEnvOrDefaultString("DORIS_USER", "root")
+	DorisPassword = GetEnvOrDefaultString("DORIS_PASSWORD", "")
+	DorisDatabase = GetEnvOrDefaultString("DORIS_DATABASE", "new_api")
+	DorisTable = GetEnvOrDefaultString("DORIS_TABLE", "request_logs")
+	DorisFlushInterval = GetEnvOrDefault("DORIS_FLUSH_INTERVAL", 5)
+	DorisFlushBatchSize = GetEnvOrDefault("DORIS_FLUSH_BATCH_SIZE", 100)
+	DorisEnabled = DorisHost != ""
+
 	initConstantEnv()
 }
 

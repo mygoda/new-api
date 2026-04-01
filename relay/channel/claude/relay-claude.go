@@ -63,6 +63,10 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 				if s == "type" || s == "properties" || s == "required" {
 					continue
 				}
+				// Claude/Bedrock does not support oneOf, allOf, anyOf at the top level of input_schema
+				if s == "oneOf" || s == "allOf" || s == "anyOf" {
+					continue
+				}
 				claudeTool.InputSchema[s] = a
 			}
 			claudeTools = append(claudeTools, &claudeTool)
@@ -347,6 +351,10 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 						Type: mediaMessage.Type,
 					}
 					if mediaMessage.Type == "text" {
+						// skip empty text content blocks - Bedrock/Claude rejects them
+						if mediaMessage.Text == "" {
+							continue
+						}
 						claudeMediaMessage.Text = common.GetPointer[string](mediaMessage.Text)
 					} else {
 						imageUrl := mediaMessage.GetImageMedia()
@@ -385,6 +393,13 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 						})
 					}
 				}
+				// if all text blocks were empty and no tool calls, add placeholder
+				if len(claudeMediaMessages) == 0 {
+					claudeMediaMessages = append(claudeMediaMessages, dto.ClaudeMediaMessage{
+						Type: "text",
+						Text: common.GetPointer[string]("..."),
+					})
+				}
 				claudeMessage.Content = claudeMediaMessages
 			}
 			claudeMessages = append(claudeMessages, claudeMessage)
@@ -399,6 +414,55 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 	claudeRequest.Prompt = ""
 	claudeRequest.Messages = claudeMessages
 	return &claudeRequest, nil
+}
+
+// FilterSystemMessages extracts system-role messages from the Messages array
+// and merges them into the top-level System field. Some clients incorrectly
+// include system messages in the Messages array, which Bedrock/Vertex reject
+// with "Unexpected role system".
+func FilterSystemMessages(request *dto.ClaudeRequest) {
+	if request == nil || len(request.Messages) == 0 {
+		return
+	}
+
+	var extractedSystem []dto.ClaudeMediaMessage
+	filteredMessages := make([]dto.ClaudeMessage, 0, len(request.Messages))
+
+	for _, msg := range request.Messages {
+		if msg.Role != "system" {
+			filteredMessages = append(filteredMessages, msg)
+			continue
+		}
+		// extract system message content as text
+		text := msg.GetStringContent()
+		if text != "" {
+			extractedSystem = append(extractedSystem, dto.ClaudeMediaMessage{
+				Type: "text",
+				Text: common.GetPointer[string](text),
+			})
+		}
+	}
+
+	if len(extractedSystem) == 0 {
+		return
+	}
+
+	// merge with existing system field
+	if request.System != nil {
+		existing, err := common.Any2Type[[]dto.ClaudeMediaMessage](request.System)
+		if err == nil && len(existing) > 0 {
+			extractedSystem = append(existing, extractedSystem...)
+		} else if sysStr, ok := request.System.(string); ok && sysStr != "" {
+			// system field is a plain string
+			extractedSystem = append([]dto.ClaudeMediaMessage{{
+				Type: "text",
+				Text: common.GetPointer[string](sysStr),
+			}}, extractedSystem...)
+		}
+	}
+
+	request.System = extractedSystem
+	request.Messages = filteredMessages
 }
 
 func StreamResponseClaude2OpenAI(claudeResponse *dto.ClaudeResponse) *dto.ChatCompletionsStreamResponse {

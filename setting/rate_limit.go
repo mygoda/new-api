@@ -16,6 +16,12 @@ var ModelRequestRateLimitSuccessCount = 1000
 var ModelRequestRateLimitGroup = map[string][2]int{}
 var ModelRequestRateLimitMutex sync.RWMutex
 
+var TokenRateLimitEnabled = false
+var TokenRateLimitDefaultRPM = 0
+var TokenRateLimitDefaultTPM = 0
+
+var DorisLogEnabled = false
+
 func ModelRequestRateLimitGroup2JSONString() string {
 	ModelRequestRateLimitMutex.RLock()
 	defer ModelRequestRateLimitMutex.RUnlock()

@@ -23,6 +23,7 @@ import { Card, Spin } from '@douyinfe/semi-ui';
 import { API, showError, toBoolean } from '../../helpers';
 import { useTranslation } from 'react-i18next';
 import RequestRateLimit from '../../pages/Setting/RateLimit/SettingsRequestRateLimit';
+import TokenRateLimit from '../../pages/Setting/RateLimit/SettingsTokenRateLimit';
 
 const RateLimitSetting = () => {
   const { t } = useTranslation();
@@ -32,6 +33,9 @@ const RateLimitSetting = () => {
     ModelRequestRateLimitSuccessCount: 1000,
     ModelRequestRateLimitDurationMinutes: 1,
     ModelRequestRateLimitGroup: '',
+    TokenRateLimitEnabled: false,
+    TokenRateLimitDefaultRPM: 0,
+    TokenRateLimitDefaultTPM: 0,
   });
 
   let [loading, setLoading] = useState(false);
@@ -80,6 +84,10 @@ const RateLimitSetting = () => {
         {/* AI请求速率限制 */}
         <Card style={{ marginTop: '10px' }}>
           <RequestRateLimit options={inputs} refresh={onRefresh} />
+        </Card>
+        {/* 令牌速率限制 */}
+        <Card style={{ marginTop: '10px' }}>
+          <TokenRateLimit options={inputs} refresh={onRefresh} />
         </Card>
       </Spin>
     </>

@@ -74,6 +74,8 @@ const EditTokenModal = (props) => {
     allow_ips: '',
     group: '',
     cross_group_retry: false,
+    rpm: 0,
+    tpm: 0,
     tokenCount: 1,
   });
 
@@ -570,6 +572,28 @@ const EditTokenModal = (props) => {
                         '请勿过度信任此功能，IP可能被伪造，请配合nginx和cdn等网关使用',
                       )}
                       showClear
+                      style={{ width: '100%' }}
+                    />
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.InputNumber
+                      field='rpm'
+                      label={t('每分钟最大请求数 (RPM)')}
+                      min={0}
+                      max={100000000}
+                      step={1}
+                      extraText={t('0 表示使用全局默认值')}
+                      style={{ width: '100%' }}
+                    />
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.InputNumber
+                      field='tpm'
+                      label={t('每分钟最大 Token 数 (TPM)')}
+                      min={0}
+                      max={100000000}
+                      step={1000}
+                      extraText={t('0 表示使用全局默认值')}
                       style={{ width: '100%' }}
                     />
                   </Col>

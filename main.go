@@ -291,6 +291,9 @@ func InitResources() error {
 		return err
 	}
 
+	// Initialize Doris logger (async batch writer)
+	service.InitDorisLogger()
+
 	// 启动系统监控
 	common.StartSystemMonitor()
 

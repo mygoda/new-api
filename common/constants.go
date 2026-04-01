@@ -123,6 +123,17 @@ var SyncFrequency int // unit is second
 var BatchUpdateEnabled = false
 var BatchUpdateInterval int
 
+// Doris detailed request logging
+var DorisEnabled = false
+var DorisHost = ""
+var DorisPort = 8030
+var DorisUser = "root"
+var DorisPassword = ""
+var DorisDatabase = "new_api"
+var DorisTable = "request_logs"
+var DorisFlushInterval = 5   // seconds
+var DorisFlushBatchSize = 100
+
 var RelayTimeout int // unit is second
 
 var RelayMaxIdleConns int

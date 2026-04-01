@@ -72,6 +72,7 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayIn
 			request.Messages[i] = message
 		}
 	}
+	claude.FilterSystemMessages(request)
 	return request, nil
 }
 

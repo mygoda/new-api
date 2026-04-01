@@ -156,6 +156,10 @@ func InitOptionMap() {
 	common.OptionMap["DemoSiteEnabled"] = strconv.FormatBool(operation_setting.DemoSiteEnabled)
 	common.OptionMap["SelfUseModeEnabled"] = strconv.FormatBool(operation_setting.SelfUseModeEnabled)
 	common.OptionMap["ModelRequestRateLimitEnabled"] = strconv.FormatBool(setting.ModelRequestRateLimitEnabled)
+	common.OptionMap["TokenRateLimitEnabled"] = strconv.FormatBool(setting.TokenRateLimitEnabled)
+	common.OptionMap["TokenRateLimitDefaultRPM"] = strconv.Itoa(setting.TokenRateLimitDefaultRPM)
+	common.OptionMap["TokenRateLimitDefaultTPM"] = strconv.Itoa(setting.TokenRateLimitDefaultTPM)
+	common.OptionMap["DorisLogEnabled"] = strconv.FormatBool(setting.DorisLogEnabled)
 	common.OptionMap["CheckSensitiveOnPromptEnabled"] = strconv.FormatBool(setting.CheckSensitiveOnPromptEnabled)
 	common.OptionMap["StopOnSensitiveEnabled"] = strconv.FormatBool(setting.StopOnSensitiveEnabled)
 	common.OptionMap["SensitiveWords"] = setting.SensitiveWordsToString()
@@ -304,6 +308,10 @@ func updateOptionMap(key string, value string) (err error) {
 			setting.CheckSensitiveOnPromptEnabled = boolValue
 		case "ModelRequestRateLimitEnabled":
 			setting.ModelRequestRateLimitEnabled = boolValue
+		case "TokenRateLimitEnabled":
+			setting.TokenRateLimitEnabled = boolValue
+		case "DorisLogEnabled":
+			setting.DorisLogEnabled = boolValue
 		case "StopOnSensitiveEnabled":
 			setting.StopOnSensitiveEnabled = boolValue
 		case "SMTPSSLEnabled":
@@ -454,6 +462,10 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.ModelRequestRateLimitSuccessCount, _ = strconv.Atoi(value)
 	case "ModelRequestRateLimitGroup":
 		err = setting.UpdateModelRequestRateLimitGroupByJSONString(value)
+	case "TokenRateLimitDefaultRPM":
+		setting.TokenRateLimitDefaultRPM, _ = strconv.Atoi(value)
+	case "TokenRateLimitDefaultTPM":
+		setting.TokenRateLimitDefaultTPM, _ = strconv.Atoi(value)
 	case "RetryTimes":
 		common.RetryTimes, _ = strconv.Atoi(value)
 	case "DataExportInterval":

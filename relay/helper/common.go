@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -157,11 +158,13 @@ func WssError(c *gin.Context, ws *websocket.Conn, openaiError types.OpenAIError)
 
 func GetResponseID(c *gin.Context) string {
 	logID := c.GetString(common.RequestIdKey)
+	logID = strings.TrimPrefix(logID, "req-")
 	return fmt.Sprintf("chatcmpl-%s", logID)
 }
 
 func GetLocalRealtimeID(c *gin.Context) string {
 	logID := c.GetString(common.RequestIdKey)
+	logID = strings.TrimPrefix(logID, "req-")
 	return fmt.Sprintf("evt_%s", logID)
 }
 

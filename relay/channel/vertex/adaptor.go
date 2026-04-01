@@ -97,6 +97,7 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayIn
 	} else {
 		c.Set("request_model", request.Model)
 	}
+	claude.FilterSystemMessages(request)
 	vertexClaudeReq := copyRequest(request, anthropicVersion)
 	return vertexClaudeReq, nil
 }

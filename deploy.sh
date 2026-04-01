@@ -3,11 +3,12 @@
 # deploy.sh — 一键构建并部署 new-api
 #
 # 用法:
-#   ./deploy.sh              # 默认: 本地构建 Docker 镜像并启动
+#   ./deploy.sh              # 默认: 构建镜像 + 生成 compose + 部署
+#   ./deploy.sh deploy       # 同上: 构建镜像 + 生成 compose + 部署
 #   ./deploy.sh build        # 仅构建镜像
-#   ./deploy.sh up           # 仅启动服务 (使用已有镜像)
+#   ./deploy.sh up           # 生成 compose 并启动 (使用已有镜像)
 #   ./deploy.sh down         # 停止并移除容器
-#   ./deploy.sh restart      # 重启服务
+#   ./deploy.sh restart      # 重新生成 compose 并重启 new-api 服务
 #   ./deploy.sh logs         # 查看实时日志
 #   ./deploy.sh status       # 查看服务状态
 #
@@ -18,6 +19,13 @@
 #   DB_TYPE       数据库类型: postgres / mysql / sqlite (默认: sqlite)
 #   DB_DSN        自定义数据库 DSN (覆盖 DB_TYPE 的默认值)
 #   REDIS_URL     Redis 连接串 (默认: 不使用 Redis)
+#   DORIS_ENABLED 是否启用 Doris 详细请求日志: true / false (默认: false)
+#   DORIS_HOST    Doris FE 地址 (启用 Doris 时必填, 默认: doris)
+#   DORIS_PORT    Doris FE HTTP 端口 (默认: 8030)
+#   DORIS_USER    Doris 用户名 (默认: root)
+#   DORIS_PASSWORD Doris 密码 (默认: 空)
+#   DORIS_DATABASE Doris 数据库名 (默认: new_api)
+#   DORIS_TABLE   Doris 表名 (默认: request_logs)
 #   SESSION_SECRET  会话密钥 (默认: 自动生成)
 #
 
@@ -45,6 +53,14 @@ PORT="${PORT:-3010}"
 DB_TYPE="${DB_TYPE:-sqlite}"
 REDIS_URL="${REDIS_URL:-}"
 SESSION_SECRET="${SESSION_SECRET:-$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32 2>/dev/null || echo 'change-me-in-production')}"
+
+DORIS_ENABLED="${DORIS_ENABLED:-false}"
+DORIS_HOST="${DORIS_HOST:-doris}"
+DORIS_PORT="${DORIS_PORT:-8030}"
+DORIS_USER="${DORIS_USER:-root}"
+DORIS_PASSWORD="${DORIS_PASSWORD:-}"
+DORIS_DATABASE="${DORIS_DATABASE:-new_api}"
+DORIS_TABLE="${DORIS_TABLE:-request_logs}"
 
 DATA_DIR="$SCRIPT_DIR/data"
 LOG_DIR="$SCRIPT_DIR/logs"
@@ -119,6 +135,15 @@ generate_compose() {
         env_lines+="      - REDIS_CONN_STRING=${REDIS_URL}\n"
     fi
 
+    if [ "$DORIS_ENABLED" = "true" ]; then
+        env_lines+="      - DORIS_HOST=${DORIS_HOST}\n"
+        env_lines+="      - DORIS_PORT=${DORIS_PORT}\n"
+        env_lines+="      - DORIS_USER=${DORIS_USER}\n"
+        env_lines+="      - DORIS_PASSWORD=${DORIS_PASSWORD}\n"
+        env_lines+="      - DORIS_DATABASE=${DORIS_DATABASE}\n"
+        env_lines+="      - DORIS_TABLE=${DORIS_TABLE}\n"
+    fi
+
     local depends_on=""
     local extra_services=""
     local extra_volumes=""
@@ -168,6 +193,26 @@ generate_compose() {
     restart: always
     networks:
       - app-network"
+    fi
+
+    if [ "$DORIS_ENABLED" = "true" ] && [ "$DORIS_HOST" = "doris" ]; then
+        depends_on+="${depends_on:+\n}      - doris"
+        extra_services+="
+  doris:
+    image: apache/doris:doris-all-in-one-2.1.7
+    container_name: ${COMPOSE_PROJECT}-doris
+    restart: always
+    ports:
+      - \"${DORIS_PORT}:8030\"
+      - \"9030:9030\"
+    volumes:
+      - doris_data:/opt/apache-doris
+    environment:
+      - FE_SERVERS=fe1:127.0.0.1:9010
+      - FE_ID=1
+    networks:
+      - app-network"
+        extra_volumes+="\n  doris_data:"
     fi
 
     cat > "$(pwd)/docker-compose.deploy.yml" <<YAML
@@ -230,6 +275,9 @@ do_up() {
     info "  数据目录: ${DATA_DIR}"
     info "  日志目录: ${LOG_DIR}"
     info "  数据库:   ${DB_TYPE}"
+    if [ "$DORIS_ENABLED" = "true" ]; then
+    info "  Doris:    ${DORIS_HOST}:${DORIS_PORT}/${DORIS_DATABASE}.${DORIS_TABLE}"
+    fi
     info "========================================="
 }
 
@@ -252,6 +300,17 @@ do_run_standalone() {
     fi
     if [ -n "$REDIS_URL" ]; then
         env_args+=(-e "REDIS_CONN_STRING=${REDIS_URL}")
+    fi
+
+    if [ "$DORIS_ENABLED" = "true" ]; then
+        env_args+=(
+            -e "DORIS_HOST=${DORIS_HOST}"
+            -e "DORIS_PORT=${DORIS_PORT}"
+            -e "DORIS_USER=${DORIS_USER}"
+            -e "DORIS_PASSWORD=${DORIS_PASSWORD}"
+            -e "DORIS_DATABASE=${DORIS_DATABASE}"
+            -e "DORIS_TABLE=${DORIS_TABLE}"
+        )
     fi
 
     docker run -d \
@@ -281,13 +340,20 @@ do_down() {
     info "new-api 服务已停止"
 }
 
+do_deploy() {
+    info "========= 开始完整部署 ========="
+    do_build
+    info "重新生成 docker-compose 配置..."
+    do_up
+}
+
 do_restart() {
     info "重启 new-api 服务..."
     local compose_cmd
     compose_cmd="$(get_compose_cmd)"
 
-    if [ -n "$compose_cmd" ] && [ -f "$(pwd)/docker-compose.deploy.yml" ]; then
-        # 只重启 new-api 服务，不影响 postgres/redis 等其他服务
+    if [ -n "$compose_cmd" ]; then
+        generate_compose
         $compose_cmd -f "$(pwd)/docker-compose.deploy.yml" -p "$COMPOSE_PROJECT" up -d --no-deps --force-recreate new-api
     else
         docker rm -f "$COMPOSE_PROJECT" 2>/dev/null || true
@@ -324,11 +390,12 @@ show_help() {
     echo "用法: ./deploy.sh [命令]"
     echo ""
     echo "命令:"
-    echo "  (无参数)    构建镜像并启动服务"
+    echo "  (无参数)    构建镜像 + 生成 compose + 部署 (等同 deploy)"
+    echo "  deploy     构建镜像 + 生成 compose + 部署"
     echo "  build      仅构建 Docker 镜像"
-    echo "  up         启动服务 (使用已有镜像)"
+    echo "  up         生成 compose 并启动 (使用已有镜像)"
     echo "  down       停止服务"
-    echo "  restart    重启服务"
+    echo "  restart    重新生成 compose 并重启 new-api 服务"
     echo "  logs       查看实时日志"
     echo "  status     查看服务状态"
     echo "  help       显示此帮助"
@@ -338,6 +405,13 @@ show_help() {
     echo "  DB_TYPE=sqlite     数据库: postgres / mysql / sqlite"
     echo "  DB_DSN=...         自定义数据库 DSN (覆盖 DB_TYPE)"
     echo "  REDIS_URL=...      Redis 连接串"
+    echo "  DORIS_ENABLED=false 是否启用 Doris 详细请求日志"
+    echo "  DORIS_HOST=doris   Doris FE 地址 (doris=自动启动容器)"
+    echo "  DORIS_PORT=8030    Doris FE HTTP 端口"
+    echo "  DORIS_USER=root    Doris 用户名"
+    echo "  DORIS_PASSWORD=    Doris 密码"
+    echo "  DORIS_DATABASE=new_api  Doris 数据库名"
+    echo "  DORIS_TABLE=request_logs Doris 表名"
     echo "  IMAGE_NAME=new-api 镜像名称"
     echo "  IMAGE_TAG=...      镜像标签 (默认: git hash)"
     echo ""
@@ -346,12 +420,17 @@ show_help() {
     echo "  PORT=8080 ./deploy.sh                            # SQLite, 端口 8080"
     echo "  DB_TYPE=postgres ./deploy.sh                     # PostgreSQL + 自动启动 PG 容器"
     echo "  DB_DSN='postgres://u:p@host/db' ./deploy.sh up   # 自定义外部数据库"
+    echo "  DORIS_ENABLED=true ./deploy.sh                   # 启用 Doris + 自动启动容器"
+    echo "  DORIS_ENABLED=true DORIS_HOST=10.0.0.1 ./deploy.sh  # 使用外部 Doris"
 }
 
 # ─── 入口 ───
 check_deps
 
 case "${1:-}" in
+    deploy)
+        do_deploy
+        ;;
     build)
         do_build
         ;;
@@ -374,8 +453,7 @@ case "${1:-}" in
         show_help
         ;;
     "")
-        do_build
-        do_up
+        do_deploy
         ;;
     *)
         error "未知命令: $1 (使用 ./deploy.sh help 查看帮助)"

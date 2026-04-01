@@ -299,6 +299,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	if originUsage != nil {
 		ObserveChannelAffinityUsageCacheByRelayFormat(ctx, usage, relayInfo.GetFinalRequestRelayFormat())
 	}
+	if usage != nil && usage.TotalTokens > 0 {
+		common.SetContextKey(ctx, constant.ContextKeyUsageTotalTokens, usage.TotalTokens)
+	}
 
 	adminRejectReason := common.GetContextKeyString(ctx, constant.ContextKeyAdminRejectReason)
 	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
@@ -427,4 +430,50 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		Group:            relayInfo.UsingGroup,
 		Other:            other,
 	})
+
+	emitDorisTextLog(ctx, relayInfo, usage, &summary)
+}
+
+func emitDorisTextLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, summary *textQuotaSummary) {
+	if !common.DorisEnabled {
+		return
+	}
+	dorisLog := DorisRequestLog{
+		RequestId:        relayInfo.RequestId,
+		UserId:           relayInfo.UserId,
+		TokenId:          relayInfo.TokenId,
+		TokenName:        summary.TokenName,
+		UserGroup:        relayInfo.UserGroup,
+		TokenGroup:       relayInfo.TokenGroup,
+		UsingGroup:       relayInfo.UsingGroup,
+		ModelName:        summary.ModelName,
+		IsStream:         relayInfo.IsStream,
+		RelayMode:        relayInfo.RelayMode,
+		RequestPath:      relayInfo.RequestURLPath,
+		ClientIp:         ctx.ClientIP(),
+		PromptTokens:     summary.PromptTokens,
+		CompletionTokens: summary.CompletionTokens,
+		TotalTokens:      summary.TotalTokens,
+		CacheTokens:      summary.CacheTokens,
+		Quota:            summary.Quota,
+		ModelRatio:       summary.ModelRatio,
+		GroupRatio:        summary.GroupRatio,
+		CompletionRatio:  summary.CompletionRatio,
+		ModelPrice:       summary.ModelPrice,
+		UseTimeMs:        summary.UseTimeSeconds * 1000,
+		IsSuccess:        true,
+		StatusCode:       ctx.Writer.Status(),
+		RetryCount:       relayInfo.RetryIndex,
+		CreatedAt:        time.Now().UTC().Format("2006-01-02 15:04:05"),
+	}
+	if relayInfo.ChannelMeta != nil {
+		dorisLog.ChannelId = relayInfo.ChannelId
+		dorisLog.ChannelType = relayInfo.ChannelType
+		dorisLog.UpstreamModel = relayInfo.UpstreamModelName
+	}
+	dorisLog.ChannelName = ctx.GetString("channel_name")
+	if usage != nil {
+		dorisLog.CacheTokens = usage.PromptTokensDetails.CachedTokens
+	}
+	RecordDorisLog(dorisLog)
 }
