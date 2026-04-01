@@ -199,7 +199,7 @@ generate_compose() {
         depends_on+="${depends_on:+\n}      - doris"
         extra_services+="
   doris:
-    image: apache/doris:doris-all-in-one-2.1.7
+    image: apache/doris:doris-all-in-one-2.1.0
     container_name: ${COMPOSE_PROJECT}-doris
     restart: always
     ports:
