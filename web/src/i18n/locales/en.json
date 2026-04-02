@@ -3364,6 +3364,19 @@
     "输出价格：{{symbol}}{{price}} / 1M tokens": "Output Price: {{symbol}}{{price}} / 1M tokens",
     "输出价格：{{symbol}}{{total}} / 1M tokens": "Output Price: {{symbol}}{{total}} / 1M tokens",
     "例如：gpt-4.1-nano,regex:^claude-.*$,regex:^sora-.*$": "Example: gpt-4.1-nano,regex:^claude-.*$,regex:^sora-.*$",
-    "支持精确匹配；使用 regex: 开头可按正则匹配。": "Supports exact matching. Use a regex: prefix for regex matching."
+    "支持精确匹配；使用 regex: 开头可按正则匹配。": "Supports exact matching. Use a regex: prefix for regex matching.",
+    "请求日志": "Request Logs",
+    "请求 ID": "Request ID",
+    "上游模型": "Upstream Model",
+    "客户端 IP": "Client IP",
+    "请求状态": "Request Status",
+    "响应内容": "Response Content",
+    "请求体": "Request Body",
+    "HTTP 状态码": "HTTP Status Code",
+    "错误类型": "Error Type",
+    "错误消息": "Error Message",
+    "使用分组": "Using Group",
+    "已复制": "Copied",
+    "否": "No"
   }
 }

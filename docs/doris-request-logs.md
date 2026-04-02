@@ -20,7 +20,6 @@
 | `DORIS_TABLE` | `request_logs` | Doris 表名 |
 | `DORIS_FLUSH_INTERVAL` | `5` | 批量刷写间隔（秒） |
 | `DORIS_FLUSH_BATCH_SIZE` | `100` | 触发即时刷写的缓冲区行数阈值 |
-| `DORIS_BODY_MAX_RUNES` | `65536` | 写入 Doris 的请求体 `request_body`、响应摘要 `response_content` 的最大 Unicode 字符数（1024～500000） |
 
 ## Doris 建表 DDL
 
@@ -48,8 +47,8 @@ CREATE TABLE IF NOT EXISTS request_logs (
     relay_mode      INT             DEFAULT 0  COMMENT '中继模式',
     request_path    VARCHAR(512)    DEFAULT '' COMMENT '请求路径',
     client_ip       VARCHAR(64)     DEFAULT '' COMMENT '客户端IP',
-    request_body    TEXT            DEFAULT '' COMMENT '请求体 JSON/文本，按 DORIS_BODY_MAX_RUNES 截断',
-    response_content TEXT           DEFAULT '' COMMENT '模型输出文本摘要，按 DORIS_BODY_MAX_RUNES 截断',
+    request_body    STRING          DEFAULT '' COMMENT '请求体 JSON/文本（无长度限制）',
+    response_content STRING         DEFAULT '' COMMENT '模型输出文本（无长度限制）',
     prompt_tokens   INT             DEFAULT 0  COMMENT '输入Token数',
     completion_tokens INT           DEFAULT 0  COMMENT '输出Token数',
     total_tokens    INT             DEFAULT 0  COMMENT '总Token数',

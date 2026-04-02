@@ -47,6 +47,7 @@ const routerMap = {
   task: '/console/task',
   models: '/console/models',
   deployment: '/console/deployment',
+  request_logs: '/console/request-logs',
   playground: '/console/playground',
   personal: '/console/personal',
 };
@@ -181,6 +182,12 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         text: t('用户管理'),
         itemKey: 'user',
         to: '/user',
+        className: isAdmin() ? '' : 'tableHiddle',
+      },
+      {
+        text: t('请求日志'),
+        itemKey: 'request_logs',
+        to: '/request_logs',
         className: isAdmin() ? '' : 'tableHiddle',
       },
       {

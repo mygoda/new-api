@@ -163,15 +163,14 @@ func EmitDorisErrorLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, statu
 // fillDorisBodyFields populates RequestBody and ResponseContent on a DorisRequestLog
 // from the Gin context. Called at the end of quota consumption hooks.
 func fillDorisBodyFields(ctx *gin.Context, log *DorisRequestLog) {
-	limit := common.DorisBodyMaxRunes
 	if storage, err := common.GetBodyStorage(ctx); err == nil {
 		if body, err := storage.Bytes(); err == nil && len(body) > 0 {
-			log.RequestBody = truncateString(string(body), limit)
+			log.RequestBody = string(body)
 		}
 	}
 	if v, exists := common.GetContextKey(ctx, constant.ContextKeyResponseContent); exists {
 		if s, ok := v.(string); ok {
-			log.ResponseContent = truncateString(s, limit)
+			log.ResponseContent = s
 		}
 	}
 }
@@ -189,7 +188,7 @@ func SetResponseContent(c *gin.Context, content string) {
 	if content == "" {
 		return
 	}
-	common.SetContextKey(c, constant.ContextKeyResponseContent, truncateString(content, common.DorisBodyMaxRunes))
+	common.SetContextKey(c, constant.ContextKeyResponseContent, content)
 }
 
 // SetResponseContentFromChoices extracts text from OpenAI choices and stores it.
