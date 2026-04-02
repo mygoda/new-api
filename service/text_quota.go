@@ -449,7 +449,7 @@ func emitDorisTextLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 		ModelName:        summary.ModelName,
 		IsStream:         relayInfo.IsStream,
 		RelayMode:        relayInfo.RelayMode,
-		RequestPath:      relayInfo.RequestURLPath,
+		RequestPath:      dorisRequestPathForLog(ctx, relayInfo),
 		ClientIp:         ctx.ClientIP(),
 		PromptTokens:     summary.PromptTokens,
 		CompletionTokens: summary.CompletionTokens,

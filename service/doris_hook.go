@@ -13,6 +13,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// dorisRequestPathForLog stores the path users expect in logs. Playground uses /pg/... but
+// RelayInfo.RequestURLPath is normalized to /v1/... for relay logic; keep the real path in Doris.
+func dorisRequestPathForLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) string {
+	if relayInfo != nil && relayInfo.IsPlayground && ctx != nil && ctx.Request != nil && ctx.Request.URL != nil {
+		return ctx.Request.URL.Path
+	}
+	if relayInfo != nil {
+		return relayInfo.RequestURLPath
+	}
+	return ""
+}
+
 // EmitDorisLog builds a DorisRequestLog from the relay context and enqueues it
 // for async batch write to Doris. Called after successful quota consumption.
 func EmitDorisLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage) {
@@ -34,7 +46,7 @@ func EmitDorisLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto
 		ModelName:   relayInfo.OriginModelName,
 		IsStream:    relayInfo.IsStream,
 		RelayMode:   relayInfo.RelayMode,
-		RequestPath: relayInfo.RequestURLPath,
+		RequestPath: dorisRequestPathForLog(ctx, relayInfo),
 		ClientIp:    ctx.ClientIP(),
 		IsSuccess:   true,
 		CreatedAt:   time.Now().UTC().Format("2006-01-02 15:04:05"),
@@ -89,7 +101,7 @@ func EmitDorisLogWithSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInfo,
 		ModelName:        relayInfo.OriginModelName,
 		IsStream:         relayInfo.IsStream,
 		RelayMode:        relayInfo.RelayMode,
-		RequestPath:      relayInfo.RequestURLPath,
+		RequestPath:      dorisRequestPathForLog(ctx, relayInfo),
 		ClientIp:         ctx.ClientIP(),
 		PromptTokens:     promptTokens,
 		CompletionTokens: completionTokens,
@@ -137,7 +149,7 @@ func EmitDorisErrorLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, statu
 		ModelName:    relayInfo.OriginModelName,
 		IsStream:     relayInfo.IsStream,
 		RelayMode:    relayInfo.RelayMode,
-		RequestPath:  relayInfo.RequestURLPath,
+		RequestPath:  dorisRequestPathForLog(ctx, relayInfo),
 		ClientIp:     ctx.ClientIP(),
 		IsSuccess:    false,
 		StatusCode:   statusCode,
