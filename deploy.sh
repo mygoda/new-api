@@ -22,8 +22,12 @@
 #   DB_DSN        自定义数据库 DSN (覆盖 DB_TYPE 的默认值)
 #   REDIS_URL     Redis 连接串 (默认: 不使用 Redis)
 #   DORIS_ENABLED 是否启用 Doris 详细请求日志: true / false (默认: true)
-#   DORIS_HOST    Doris FE 地址 (启用 Doris 时必填, 默认: doris)
-#   DORIS_PORT    Doris FE HTTP 端口 (默认: 8030)
+#   DORIS_HOST    Doris FE 地址 (compose 内嵌服务名 doris / 或外置 FE 主机名)
+#   DORIS_PORT    外置 Doris 时: new-api 访问的 FE HTTP 端口 (默认 8030)。
+#                 内嵌 doris 时: 仅表示「宿主机映射端口」(默认 8030)，容器内互联固定为 8030，勿与 8040(BE) 混淆。
+#   DORIS_HTTP_PUBLISH_PORT  内嵌 doris 时宿主机暴露的 FE HTTP 端口 (默认与 DORIS_PORT 相同，可单独设避免歧义)
+#   DORIS_PUBLISH_QUERY_PORT 内嵌 doris 时宿主机暴露的 MySQL 查询端口 (默认 9030，建表脚本从宿主机连 Doris 用)
+#   DORIS_QUERY_PORT new-api 查日志用的 MySQL 协议端口 (默认 9030)
 #   DORIS_USER    Doris 用户名 (默认: root)
 #   DORIS_PASSWORD Doris 密码 (默认: 空)
 #   DORIS_DATABASE Doris 数据库名 (默认: new_api)
@@ -59,10 +63,20 @@ SESSION_SECRET="${SESSION_SECRET:-$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | 
 DORIS_ENABLED="${DORIS_ENABLED:-true}"
 DORIS_HOST="${DORIS_HOST:-doris}"
 DORIS_PORT="${DORIS_PORT:-8030}"
+DORIS_QUERY_PORT="${DORIS_QUERY_PORT:-9030}"
+DORIS_PUBLISH_QUERY_PORT="${DORIS_PUBLISH_QUERY_PORT:-9030}"
 DORIS_USER="${DORIS_USER:-root}"
 DORIS_PASSWORD="${DORIS_PASSWORD:-}"
 DORIS_DATABASE="${DORIS_DATABASE:-new_api}"
 DORIS_TABLE="${DORIS_TABLE:-request_logs}"
+# 内嵌 doris 时映射到宿主机的 FE HTTP 左端口；未单独指定时沿用 DORIS_PORT（兼容旧用法）
+if [ -z "${DORIS_HTTP_PUBLISH_PORT:-}" ]; then
+    if [ "$DORIS_HOST" = "doris" ]; then
+        DORIS_HTTP_PUBLISH_PORT="$DORIS_PORT"
+    else
+        DORIS_HTTP_PUBLISH_PORT="8030"
+    fi
+fi
 
 DATA_DIR="$SCRIPT_DIR/data"
 LOG_DIR="$SCRIPT_DIR/logs"
@@ -139,7 +153,14 @@ generate_compose() {
 
     if [ "$DORIS_ENABLED" = "true" ]; then
         env_lines+="      - DORIS_HOST=${DORIS_HOST}\n"
-        env_lines+="      - DORIS_PORT=${DORIS_PORT}\n"
+        # 与 compose 中的 doris 服务通信必须用容器内端口 8030/9030；勿把宿主机映射端口当作 DORIS_PORT 传入
+        if [ "$DORIS_HOST" = "doris" ]; then
+            env_lines+="      - DORIS_PORT=8030\n"
+            env_lines+="      - DORIS_QUERY_PORT=9030\n"
+        else
+            env_lines+="      - DORIS_PORT=${DORIS_PORT}\n"
+            env_lines+="      - DORIS_QUERY_PORT=${DORIS_QUERY_PORT}\n"
+        fi
         env_lines+="      - DORIS_USER=${DORIS_USER}\n"
         env_lines+="      - DORIS_PASSWORD=${DORIS_PASSWORD}\n"
         env_lines+="      - DORIS_DATABASE=${DORIS_DATABASE}\n"
@@ -205,8 +226,8 @@ generate_compose() {
     container_name: ${COMPOSE_PROJECT}-doris
     restart: always
     ports:
-      - \"${DORIS_PORT}:8030\"
-      - \"9030:9030\"
+      - \"${DORIS_HTTP_PUBLISH_PORT}:8030\"
+      - \"${DORIS_PUBLISH_QUERY_PORT}:9030\"
     volumes:
       - doris_data:/opt/apache-doris
     environment:
@@ -272,13 +293,14 @@ do_doris_setup() {
         return
     fi
 
-    local doris_query_port="${DORIS_QUERY_PORT:-9030}"
+    local doris_query_port="$DORIS_QUERY_PORT"
     local doris_host="$DORIS_HOST"
 
-    # 如果 DORIS_HOST 是容器名（如 doris），尝试用 127.0.0.1 代替
+    # 如果 DORIS_HOST 是 compose 服务名，从宿主机连 Doris 要用映射后的查询端口
     if [[ "$doris_host" == "doris" ]]; then
         doris_host="127.0.0.1"
-        info "检测到 DORIS_HOST=doris（容器名），建表使用 127.0.0.1:${doris_query_port}"
+        doris_query_port="$DORIS_PUBLISH_QUERY_PORT"
+        info "检测到 DORIS_HOST=doris（容器名），建表使用 127.0.0.1:${doris_query_port}（宿主机映射 -> 容器 9030）"
     fi
 
     info "初始化 Doris 表结构 (${doris_host}:${doris_query_port}) ..."
@@ -341,7 +363,11 @@ do_up() {
     info "  日志目录: ${LOG_DIR}"
     info "  数据库:   ${DB_TYPE}"
     if [ "$DORIS_ENABLED" = "true" ]; then
-    info "  Doris:    ${DORIS_HOST}:${DORIS_PORT}/${DORIS_DATABASE}.${DORIS_TABLE}"
+        if [ "$DORIS_HOST" = "doris" ]; then
+            info "  Doris:    new-api -> ${DORIS_HOST}:8030(StreamLoad)/9030(查询); 宿主机映射 HTTP ${DORIS_HTTP_PUBLISH_PORT}->8030, 查询 ${DORIS_PUBLISH_QUERY_PORT}->9030; 库表 ${DORIS_DATABASE}.${DORIS_TABLE}"
+        else
+            info "  Doris:    ${DORIS_HOST}:${DORIS_PORT}(HTTP)/${DORIS_QUERY_PORT}(查询) ${DORIS_DATABASE}.${DORIS_TABLE}"
+        fi
     fi
     info "========================================="
 }
@@ -368,9 +394,13 @@ do_run_standalone() {
     fi
 
     if [ "$DORIS_ENABLED" = "true" ]; then
+        if [ "$DORIS_HOST" = "doris" ]; then
+            warn "docker run 单机模式无法解析服务名 doris，请改用 compose 部署或设置外置 DORIS_HOST"
+        fi
         env_args+=(
             -e "DORIS_HOST=${DORIS_HOST}"
             -e "DORIS_PORT=${DORIS_PORT}"
+            -e "DORIS_QUERY_PORT=${DORIS_QUERY_PORT}"
             -e "DORIS_USER=${DORIS_USER}"
             -e "DORIS_PASSWORD=${DORIS_PASSWORD}"
             -e "DORIS_DATABASE=${DORIS_DATABASE}"
@@ -498,8 +528,11 @@ show_help() {
     echo "  DB_DSN=...         自定义数据库 DSN (覆盖 DB_TYPE)"
     echo "  REDIS_URL=...      Redis 连接串"
     echo "  DORIS_ENABLED=true  是否启用 Doris 详细请求日志"
-    echo "  DORIS_HOST=doris   Doris FE 地址 (doris=自动启动容器)"
-    echo "  DORIS_PORT=8030    Doris FE HTTP 端口"
+    echo "  DORIS_HOST=doris   内嵌 Doris 服务名；外置时填 FE 可达主机名"
+    echo "  DORIS_PORT=8030    外置: new-api 访问的 FE HTTP 端口；内嵌: 宿主机 HTTP 映射左端口(默认8030)"
+    echo "  DORIS_HTTP_PUBLISH_PORT= 内嵌时宿主机 HTTP 映射(可选，默认同 DORIS_PORT)"
+    echo "  DORIS_PUBLISH_QUERY_PORT=9030 内嵌时宿主机 MySQL 查询端口映射"
+    echo "  DORIS_QUERY_PORT=9030  new-api 查日志用的查询端口(外置时按实际 FE)"
     echo "  DORIS_USER=root    Doris 用户名"
     echo "  DORIS_PASSWORD=    Doris 密码"
     echo "  DORIS_DATABASE=new_api  Doris 数据库名"

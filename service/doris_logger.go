@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -162,7 +163,11 @@ func dorisStreamLoad(data []byte) error {
 
 	resp, err := dorisHttpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("http request: %w", err)
+		err = fmt.Errorf("http request: %w", err)
+		if strings.Contains(err.Error(), "connection refused") {
+			err = fmt.Errorf("%w | Stream Load 必须访问 Doris FE 的 HTTP 端口（默认 8030，环境变量 DORIS_PORT）；9030 为 MySQL 查询端口；8040 多为 BE 端口不可用。若在 Docker 内跑 new-api，DORIS_HOST 勿用 127.0.0.1 指向宿主机，应使用 compose 服务名或 host 网关", err)
+		}
+		return err
 	}
 	defer resp.Body.Close()
 
