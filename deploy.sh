@@ -261,14 +261,32 @@ YAML
 }
 
 do_doris_setup() {
-    info "初始化 Doris 表结构..."
+    if [ "$DORIS_ENABLED" != "true" ]; then
+        warn "Doris 未启用 (DORIS_ENABLED!=true)，跳过建表"
+        return
+    fi
+
+    if ! command -v mysql >/dev/null 2>&1; then
+        warn "未找到 mysql 客户端，跳过自动建表。"
+        warn "请安装 mysql 客户端后手动执行: DORIS_HOST=$DORIS_HOST bash scripts/doris-setup.sh"
+        return
+    fi
+
     local doris_query_port="${DORIS_QUERY_PORT:-9030}"
+    local doris_host="$DORIS_HOST"
+
+    # 如果 DORIS_HOST 是容器名（如 doris），尝试用 127.0.0.1 代替
+    if [[ "$doris_host" == "doris" ]]; then
+        doris_host="127.0.0.1"
+        info "检测到 DORIS_HOST=doris（容器名），建表使用 127.0.0.1:${doris_query_port}"
+    fi
+
+    info "初始化 Doris 表结构 (${doris_host}:${doris_query_port}) ..."
     local max_retries=30
     local retry=0
 
-    # 等待 Doris 就绪（最多 60 秒）
     while [ $retry -lt $max_retries ]; do
-        if mysql -h "$DORIS_HOST" -P "$doris_query_port" -u "$DORIS_USER" \
+        if mysql -h "$doris_host" -P "$doris_query_port" -u "$DORIS_USER" \
             ${DORIS_PASSWORD:+-p"$DORIS_PASSWORD"} --batch --skip-column-names \
             -e "SELECT 1" >/dev/null 2>&1; then
             break
@@ -279,11 +297,13 @@ do_doris_setup() {
     done
 
     if [ $retry -ge $max_retries ]; then
-        warn "Doris 未就绪，跳过建表。请稍后手动执行: DORIS_HOST=$DORIS_HOST bash scripts/doris-setup.sh"
+        warn "Doris 未就绪，跳过建表。请稍后手动执行:"
+        warn "  DORIS_HOST=$doris_host bash scripts/doris-setup.sh"
         return
     fi
 
-    DORIS_HOST="$DORIS_HOST" \
+    info "Doris 已就绪，执行建表脚本..."
+    DORIS_HOST="$doris_host" \
     DORIS_QUERY_PORT="$doris_query_port" \
     DORIS_USER="$DORIS_USER" \
     DORIS_PASSWORD="$DORIS_PASSWORD" \
