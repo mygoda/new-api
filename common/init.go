@@ -162,23 +162,27 @@ func dorisProcessLikelyInDocker() bool {
 	return err == nil
 }
 
-// applyDorisDockerLoopbackFix: in Docker, 127.0.0.1 is the container itself, not the host.
-// Use DORIS_DOCKER_SERVICE_NAME (e.g. doris) when set; optionally correct mistaken BE port 8040.
+// applyDorisDockerLoopbackFix fixes common Doris misconfigurations:
+// 1) DORIS_PORT=8040 (usually BE) is corrected to FE HTTP 8030.
+// 2) In Docker, loopback DORIS_HOST is replaced with a container-reachable service host.
 func applyDorisDockerLoopbackFix() {
-	if DorisHost == "" || !dorisHostIsLoopback(DorisHost) || !dorisProcessLikelyInDocker() {
+	if DorisHost == "" {
 		return
 	}
-	svc := strings.TrimSpace(os.Getenv("DORIS_DOCKER_SERVICE_NAME"))
-	if svc == "" {
-		SysLog("警告: Doris DORIS_HOST 为回环地址，在 Docker 容器内无法访问 Doris FE。请设置 DORIS_FE_HOST=doris（与 compose 服务名一致）或 DORIS_DOCKER_SERVICE_NAME=doris")
-		return
-	}
-	SysLog(fmt.Sprintf("Doris: 已将回环 DORIS_HOST=%q 替换为 DORIS_DOCKER_SERVICE_NAME=%q（容器间访问）", DorisHost, svc))
-	DorisHost = svc
 	if DorisPort == 8040 {
 		SysLog("Doris: DORIS_PORT=8040 多为 BE 端口，已改为 FE HTTP 8030")
 		DorisPort = 8030
 	}
+	if !dorisHostIsLoopback(DorisHost) || !dorisProcessLikelyInDocker() {
+		return
+	}
+	svc := strings.TrimSpace(os.Getenv("DORIS_DOCKER_SERVICE_NAME"))
+	if svc == "" {
+		svc = "doris"
+		SysLog("Doris: 检测到容器内 DORIS_HOST 为回环地址，未设置 DORIS_DOCKER_SERVICE_NAME，默认尝试服务名 doris")
+	}
+	SysLog(fmt.Sprintf("Doris: 已将回环 DORIS_HOST=%q 替换为 %q（容器间访问）", DorisHost, svc))
+	DorisHost = svc
 }
 
 func initConstantEnv() {

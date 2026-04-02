@@ -71,6 +71,46 @@ DORIS_USER="${DORIS_USER:-root}"
 DORIS_PASSWORD="${DORIS_PASSWORD:-}"
 DORIS_DATABASE="${DORIS_DATABASE:-new_api}"
 DORIS_TABLE="${DORIS_TABLE:-request_logs}"
+DORIS_FE_HOST="${DORIS_FE_HOST:-}"
+DORIS_DOCKER_SERVICE_NAME="${DORIS_DOCKER_SERVICE_NAME:-}"
+
+is_loopback_host() {
+    case "$1" in
+        127.0.0.1|localhost|::1)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+normalize_doris_config() {
+    if [ "$DORIS_ENABLED" != "true" ]; then
+        return
+    fi
+
+    if is_loopback_host "$DORIS_HOST"; then
+        warn "检测到 DORIS_HOST=${DORIS_HOST}（容器内回环地址不可达），已自动改为 compose 服务名 doris"
+        DORIS_HOST="doris"
+        if [ -z "$DORIS_FE_HOST" ] || is_loopback_host "$DORIS_FE_HOST"; then
+            DORIS_FE_HOST="doris"
+        fi
+    fi
+
+    if [ "$DORIS_PORT" = "8040" ]; then
+        warn "检测到 DORIS_PORT=8040（通常是 Doris BE 端口），已自动改为 FE HTTP 端口 8030"
+        DORIS_PORT="8030"
+    fi
+
+    if [ "$DORIS_HOST" = "doris" ]; then
+        DORIS_FE_HOST="${DORIS_FE_HOST:-doris}"
+        DORIS_DOCKER_SERVICE_NAME="${DORIS_DOCKER_SERVICE_NAME:-doris}"
+    fi
+}
+
+normalize_doris_config
+
 # 内嵌 doris 时映射到宿主机的 FE HTTP 左端口；未单独指定时沿用 DORIS_PORT（兼容旧用法）
 if [ -z "${DORIS_HTTP_PUBLISH_PORT:-}" ]; then
     if [ "$DORIS_HOST" = "doris" ]; then
@@ -167,10 +207,12 @@ generate_compose() {
         env_lines+="      - DORIS_PASSWORD=${DORIS_PASSWORD}\n"
         env_lines+="      - DORIS_DATABASE=${DORIS_DATABASE}\n"
         env_lines+="      - DORIS_TABLE=${DORIS_TABLE}\n"
-        # 强制容器内用 compose 服务名连 Doris（覆盖面板里误填的 127.0.0.1 / 8040）
-        if [ "$DORIS_HOST" = "doris" ]; then
-            env_lines+="      - DORIS_FE_HOST=doris\n"
-            env_lines+="      - DORIS_DOCKER_SERVICE_NAME=doris\n"
+        # 容器内 Doris 连通性纠偏变量：DORIS_FE_HOST 优先，DORIS_DOCKER_SERVICE_NAME 用于回环地址自动替换
+        if [ -n "$DORIS_FE_HOST" ]; then
+            env_lines+="      - DORIS_FE_HOST=${DORIS_FE_HOST}\n"
+        fi
+        if [ -n "$DORIS_DOCKER_SERVICE_NAME" ]; then
+            env_lines+="      - DORIS_DOCKER_SERVICE_NAME=${DORIS_DOCKER_SERVICE_NAME}\n"
         fi
     fi
 
@@ -413,6 +455,12 @@ do_run_standalone() {
             -e "DORIS_DATABASE=${DORIS_DATABASE}"
             -e "DORIS_TABLE=${DORIS_TABLE}"
         )
+        if [ -n "$DORIS_FE_HOST" ]; then
+            env_args+=(-e "DORIS_FE_HOST=${DORIS_FE_HOST}")
+        fi
+        if [ -n "$DORIS_DOCKER_SERVICE_NAME" ]; then
+            env_args+=(-e "DORIS_DOCKER_SERVICE_NAME=${DORIS_DOCKER_SERVICE_NAME}")
+        fi
     fi
 
     docker run -d \
