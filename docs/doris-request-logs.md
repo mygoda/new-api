@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     channel_id      INT             DEFAULT 0  COMMENT '渠道ID',
     channel_type    INT             DEFAULT 0  COMMENT '渠道类型',
     channel_name    VARCHAR(256)    DEFAULT '' COMMENT '渠道名称',
-    is_stream       BOOLEAN         DEFAULT FALSE COMMENT '是否流式请求',
+    is_stream       TINYINT         DEFAULT 0 COMMENT '是否流式(0否1是，Doris 不支持 BOOLEAN DEFAULT FALSE)',
     relay_mode      INT             DEFAULT 0  COMMENT '中继模式',
     request_path    VARCHAR(512)    DEFAULT '' COMMENT '请求路径',
     client_ip       VARCHAR(64)     DEFAULT '' COMMENT '客户端IP',
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     completion_ratio DOUBLE         DEFAULT 0  COMMENT '补全倍率',
     model_price     DOUBLE          DEFAULT 0  COMMENT '模型价格',
     use_time_ms     BIGINT          DEFAULT 0  COMMENT '请求耗时(毫秒)',
-    is_success      BOOLEAN         DEFAULT TRUE COMMENT '是否成功',
+    is_success      TINYINT         DEFAULT 1 COMMENT '是否成功(0否1是)',
     retry_count     INT             DEFAULT 0  COMMENT '重试次数',
     status_code     INT             DEFAULT 0  COMMENT 'HTTP状态码',
     error_type      VARCHAR(128)    DEFAULT '' COMMENT '错误类型',
@@ -78,6 +78,10 @@ PROPERTIES (
     "dynamic_partition.create_history_partition" = "true"
 );
 ```
+
+### 若建表报 `BOOLEAN` / `FALSE` 解析错误
+
+Apache Doris 的 OLAP 建表语法对 `BOOLEAN DEFAULT FALSE`、`DEFAULT TRUE` 不兼容，请使用 **`TINYINT` + `0`/`1`**（本仓库的 `scripts/doris-setup.sh` 已按此写法）。若曾用错误 DDL 建表失败，可先 `DROP TABLE IF EXISTS new_api.request_logs;` 再重新执行建表脚本。
 
 ### 从旧表结构升级（缺少列时执行）
 
