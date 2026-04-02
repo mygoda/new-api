@@ -19,11 +19,12 @@ var (
 func getDorisDB() (*sql.DB, error) {
 	var initErr error
 	dorisDBOnce.Do(func() {
+		endpoint := resolveDorisEndpoint()
 		// interpolateParams=true: 客户端拼接参数，避免 Doris FE 对 COM_STMT_PREPARE 仅支持点查的限制
 		// （否则 COUNT/分页等会报 errCode=2 Only support prepare SelectStmt point query now）
 		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=true&loc=UTC&interpolateParams=true",
 			common.DorisUser, common.DorisPassword,
-			common.DorisHost, common.DorisQueryPort,
+			endpoint.host, endpoint.queryPort,
 			common.DorisDatabase)
 		db, err := sql.Open("mysql", dsn)
 		if err != nil {
@@ -56,7 +57,7 @@ type DorisLogFilter struct {
 }
 
 type DorisLogQueryResult struct {
-	Total int                `json:"total"`
+	Total int               `json:"total"`
 	Items []DorisRequestLog `json:"items"`
 }
 

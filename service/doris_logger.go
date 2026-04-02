@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +14,41 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting"
 )
+
+// dorisRedirectPolicy handles Doris FE → BE 307 redirects for Stream Load.
+//
+// Doris FE picks a BE and returns a 307 redirect to it (typically port 8040).
+// In containerized deployments the redirect URL often uses the BE's internal
+// address (e.g. 127.0.0.1:8040) which is unreachable from outside the Doris
+// container. This policy rewrites the redirect host to the original FE host
+// while keeping the BE port, so the request reaches the same container via
+// the Docker service name.
+func dorisRedirectPolicy(req *http.Request, via []*http.Request) error {
+	if len(via) == 0 {
+		return nil
+	}
+	if len(via) >= 5 {
+		return fmt.Errorf("doris: too many redirects")
+	}
+	orig := via[0]
+
+	// Rewrite host when FE redirected to a different (often internal) host
+	origHost := orig.URL.Hostname()
+	if req.URL.Hostname() != origHost {
+		port := req.URL.Port()
+		if port != "" {
+			req.URL.Host = net.JoinHostPort(origHost, port)
+		} else {
+			req.URL.Host = origHost
+		}
+	}
+
+	// Go strips Authorization on cross-host redirects; re-apply it
+	if auth := orig.Header.Get("Authorization"); auth != "" {
+		req.Header.Set("Authorization", auth)
+	}
+	return nil
+}
 
 // DorisRequestLog represents a detailed API request log row for Doris.
 type DorisRequestLog struct {
@@ -65,11 +102,15 @@ func InitDorisLogger() {
 		return
 	}
 	dorisInitOnce.Do(func() {
+		endpoint := resolveDorisEndpoint()
 		dorisBuffer = make([]DorisRequestLog, 0, common.DorisFlushBatchSize*2)
 		dorisStopCh = make(chan struct{})
-		dorisHttpClient = &http.Client{Timeout: 30 * time.Second}
+		dorisHttpClient = &http.Client{
+			Timeout:       30 * time.Second,
+			CheckRedirect: dorisRedirectPolicy,
+		}
 		common.SysLog(fmt.Sprintf("Doris logger initialized: %s:%d/%s.%s (flush every %ds or %d rows)",
-			common.DorisHost, common.DorisPort, common.DorisDatabase, common.DorisTable,
+			endpoint.host, endpoint.httpPort, common.DorisDatabase, common.DorisTable,
 			common.DorisFlushInterval, common.DorisFlushBatchSize))
 		go dorisFlushLoop()
 	})
@@ -147,8 +188,10 @@ func marshalDorisJSON(batch []DorisRequestLog) ([]byte, error) {
 }
 
 func dorisStreamLoad(data []byte) error {
-	url := fmt.Sprintf("http://%s:%d/api/%s/%s/_stream_load",
-		common.DorisHost, common.DorisPort, common.DorisDatabase, common.DorisTable)
+	endpoint := resolveDorisEndpoint()
+	target := net.JoinHostPort(endpoint.host, strconv.Itoa(endpoint.httpPort))
+	url := fmt.Sprintf("http://%s/api/%s/%s/_stream_load",
+		target, common.DorisDatabase, common.DorisTable)
 
 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(data))
 	if err != nil {
