@@ -64,6 +64,7 @@ SESSION_SECRET="${SESSION_SECRET:-$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | 
 
 DORIS_ENABLED="${DORIS_ENABLED:-true}"
 DORIS_HOST="${DORIS_HOST:-doris}"
+DORIS_PORT_WAS_SET="${DORIS_PORT+x}"
 DORIS_PORT="${DORIS_PORT:-8030}"
 DORIS_QUERY_PORT="${DORIS_QUERY_PORT:-9030}"
 DORIS_PUBLISH_QUERY_PORT="${DORIS_PUBLISH_QUERY_PORT:-9030}"
@@ -85,10 +86,43 @@ is_loopback_host() {
     esac
 }
 
+sanitize_doris_host_and_port() {
+    local raw="$DORIS_HOST"
+    local host="$raw"
+    local parsed_port=""
+
+    host="${host#http://}"
+    host="${host#https://}"
+    host="${host%%/*}"
+
+    if [[ "$host" == *"@"* ]]; then
+        host="${host##*@}"
+        warn "检测到 DORIS_HOST 包含账号信息，已自动剥离为 ${host}（账号请使用 DORIS_USER/DORIS_PASSWORD）"
+    fi
+
+    if [[ "$host" =~ ^\[([^]]+)\]:([0-9]+)$ ]]; then
+        host="${BASH_REMATCH[1]}"
+        parsed_port="${BASH_REMATCH[2]}"
+    elif [[ "$host" =~ ^([^:]+):([0-9]+)$ ]]; then
+        host="${BASH_REMATCH[1]}"
+        parsed_port="${BASH_REMATCH[2]}"
+    elif [[ "$host" =~ ^\[([^]]+)\]$ ]]; then
+        host="${BASH_REMATCH[1]}"
+    fi
+
+    DORIS_HOST="$host"
+    if [ -n "$parsed_port" ] && [ -z "$DORIS_PORT_WAS_SET" ]; then
+        DORIS_PORT="$parsed_port"
+        info "从 DORIS_HOST 解析 Doris HTTP 端口为 ${DORIS_PORT}（未单独设置 DORIS_PORT）"
+    fi
+}
+
 normalize_doris_config() {
     if [ "$DORIS_ENABLED" != "true" ]; then
         return
     fi
+
+    sanitize_doris_host_and_port
 
     if is_loopback_host "$DORIS_HOST"; then
         warn "检测到 DORIS_HOST=${DORIS_HOST}（容器内回环地址不可达），已自动改为 compose 服务名 doris"

@@ -4,7 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -139,6 +141,7 @@ func InitEnv() {
 	DorisFlushInterval = GetEnvOrDefault("DORIS_FLUSH_INTERVAL", 5)
 	DorisFlushBatchSize = GetEnvOrDefault("DORIS_FLUSH_BATCH_SIZE", 100)
 
+	sanitizeDorisHostAndPort()
 	applyDorisDockerLoopbackFix()
 
 	DorisEnabled = DorisHost != ""
@@ -160,6 +163,48 @@ func dorisHostIsLoopback(host string) bool {
 func dorisProcessLikelyInDocker() bool {
 	_, err := os.Stat("/.dockerenv")
 	return err == nil
+}
+
+// sanitizeDorisHostAndPort normalizes DORIS_HOST and extracts optional ":port" from host input.
+// It tolerates accidental forms like:
+// - root:pwd@127.0.0.1
+// - root:pwd@127.0.0.1:8040
+// - http://root:pwd@127.0.0.1:8040
+func sanitizeDorisHostAndPort() {
+	raw := strings.TrimSpace(DorisHost)
+	if raw == "" {
+		return
+	}
+
+	normalized := raw
+	if strings.Contains(normalized, "://") {
+		if u, err := url.Parse(normalized); err == nil && u.Host != "" {
+			normalized = u.Host
+		}
+	}
+	if at := strings.LastIndex(normalized, "@"); at >= 0 {
+		normalized = normalized[at+1:]
+	}
+
+	host := normalized
+	if h, p, err := net.SplitHostPort(normalized); err == nil {
+		host = h
+		if os.Getenv("DORIS_PORT") == "" {
+			if parsedPort, convErr := strconv.Atoi(strings.TrimSpace(p)); convErr == nil && parsedPort > 0 {
+				DorisPort = parsedPort
+				SysLog(fmt.Sprintf("Doris: 从 DORIS_HOST 中解析端口 %d（未设置 DORIS_PORT）", DorisPort))
+			}
+		}
+	}
+
+	host = strings.Trim(strings.TrimSpace(host), "[]")
+	if host == "" {
+		return
+	}
+	if host != raw {
+		SysLog(fmt.Sprintf("Doris: 已规范化 DORIS_HOST=%q -> %q", raw, host))
+	}
+	DorisHost = host
 }
 
 // applyDorisDockerLoopbackFix fixes common Doris misconfigurations:
