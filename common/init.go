@@ -131,8 +131,16 @@ func InitEnv() {
 	DorisPassword = GetEnvOrDefaultString("DORIS_PASSWORD", "")
 	DorisDatabase = GetEnvOrDefaultString("DORIS_DATABASE", "new_api")
 	DorisTable = GetEnvOrDefaultString("DORIS_TABLE", "request_logs")
+	DorisQueryPort = GetEnvOrDefault("DORIS_QUERY_PORT", 9030)
 	DorisFlushInterval = GetEnvOrDefault("DORIS_FLUSH_INTERVAL", 5)
 	DorisFlushBatchSize = GetEnvOrDefault("DORIS_FLUSH_BATCH_SIZE", 100)
+	DorisBodyMaxRunes = GetEnvOrDefault("DORIS_BODY_MAX_RUNES", 65536)
+	if DorisBodyMaxRunes < 1024 {
+		DorisBodyMaxRunes = 1024
+	}
+	if DorisBodyMaxRunes > 500000 {
+		DorisBodyMaxRunes = 500000
+	}
 	DorisEnabled = DorisHost != ""
 
 	initConstantEnv()

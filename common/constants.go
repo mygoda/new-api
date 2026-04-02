@@ -131,8 +131,11 @@ var DorisUser = "root"
 var DorisPassword = ""
 var DorisDatabase = "new_api"
 var DorisTable = "request_logs"
+var DorisQueryPort = 9030 // MySQL protocol port for querying
 var DorisFlushInterval = 5   // seconds
 var DorisFlushBatchSize = 100
+// DorisBodyMaxRunes 写入 Doris 的请求体/响应内容按 Unicode 字符截断的最大长度（环境变量 DORIS_BODY_MAX_RUNES）
+var DorisBodyMaxRunes = 65536
 
 var RelayTimeout int // unit is second
 

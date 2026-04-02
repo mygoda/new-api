@@ -472,8 +472,10 @@ func emitDorisTextLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 		dorisLog.UpstreamModel = relayInfo.UpstreamModelName
 	}
 	dorisLog.ChannelName = ctx.GetString("channel_name")
+	dorisLog.TokenKey = relayInfo.TokenKey
 	if usage != nil {
 		dorisLog.CacheTokens = usage.PromptTokensDetails.CachedTokens
 	}
+	fillDorisBodyFields(ctx, &dorisLog)
 	RecordDorisLog(dorisLog)
 }

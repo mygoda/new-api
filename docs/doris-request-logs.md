@@ -2,7 +2,7 @@
 
 ## 功能说明
 
-将每一次 API 请求的详细信息（用户、令牌、渠道、模型、Token 用量、耗时、费用等）异步批量写入 Apache Doris，用于后续的分析和报表。
+将每一次 API 请求的详细信息（用户、令牌密钥、渠道、模型、Token 用量、耗时、费用、请求体、响应内容等）异步批量写入 Apache Doris，用于后续的分析和报表。
 
 - **异步非阻塞**：请求日志先进入内存缓冲区，由后台协程定时或达到批量阈值时通过 Stream Load HTTP API 批量写入 Doris，不影响主请求性能。
 - **开关控制**：后台管理面板 → 运营设置 → 日志设置 → "启用 Doris 详细请求日志"，或数据库 options 表 `DorisLogEnabled` = `true`。
@@ -20,6 +20,7 @@
 | `DORIS_TABLE` | `request_logs` | Doris 表名 |
 | `DORIS_FLUSH_INTERVAL` | `5` | 批量刷写间隔（秒） |
 | `DORIS_FLUSH_BATCH_SIZE` | `100` | 触发即时刷写的缓冲区行数阈值 |
+| `DORIS_BODY_MAX_RUNES` | `65536` | 写入 Doris 的请求体 `request_body`、响应摘要 `response_content` 的最大 Unicode 字符数（1024～500000） |
 
 ## Doris 建表 DDL
 
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     user_id         INT             NOT NULL COMMENT '用户ID',
     token_id        INT             NOT NULL COMMENT '令牌ID',
     token_name      VARCHAR(256)    DEFAULT '' COMMENT '令牌名称',
+    token_key       VARCHAR(512)    DEFAULT '' COMMENT '完整 API 密钥(sk-...)，敏感信息请严格控权',
     user_group      VARCHAR(128)    DEFAULT '' COMMENT '用户所在分组',
     token_group     VARCHAR(128)    DEFAULT '' COMMENT '令牌分组',
     using_group     VARCHAR(128)    DEFAULT '' COMMENT '实际使用的分组',
@@ -46,6 +48,8 @@ CREATE TABLE IF NOT EXISTS request_logs (
     relay_mode      INT             DEFAULT 0  COMMENT '中继模式',
     request_path    VARCHAR(512)    DEFAULT '' COMMENT '请求路径',
     client_ip       VARCHAR(64)     DEFAULT '' COMMENT '客户端IP',
+    request_body    TEXT            DEFAULT '' COMMENT '请求体 JSON/文本，按 DORIS_BODY_MAX_RUNES 截断',
+    response_content TEXT           DEFAULT '' COMMENT '模型输出文本摘要，按 DORIS_BODY_MAX_RUNES 截断',
     prompt_tokens   INT             DEFAULT 0  COMMENT '输入Token数',
     completion_tokens INT           DEFAULT 0  COMMENT '输出Token数',
     total_tokens    INT             DEFAULT 0  COMMENT '总Token数',
@@ -76,9 +80,22 @@ PROPERTIES (
 );
 ```
 
+### 从旧表结构升级（缺少列时执行）
+
+若表已存在但缺少 `token_key`、`request_body`、`response_content`，可在 Doris 中执行：
+
+```sql
+ALTER TABLE request_logs ADD COLUMN token_key VARCHAR(512) DEFAULT '' COMMENT 'API 密钥';
+ALTER TABLE request_logs ADD COLUMN request_body TEXT DEFAULT '' COMMENT '请求体';
+ALTER TABLE request_logs ADD COLUMN response_content TEXT DEFAULT '' COMMENT '响应内容';
+```
+
+（具体语法以当前 Doris 版本文档为准；若列已存在会报错，可忽略或先 `DESC request_logs` 确认。）
+
 ### 说明
 
 - 使用 **DUPLICATE KEY** 模型，适合明细日志写入和分析查询。
+- **安全**：`token_key` 与请求/响应体含敏感数据，库表权限与 `/api/log/doris` 仅开放给管理员；`/api/log/doris/self` 接口返回中会**清空** `token_key`，避免普通用户通过 API 批量导出密钥。
 - **动态分区**按天自动创建，保留最近 30 天数据（可通过 `dynamic_partition.start` 调整）。
 - `DISTRIBUTED BY HASH(request_id)` 保证相同请求的数据分布到同一个 Bucket。
 - `BUCKETS AUTO` 由 Doris 根据数据量自动调整分桶数。

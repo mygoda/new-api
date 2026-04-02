@@ -71,4 +71,6 @@ const (
 
 	// ContextKeyForceAnthropicAPI 当 OpenAI 协议请求的模型为 Claude 系列时，强制使用 Anthropic 适配器
 	ContextKeyForceAnthropicAPI ContextKey = "force_anthropic_api"
+
+	ContextKeyResponseContent ContextKey = "doris_response_content"
 )

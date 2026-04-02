@@ -1,9 +1,11 @@
 package service
 
 import (
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting"
@@ -60,6 +62,8 @@ func EmitDorisLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto
 	log.RetryCount = relayInfo.RetryIndex
 
 	log.StatusCode = ctx.Writer.Status()
+	log.TokenKey = relayInfo.TokenKey
+	fillDorisBodyFields(ctx, &log)
 
 	RecordDorisLog(log)
 }
@@ -102,11 +106,13 @@ func EmitDorisLogWithSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInfo,
 		log.UpstreamModel = relayInfo.UpstreamModelName
 	}
 	log.ChannelName = ctx.GetString("channel_name")
+	log.TokenKey = relayInfo.TokenKey
 	log.ModelRatio = relayInfo.PriceData.ModelRatio
 	log.GroupRatio = relayInfo.PriceData.GroupRatioInfo.GroupRatio
 	log.ModelPrice = relayInfo.PriceData.ModelPrice
 	log.UseTimeMs = time.Since(relayInfo.StartTime).Milliseconds()
 	log.RetryCount = relayInfo.RetryIndex
+	fillDorisBodyFields(ctx, &log)
 
 	RecordDorisLog(log)
 }
@@ -146,10 +152,28 @@ func EmitDorisErrorLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, statu
 		log.UpstreamModel = relayInfo.UpstreamModelName
 	}
 	log.ChannelName = ctx.GetString("channel_name")
+	log.TokenKey = relayInfo.TokenKey
 	log.UseTimeMs = time.Since(relayInfo.StartTime).Milliseconds()
 	log.RetryCount = relayInfo.RetryIndex
+	fillDorisBodyFields(ctx, &log)
 
 	RecordDorisLog(log)
+}
+
+// fillDorisBodyFields populates RequestBody and ResponseContent on a DorisRequestLog
+// from the Gin context. Called at the end of quota consumption hooks.
+func fillDorisBodyFields(ctx *gin.Context, log *DorisRequestLog) {
+	limit := common.DorisBodyMaxRunes
+	if storage, err := common.GetBodyStorage(ctx); err == nil {
+		if body, err := storage.Bytes(); err == nil && len(body) > 0 {
+			log.RequestBody = truncateString(string(body), limit)
+		}
+	}
+	if v, exists := common.GetContextKey(ctx, constant.ContextKeyResponseContent); exists {
+		if s, ok := v.(string); ok {
+			log.ResponseContent = truncateString(s, limit)
+		}
+	}
 }
 
 func truncateString(s string, maxLen int) string {
@@ -158,4 +182,29 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return string(runes[:maxLen])
+}
+
+// SetResponseContent stores the response text in the Gin context for Doris logging.
+func SetResponseContent(c *gin.Context, content string) {
+	if content == "" {
+		return
+	}
+	common.SetContextKey(c, constant.ContextKeyResponseContent, truncateString(content, common.DorisBodyMaxRunes))
+}
+
+// SetResponseContentFromChoices extracts text from OpenAI choices and stores it.
+func SetResponseContentFromChoices(c *gin.Context, choices []dto.OpenAITextResponseChoice) {
+	if len(choices) == 0 {
+		return
+	}
+	var sb strings.Builder
+	for _, choice := range choices {
+		content := choice.Message.StringContent()
+		if content != "" {
+			sb.WriteString(content)
+		}
+	}
+	if sb.Len() > 0 {
+		SetResponseContent(c, sb.String())
+	}
 }

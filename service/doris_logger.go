@@ -14,38 +14,41 @@ import (
 
 // DorisRequestLog represents a detailed API request log row for Doris.
 type DorisRequestLog struct {
-	RequestId        string `json:"request_id"`
-	UserId           int    `json:"user_id"`
-	TokenId          int    `json:"token_id"`
-	TokenName        string `json:"token_name"`
-	UserGroup        string `json:"user_group"`
-	TokenGroup       string `json:"token_group"`
-	UsingGroup       string `json:"using_group"`
-	ModelName        string `json:"model_name"`
-	UpstreamModel    string `json:"upstream_model"`
-	ChannelId        int    `json:"channel_id"`
-	ChannelType      int    `json:"channel_type"`
-	ChannelName      string `json:"channel_name"`
-	IsStream         bool   `json:"is_stream"`
-	RelayMode        int    `json:"relay_mode"`
-	RequestPath      string `json:"request_path"`
-	ClientIp         string `json:"client_ip"`
-	PromptTokens     int    `json:"prompt_tokens"`
-	CompletionTokens int    `json:"completion_tokens"`
-	TotalTokens      int    `json:"total_tokens"`
-	CacheTokens      int    `json:"cache_tokens"`
-	Quota            int    `json:"quota"`
+	RequestId        string  `json:"request_id"`
+	UserId           int     `json:"user_id"`
+	TokenId          int     `json:"token_id"`
+	TokenName        string  `json:"token_name"`
+	TokenKey         string  `json:"token_key"`
+	UserGroup        string  `json:"user_group"`
+	TokenGroup       string  `json:"token_group"`
+	UsingGroup       string  `json:"using_group"`
+	ModelName        string  `json:"model_name"`
+	UpstreamModel    string  `json:"upstream_model"`
+	ChannelId        int     `json:"channel_id"`
+	ChannelType      int     `json:"channel_type"`
+	ChannelName      string  `json:"channel_name"`
+	IsStream         bool    `json:"is_stream"`
+	RelayMode        int     `json:"relay_mode"`
+	RequestPath      string  `json:"request_path"`
+	ClientIp         string  `json:"client_ip"`
+	RequestBody      string  `json:"request_body"`
+	ResponseContent  string  `json:"response_content"`
+	PromptTokens     int     `json:"prompt_tokens"`
+	CompletionTokens int     `json:"completion_tokens"`
+	TotalTokens      int     `json:"total_tokens"`
+	CacheTokens      int     `json:"cache_tokens"`
+	Quota            int     `json:"quota"`
 	ModelRatio       float64 `json:"model_ratio"`
 	GroupRatio       float64 `json:"group_ratio"`
 	CompletionRatio  float64 `json:"completion_ratio"`
 	ModelPrice       float64 `json:"model_price"`
-	UseTimeMs        int64  `json:"use_time_ms"`
-	IsSuccess        bool   `json:"is_success"`
-	RetryCount       int    `json:"retry_count"`
-	StatusCode       int    `json:"status_code"`
-	ErrorType        string `json:"error_type,omitempty"`
-	ErrorMessage     string `json:"error_message,omitempty"`
-	CreatedAt        string `json:"created_at"`
+	UseTimeMs        int64   `json:"use_time_ms"`
+	IsSuccess        bool    `json:"is_success"`
+	RetryCount       int     `json:"retry_count"`
+	StatusCode       int     `json:"status_code"`
+	ErrorType        string  `json:"error_type,omitempty"`
+	ErrorMessage     string  `json:"error_message,omitempty"`
+	CreatedAt        string  `json:"created_at"`
 }
 
 var (

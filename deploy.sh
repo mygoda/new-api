@@ -7,7 +7,9 @@
 #   ./deploy.sh deploy       # 同上: 构建镜像 + 生成 compose + 部署
 #   ./deploy.sh build        # 仅构建镜像
 #   ./deploy.sh up           # 生成 compose 并启动 (使用已有镜像)
-#   ./deploy.sh down         # 停止并移除容器
+#   ./deploy.sh down         # 停止并移除 new-api 容器
+#   ./deploy.sh stop         # 暂停: 仅停止 new-api 容器（不删除，可 start 恢复）
+#   ./deploy.sh start        # 启动已存在的 new-api 容器（配合 stop 使用）
 #   ./deploy.sh restart      # 重新生成 compose 并重启 new-api 服务
 #   ./deploy.sh logs         # 查看实时日志
 #   ./deploy.sh status       # 查看服务状态
@@ -332,6 +334,30 @@ do_run_standalone() {
     info "容器已启动: $COMPOSE_PROJECT (镜像: ${IMAGE_NAME}:latest)"
 }
 
+do_stop() {
+    local compose_cmd
+    compose_cmd="$(get_compose_cmd)"
+
+    if [ -n "$compose_cmd" ] && [ -f "$(pwd)/docker-compose.deploy.yml" ]; then
+        $compose_cmd -f "$(pwd)/docker-compose.deploy.yml" -p "$COMPOSE_PROJECT" stop new-api
+    else
+        docker stop "$COMPOSE_PROJECT" 2>/dev/null || true
+    fi
+    info "new-api 已暂停（容器保留，使用 ./deploy.sh start 恢复）"
+}
+
+do_start() {
+    local compose_cmd
+    compose_cmd="$(get_compose_cmd)"
+
+    if [ -n "$compose_cmd" ] && [ -f "$(pwd)/docker-compose.deploy.yml" ]; then
+        $compose_cmd -f "$(pwd)/docker-compose.deploy.yml" -p "$COMPOSE_PROJECT" start new-api
+    else
+        docker start "$COMPOSE_PROJECT" 2>/dev/null || warn "未找到运行过的容器，请使用 ./deploy.sh up"
+    fi
+    info "new-api 已启动（若失败请先 ./deploy.sh up 完整部署）"
+}
+
 do_down() {
     local compose_cmd
     compose_cmd="$(get_compose_cmd)"
@@ -400,7 +426,9 @@ show_help() {
     echo "  deploy     构建镜像 + 生成 compose + 部署"
     echo "  build      仅构建 Docker 镜像"
     echo "  up         生成 compose 并启动 (使用已有镜像)"
-    echo "  down       停止服务"
+    echo "  down       停止并删除 new-api 容器"
+    echo "  stop       暂停 new-api（只 stop，不删容器；MySQL/Redis/Doris 等仍运行）"
+    echo "  start      启动已存在的 new-api 容器（与 stop 配对）"
     echo "  restart    重新生成 compose 并重启 new-api 服务"
     echo "  logs       查看实时日志"
     echo "  status     查看服务状态"
@@ -445,6 +473,12 @@ case "${1:-}" in
         ;;
     down)
         do_down
+        ;;
+    stop)
+        do_stop
+        ;;
+    start)
+        do_start
         ;;
     restart)
         do_restart

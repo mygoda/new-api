@@ -21,6 +21,9 @@ import (
 
 func ResponseText2Usage(c *gin.Context, responseText string, modeName string, promptTokens int) *dto.Usage {
 	common.SetContextKey(c, constant.ContextKeyLocalCountTokens, true)
+	if _, exists := common.GetContextKey(c, constant.ContextKeyResponseContent); !exists && responseText != "" {
+		common.SetContextKey(c, constant.ContextKeyResponseContent, truncateString(responseText, common.DorisBodyMaxRunes))
+	}
 	usage := &dto.Usage{}
 	usage.PromptTokens = promptTokens
 	usage.CompletionTokens = EstimateTokenByModel(modeName, responseText)

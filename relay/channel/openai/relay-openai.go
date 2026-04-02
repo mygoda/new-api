@@ -181,8 +181,12 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		logger.LogError(c, "error processing tokens: "+err.Error())
 	}
 
+	responseText := responseTextBuilder.String()
+	if responseText != "" {
+		service.SetResponseContent(c, responseText)
+	}
 	if !containStreamUsage {
-		usage = service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
+		usage = service.ResponseText2Usage(c, responseText, info.UpstreamModelName, info.GetEstimatePromptTokens())
 		usage.CompletionTokens += toolCount * 7
 	}
 
@@ -296,6 +300,8 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	}
 
 	service.IOCopyBytesGracefully(c, resp, responseBody)
+
+	service.SetResponseContentFromChoices(c, simpleResponse.Choices)
 
 	return &simpleResponse.Usage, nil
 }
