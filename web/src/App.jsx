@@ -289,9 +289,9 @@ function App() {
         <Route
           path='/console/request-logs'
           element={
-            <AdminRoute>
+            <PrivateRoute>
               <RequestLogs />
-            </AdminRoute>
+            </PrivateRoute>
           }
         />
         <Route

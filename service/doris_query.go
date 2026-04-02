@@ -19,7 +19,9 @@ var (
 func getDorisDB() (*sql.DB, error) {
 	var initErr error
 	dorisDBOnce.Do(func() {
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=true&loc=UTC",
+		// interpolateParams=true: 客户端拼接参数，避免 Doris FE 对 COM_STMT_PREPARE 仅支持点查的限制
+		// （否则 COUNT/分页等会报 errCode=2 Only support prepare SelectStmt point query now）
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=true&loc=UTC&interpolateParams=true",
 			common.DorisUser, common.DorisPassword,
 			common.DorisHost, common.DorisQueryPort,
 			common.DorisDatabase)
@@ -104,8 +106,12 @@ func QueryDorisLogs(filter DorisLogFilter, page, pageSize int) (*DorisLogQueryRe
 		args = append(args, filter.ClientIp)
 	}
 	if filter.IsSuccess != nil {
+		v := 0
+		if *filter.IsSuccess {
+			v = 1
+		}
 		conditions = append(conditions, "is_success = ?")
-		args = append(args, *filter.IsSuccess)
+		args = append(args, v)
 	}
 	if filter.StartTime != "" {
 		conditions = append(conditions, "created_at >= ?")

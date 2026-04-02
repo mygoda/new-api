@@ -36,6 +36,7 @@ export const DEFAULT_ADMIN_CONFIG = {
     detail: true,
     token: true,
     log: true,
+    request_logs: true,
     midjourney: true,
     task: true,
   },
@@ -71,6 +72,17 @@ export const mergeAdminConfig = (savedConfig) => {
     }
 
     merged[sectionKey] = { ...merged[sectionKey], ...sectionConfig };
+  }
+
+  // 合并后补齐默认里已有、但旧版保存的 JSON 未包含的模块键（例如 request_logs），默认按 DEFAULT 为开启
+  for (const sectionKey of Object.keys(DEFAULT_ADMIN_CONFIG)) {
+    const defSec = DEFAULT_ADMIN_CONFIG[sectionKey];
+    if (!merged[sectionKey] || typeof merged[sectionKey] !== 'object') continue;
+    for (const k of Object.keys(defSec)) {
+      if (merged[sectionKey][k] === undefined) {
+        merged[sectionKey][k] = defSec[k];
+      }
+    }
   }
 
   return merged;
@@ -122,7 +134,7 @@ export const useSidebar = () => {
         } else {
           config = res.data.data.sidebar_modules;
         }
-        setUserConfig(config);
+        setUserConfig(mergeAdminConfig(config));
       } else {
         // 当用户没有配置时，生成一个基于管理员配置的默认用户配置
         // 这样可以确保权限控制正确生效

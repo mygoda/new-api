@@ -160,6 +160,8 @@ func InitOptionMap() {
 	common.OptionMap["TokenRateLimitDefaultRPM"] = strconv.Itoa(setting.TokenRateLimitDefaultRPM)
 	common.OptionMap["TokenRateLimitDefaultTPM"] = strconv.Itoa(setting.TokenRateLimitDefaultTPM)
 	common.OptionMap["DorisLogEnabled"] = strconv.FormatBool(setting.DorisLogEnabled)
+	// 侧边栏管理员默认配置（含控制台「请求日志」默认开启）；若库中已有 SidebarModulesAdmin 会在 loadOptionsFromDatabase 中覆盖
+	common.OptionMap["SidebarModulesAdmin"] = `{"chat":{"enabled":true,"playground":true,"chat":true},"console":{"enabled":true,"detail":true,"token":true,"log":true,"request_logs":true,"midjourney":true,"task":true},"personal":{"enabled":true,"topup":true,"personal":true},"admin":{"enabled":true,"channel":true,"models":true,"deployment":true,"redemption":true,"user":true,"subscription":true,"setting":true}}`
 	common.OptionMap["CheckSensitiveOnPromptEnabled"] = strconv.FormatBool(setting.CheckSensitiveOnPromptEnabled)
 	common.OptionMap["StopOnSensitiveEnabled"] = strconv.FormatBool(setting.StopOnSensitiveEnabled)
 	common.OptionMap["SensitiveWords"] = setting.SensitiveWordsToString()

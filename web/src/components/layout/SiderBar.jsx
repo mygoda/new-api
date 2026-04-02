@@ -91,6 +91,11 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         to: '/log',
       },
       {
+        text: t('请求日志'),
+        itemKey: 'request_logs',
+        to: '/request_logs',
+      },
+      {
         text: t('绘图日志'),
         itemKey: 'midjourney',
         to: '/midjourney',
@@ -182,12 +187,6 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         text: t('用户管理'),
         itemKey: 'user',
         to: '/user',
-        className: isAdmin() ? '' : 'tableHiddle',
-      },
-      {
-        text: t('请求日志'),
-        itemKey: 'request_logs',
-        to: '/request_logs',
         className: isAdmin() ? '' : 'tableHiddle',
       },
       {

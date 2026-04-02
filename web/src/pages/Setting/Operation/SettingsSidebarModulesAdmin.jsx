@@ -30,6 +30,7 @@ import {
 } from '@douyinfe/semi-ui';
 import { API, showSuccess, showError } from '../../../helpers';
 import { StatusContext } from '../../../context/Status';
+import { mergeAdminConfig } from '../../../hooks/common/useSidebar';
 
 const { Text } = Typography;
 
@@ -50,6 +51,7 @@ export default function SettingsSidebarModulesAdmin(props) {
       detail: true,
       token: true,
       log: true,
+      request_logs: true,
       midjourney: true,
       task: true,
     },
@@ -111,6 +113,7 @@ export default function SettingsSidebarModulesAdmin(props) {
         detail: true,
         token: true,
         log: true,
+        request_logs: true,
         midjourney: true,
         task: true,
       },
@@ -174,7 +177,7 @@ export default function SettingsSidebarModulesAdmin(props) {
     if (props.options && props.options.SidebarModulesAdmin) {
       try {
         const modules = JSON.parse(props.options.SidebarModulesAdmin);
-        setSidebarModulesAdmin(modules);
+        setSidebarModulesAdmin(mergeAdminConfig(modules));
       } catch (error) {
         // 使用默认配置
         const defaultModules = {
@@ -184,6 +187,7 @@ export default function SettingsSidebarModulesAdmin(props) {
             detail: true,
             token: true,
             log: true,
+            request_logs: true,
             midjourney: true,
             task: true,
           },
@@ -227,6 +231,11 @@ export default function SettingsSidebarModulesAdmin(props) {
         { key: 'detail', title: t('数据看板'), description: t('系统数据统计') },
         { key: 'token', title: t('令牌管理'), description: t('API令牌管理') },
         { key: 'log', title: t('使用日志'), description: t('API使用记录') },
+        {
+          key: 'request_logs',
+          title: t('请求日志'),
+          description: t('Doris 详细请求与响应记录'),
+        },
         {
           key: 'midjourney',
           title: t('绘图日志'),
