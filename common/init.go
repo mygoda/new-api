@@ -125,7 +125,11 @@ func InitEnv() {
 	SearchRateLimitNum = GetEnvOrDefault("SEARCH_RATE_LIMIT", 10)
 	SearchRateLimitDuration = int64(GetEnvOrDefault("SEARCH_RATE_LIMIT_DURATION", 60))
 
-	DorisHost = GetEnvOrDefaultString("DORIS_HOST", "")
+	// Doris: DORIS_FE_HOST 优先（compose 内应填服务名如 doris，勿用 127.0.0.1）
+	DorisHost = strings.TrimSpace(GetEnvOrDefaultString("DORIS_HOST", ""))
+	if fe := strings.TrimSpace(os.Getenv("DORIS_FE_HOST")); fe != "" {
+		DorisHost = fe
+	}
 	DorisPort = GetEnvOrDefault("DORIS_PORT", 8030)
 	DorisUser = GetEnvOrDefaultString("DORIS_USER", "root")
 	DorisPassword = GetEnvOrDefaultString("DORIS_PASSWORD", "")
@@ -134,9 +138,47 @@ func InitEnv() {
 	DorisQueryPort = GetEnvOrDefault("DORIS_QUERY_PORT", 9030)
 	DorisFlushInterval = GetEnvOrDefault("DORIS_FLUSH_INTERVAL", 5)
 	DorisFlushBatchSize = GetEnvOrDefault("DORIS_FLUSH_BATCH_SIZE", 100)
+
+	applyDorisDockerLoopbackFix()
+
 	DorisEnabled = DorisHost != ""
 
 	initConstantEnv()
+}
+
+// dorisHostIsLoopback reports whether the host is a local loopback name unsuitable for
+// reaching another container's Doris FE from inside Docker.
+func dorisHostIsLoopback(host string) bool {
+	switch strings.ToLower(strings.TrimSpace(host)) {
+	case "127.0.0.1", "localhost", "::1":
+		return true
+	default:
+		return false
+	}
+}
+
+func dorisProcessLikelyInDocker() bool {
+	_, err := os.Stat("/.dockerenv")
+	return err == nil
+}
+
+// applyDorisDockerLoopbackFix: in Docker, 127.0.0.1 is the container itself, not the host.
+// Use DORIS_DOCKER_SERVICE_NAME (e.g. doris) when set; optionally correct mistaken BE port 8040.
+func applyDorisDockerLoopbackFix() {
+	if DorisHost == "" || !dorisHostIsLoopback(DorisHost) || !dorisProcessLikelyInDocker() {
+		return
+	}
+	svc := strings.TrimSpace(os.Getenv("DORIS_DOCKER_SERVICE_NAME"))
+	if svc == "" {
+		SysLog("警告: Doris DORIS_HOST 为回环地址，在 Docker 容器内无法访问 Doris FE。请设置 DORIS_FE_HOST=doris（与 compose 服务名一致）或 DORIS_DOCKER_SERVICE_NAME=doris")
+		return
+	}
+	SysLog(fmt.Sprintf("Doris: 已将回环 DORIS_HOST=%q 替换为 DORIS_DOCKER_SERVICE_NAME=%q（容器间访问）", DorisHost, svc))
+	DorisHost = svc
+	if DorisPort == 8040 {
+		SysLog("Doris: DORIS_PORT=8040 多为 BE 端口，已改为 FE HTTP 8030")
+		DorisPort = 8030
+	}
 }
 
 func initConstantEnv() {

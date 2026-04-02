@@ -28,6 +28,8 @@
 #   DORIS_HTTP_PUBLISH_PORT  内嵌 doris 时宿主机暴露的 FE HTTP 端口 (默认与 DORIS_PORT 相同，可单独设避免歧义)
 #   DORIS_PUBLISH_QUERY_PORT 内嵌 doris 时宿主机暴露的 MySQL 查询端口 (默认 9030，建表脚本从宿主机连 Doris 用)
 #   DORIS_QUERY_PORT new-api 查日志用的 MySQL 协议端口 (默认 9030)
+#   DORIS_FE_HOST   实际连接 Doris FE 的主机名（compose 内置时填 doris）；优先于 DORIS_HOST，避免误用 127.0.0.1
+#   DORIS_DOCKER_SERVICE_NAME 容器内 DORIS_HOST 为回环时自动改为此服务名（默认由 deploy 内置 doris 时注入为 doris）
 #   DORIS_USER    Doris 用户名 (默认: root)
 #   DORIS_PASSWORD Doris 密码 (默认: 空)
 #   DORIS_DATABASE Doris 数据库名 (默认: new_api)
@@ -165,6 +167,11 @@ generate_compose() {
         env_lines+="      - DORIS_PASSWORD=${DORIS_PASSWORD}\n"
         env_lines+="      - DORIS_DATABASE=${DORIS_DATABASE}\n"
         env_lines+="      - DORIS_TABLE=${DORIS_TABLE}\n"
+        # 强制容器内用 compose 服务名连 Doris（覆盖面板里误填的 127.0.0.1 / 8040）
+        if [ "$DORIS_HOST" = "doris" ]; then
+            env_lines+="      - DORIS_FE_HOST=doris\n"
+            env_lines+="      - DORIS_DOCKER_SERVICE_NAME=doris\n"
+        fi
     fi
 
     local depends_on=""
@@ -533,6 +540,7 @@ show_help() {
     echo "  DORIS_HTTP_PUBLISH_PORT= 内嵌时宿主机 HTTP 映射(可选，默认同 DORIS_PORT)"
     echo "  DORIS_PUBLISH_QUERY_PORT=9030 内嵌时宿主机 MySQL 查询端口映射"
     echo "  DORIS_QUERY_PORT=9030  new-api 查日志用的查询端口(外置时按实际 FE)"
+    echo "  DORIS_FE_HOST=doris   compose 内置 Doris 时由脚本注入，勿删；勿把 DORIS_HOST 改成 127.0.0.1"
     echo "  DORIS_USER=root    Doris 用户名"
     echo "  DORIS_PASSWORD=    Doris 密码"
     echo "  DORIS_DATABASE=new_api  Doris 数据库名"
