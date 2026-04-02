@@ -21,7 +21,7 @@
 #   DB_TYPE       数据库类型: postgres / mysql / sqlite (默认: sqlite)
 #   DB_DSN        自定义数据库 DSN (覆盖 DB_TYPE 的默认值)
 #   REDIS_URL     Redis 连接串 (默认: 不使用 Redis)
-#   DORIS_ENABLED 是否启用 Doris 详细请求日志: true / false (默认: false)
+#   DORIS_ENABLED 是否启用 Doris 详细请求日志: true / false (默认: true)
 #   DORIS_HOST    Doris FE 地址 (启用 Doris 时必填, 默认: doris)
 #   DORIS_PORT    Doris FE HTTP 端口 (默认: 8030)
 #   DORIS_USER    Doris 用户名 (默认: root)
@@ -260,6 +260,38 @@ YAML
     info "生成 docker-compose.deploy.yml -> $(pwd)/docker-compose.deploy.yml"
 }
 
+do_doris_setup() {
+    info "初始化 Doris 表结构..."
+    local doris_query_port="${DORIS_QUERY_PORT:-9030}"
+    local max_retries=30
+    local retry=0
+
+    # 等待 Doris 就绪（最多 60 秒）
+    while [ $retry -lt $max_retries ]; do
+        if mysql -h "$DORIS_HOST" -P "$doris_query_port" -u "$DORIS_USER" \
+            ${DORIS_PASSWORD:+-p"$DORIS_PASSWORD"} --batch --skip-column-names \
+            -e "SELECT 1" >/dev/null 2>&1; then
+            break
+        fi
+        retry=$((retry + 1))
+        warn "等待 Doris 就绪... ($retry/$max_retries)"
+        sleep 2
+    done
+
+    if [ $retry -ge $max_retries ]; then
+        warn "Doris 未就绪，跳过建表。请稍后手动执行: DORIS_HOST=$DORIS_HOST bash scripts/doris-setup.sh"
+        return
+    fi
+
+    DORIS_HOST="$DORIS_HOST" \
+    DORIS_QUERY_PORT="$doris_query_port" \
+    DORIS_USER="$DORIS_USER" \
+    DORIS_PASSWORD="$DORIS_PASSWORD" \
+    DORIS_DATABASE="$DORIS_DATABASE" \
+    DORIS_TABLE="$DORIS_TABLE" \
+    bash "$SCRIPT_DIR/scripts/doris-setup.sh"
+}
+
 do_up() {
     mkdir -p "$DATA_DIR" "$LOG_DIR"
 
@@ -273,6 +305,11 @@ do_up() {
     else
         info "未检测到 Docker Compose，使用 docker run 启动..."
         do_run_standalone
+    fi
+
+    # 启用 Doris 时自动执行建表脚本
+    if [ "$DORIS_ENABLED" = "true" ]; then
+        do_doris_setup
     fi
 
     echo ""
@@ -430,6 +467,7 @@ show_help() {
     echo "  stop       暂停 new-api（只 stop，不删容器；MySQL/Redis/Doris 等仍运行）"
     echo "  start      启动已存在的 new-api 容器（与 stop 配对）"
     echo "  restart    重新生成 compose 并重启 new-api 服务"
+    echo "  doris-setup 手动执行 Doris 建表/升级脚本"
     echo "  logs       查看实时日志"
     echo "  status     查看服务状态"
     echo "  help       显示此帮助"
@@ -439,7 +477,7 @@ show_help() {
     echo "  DB_TYPE=sqlite     数据库: postgres / mysql / sqlite"
     echo "  DB_DSN=...         自定义数据库 DSN (覆盖 DB_TYPE)"
     echo "  REDIS_URL=...      Redis 连接串"
-    echo "  DORIS_ENABLED=false 是否启用 Doris 详细请求日志"
+    echo "  DORIS_ENABLED=true  是否启用 Doris 详细请求日志"
     echo "  DORIS_HOST=doris   Doris FE 地址 (doris=自动启动容器)"
     echo "  DORIS_PORT=8030    Doris FE HTTP 端口"
     echo "  DORIS_USER=root    Doris 用户名"
@@ -454,8 +492,8 @@ show_help() {
     echo "  PORT=8080 ./deploy.sh                            # SQLite, 端口 8080"
     echo "  DB_TYPE=postgres ./deploy.sh                     # PostgreSQL + 自动启动 PG 容器"
     echo "  DB_DSN='postgres://u:p@host/db' ./deploy.sh up   # 自定义外部数据库"
-    echo "  DORIS_ENABLED=true ./deploy.sh                   # 启用 Doris + 自动启动容器"
-    echo "  DORIS_ENABLED=true DORIS_HOST=10.0.0.1 ./deploy.sh  # 使用外部 Doris"
+    echo "  DORIS_ENABLED=false ./deploy.sh                  # 禁用 Doris"
+    echo "  DORIS_HOST=10.0.0.1 ./deploy.sh                  # 使用外部 Doris"
 }
 
 # ─── 入口 ───
@@ -482,6 +520,9 @@ case "${1:-}" in
         ;;
     restart)
         do_restart
+        ;;
+    doris-setup)
+        do_doris_setup
         ;;
     logs)
         do_logs

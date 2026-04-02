@@ -20,7 +20,7 @@ var TokenRateLimitEnabled = false
 var TokenRateLimitDefaultRPM = 0
 var TokenRateLimitDefaultTPM = 0
 
-var DorisLogEnabled = false
+var DorisLogEnabled = true
 
 func ModelRequestRateLimitGroup2JSONString() string {
 	ModelRequestRateLimitMutex.RLock()
