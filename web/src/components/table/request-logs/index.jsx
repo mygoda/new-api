@@ -22,7 +22,7 @@ const RequestLogsPage = () => {
         style={{ maxHeight: '80vh' }}
         bodyStyle={{ maxHeight: '60vh', overflow: 'auto' }}
       >
-        <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>
+        <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13, fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace', lineHeight: 1.6, margin: 0, padding: 12, backgroundColor: 'var(--semi-color-fill-0)', borderRadius: 8 }}>
           {logsData.detailModalContent}
         </pre>
       </Modal>

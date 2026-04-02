@@ -154,7 +154,15 @@ export const useRequestLogsData = () => {
 
   const showDetail = (title, content) => {
     setDetailModalTitle(title);
-    setDetailModalContent(content);
+    let formatted = content;
+    if (typeof content === 'string' && content.trim()) {
+      try {
+        formatted = JSON.stringify(JSON.parse(content), null, 2);
+      } catch {
+        // not valid JSON, show as-is
+      }
+    }
+    setDetailModalContent(formatted);
     setDetailModalVisible(true);
   };
 
