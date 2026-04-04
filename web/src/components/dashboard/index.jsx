@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { getRelativeTime } from '../../helpers';
 import { UserContext } from '../../context/User';
 import { StatusContext } from '../../context/Status';
@@ -25,6 +25,7 @@ import { StatusContext } from '../../context/Status';
 import DashboardHeader from './DashboardHeader';
 import StatsCards from './StatsCards';
 import ChartsPanel from './ChartsPanel';
+import ChannelAnalysisPanel from './ChannelAnalysisPanel';
 import ApiInfoPanel from './ApiInfoPanel';
 import AnnouncementsPanel from './AnnouncementsPanel';
 import FaqPanel from './FaqPanel';
@@ -34,6 +35,7 @@ import SearchModal from './modals/SearchModal';
 import { useDashboardData } from '../../hooks/dashboard/useDashboardData';
 import { useDashboardStats } from '../../hooks/dashboard/useDashboardStats';
 import { useDashboardCharts } from '../../hooks/dashboard/useDashboardCharts';
+import { useChannelAnalysis } from '../../hooks/dashboard/useChannelAnalysis';
 
 import {
   CHART_CONFIG,
@@ -84,6 +86,14 @@ const Dashboard = () => {
     dashboardData.navigate,
     dashboardData.t,
   );
+
+  // ========== 渠道/模型分析 ==========
+  const channelAnalysis = useChannelAnalysis(
+    dashboardData.isAdminUser,
+    dashboardData.inputs,
+    dashboardData.dataExportDefaultTime,
+  );
+  const [activeChannelTab, setActiveChannelTab] = useState('1');
 
   // ========== 数据处理 ==========
   const initChart = async () => {
@@ -136,7 +146,22 @@ const Dashboard = () => {
   // ========== Effects ==========
   useEffect(() => {
     initChart();
+    // 加载渠道/模型统计数据
+    if (dashboardData.isAdminUser) {
+      channelAnalysis.loadChannelStats();
+    } else {
+      channelAnalysis.loadModelPerformanceStats();
+    }
   }, []);
+
+  // 当时间范围变化时重新加载渠道统计数据
+  useEffect(() => {
+    if (dashboardData.isAdminUser) {
+      channelAnalysis.loadChannelStats();
+    } else {
+      channelAnalysis.loadModelPerformanceStats();
+    }
+  }, [dashboardData.inputs.start_timestamp, dashboardData.inputs.end_timestamp]);
 
   return (
     <div className='h-full'>
@@ -262,6 +287,29 @@ const Dashboard = () => {
               />
             )}
           </div>
+        </div>
+      )}
+
+      {/* 渠道/模型分析面板 */}
+      {(dashboardData.isAdminUser || channelAnalysis.modelPerformanceStats.length > 0) && (
+        <div className='mb-4'>
+          <ChannelAnalysisPanel
+            channelStats={channelAnalysis.channelStats}
+            modelPerformanceStats={channelAnalysis.modelPerformanceStats}
+            loading={channelAnalysis.loading}
+            latencyChartSpec={channelAnalysis.latencyChartSpec}
+            latencyPercentileChartSpec={channelAnalysis.latencyPercentileChartSpec}
+            errorRateChartSpec={channelAnalysis.errorRateChartSpec}
+            healthScoreChartSpec={channelAnalysis.healthScoreChartSpec}
+            qpsChartSpec={channelAnalysis.qpsChartSpec}
+            isAdminUser={dashboardData.isAdminUser}
+            activeTab={activeChannelTab}
+            setActiveTab={setActiveChannelTab}
+            CARD_PROPS={CARD_PROPS}
+            CHART_CONFIG={CHART_CONFIG}
+            FLEX_CENTER_GAP2={FLEX_CENTER_GAP2}
+            t={dashboardData.t}
+          />
         </div>
       )}
     </div>

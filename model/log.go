@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -454,6 +455,465 @@ func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	}
 	tx.Where("type = ?", LogTypeConsume).Scan(&token)
 	return token
+}
+
+// ChannelStats represents aggregated performance metrics per channel
+type ChannelStats struct {
+	ChannelId           int                     `json:"channel_id"`
+	ChannelName         string                  `json:"channel_name" gorm:"-"`
+	TotalRequests       int64                   `json:"total_requests"`
+	ErrorRequests      int64                   `json:"error_requests"`
+	ErrorRate           float64                 `json:"error_rate" gorm:"-"`
+	AvgLatency          float64                 `json:"avg_latency"`
+	MaxLatency          float64                 `json:"max_latency"`
+	MinLatency          float64                 `json:"min_latency"`
+	LatencyP50          float64                 `json:"latency_p50"`
+	LatencyP90          float64                 `json:"latency_p90"`
+	LatencyP95          float64                 `json:"latency_p95"`
+	StreamRequestCount  int64                   `json:"stream_request_count"`
+	StreamRatio         float64                 `json:"stream_ratio" gorm:"-"`
+	AvgTokensPerRequest float64                 `json:"avg_tokens_per_request" gorm:"-"`
+	TotalQuota          int64                   `json:"total_quota"`
+	TotalTokens         int64                   `json:"total_tokens"`
+	QPS                 float64                 `json:"qps" gorm:"-"`
+	TPM                 float64                 `json:"tpm" gorm:"-"`
+	Availability        float64                 `json:"availability" gorm:"-"`
+	HealthScore         float64                 `json:"health_score" gorm:"-"`
+	ErrorBreakdown      map[string]int64        `json:"error_breakdown" gorm:"-"`
+	ConsecutiveFailures int64                   `json:"consecutive_failures"`
+	IsHealthy           bool                    `json:"is_healthy" gorm:"-"`
+}
+
+// ModelPerformanceStats represents aggregated performance metrics per model for a user
+type ModelPerformanceStats struct {
+	ModelName           string  `json:"model_name"`
+	TotalRequests       int64   `json:"total_requests"`
+	ErrorRequests       int64   `json:"error_requests"`
+	ErrorRate           float64 `json:"error_rate" gorm:"-"`
+	AvgLatency          float64 `json:"avg_latency"`
+	MaxLatency          float64 `json:"max_latency"`
+	MinLatency          float64 `json:"min_latency"`
+	LatencyP50          float64 `json:"latency_p50"`
+	LatencyP90          float64 `json:"latency_p90"`
+	LatencyP95          float64 `json:"latency_p95"`
+	StreamRequestCount  int64   `json:"stream_request_count"`
+	StreamRatio         float64 `json:"stream_ratio" gorm:"-"`
+	AvgTokensPerRequest float64 `json:"avg_tokens_per_request" gorm:"-"`
+	TotalTokens         int64   `json:"total_tokens"`
+}
+
+// 错误类型分类常量
+const (
+	ErrorTypeTimeout        = "timeout"
+	ErrorTypeRateLimit      = "rate_limit"
+	ErrorTypeAuth           = "auth"
+	ErrorTypeQuota          = "quota"
+	ErrorTypeServerError     = "server_error"
+	ErrorTypeChannelUnavail = "channel_unavailable"
+	ErrorTypeInvalidParam    = "invalid_param"
+	ErrorTypeNetwork        = "network"
+	ErrorTypeUnknown        = "unknown"
+)
+
+// classifyError 根据错误内容分类错误类型
+func classifyError(content string) string {
+	contentLower := strings.ToLower(content)
+	switch {
+	case strings.Contains(contentLower, "timeout") ||
+		strings.Contains(contentLower, "timed out") ||
+		strings.Contains(contentLower, "deadline exceeded"):
+		return ErrorTypeTimeout
+	case strings.Contains(contentLower, "rate limit") ||
+		strings.Contains(contentLower, "rate_limit") ||
+		strings.Contains(contentLower, "too many request") ||
+		strings.Contains(contentLower, "quota exceed"):
+		return ErrorTypeRateLimit
+	case strings.Contains(contentLower, "auth") ||
+		strings.Contains(contentLower, "unauthorized") ||
+		strings.Contains(contentLower, "invalid api key") ||
+		strings.Contains(contentLower, "permission"):
+		return ErrorTypeAuth
+	case strings.Contains(contentLower, "quota") ||
+		strings.Contains(contentLower, "balance") ||
+		strings.Contains(contentLower, "insufficient"):
+		return ErrorTypeQuota
+	case strings.Contains(contentLower, "internal server error") ||
+		strings.Contains(contentLower, "500") ||
+		strings.Contains(contentLower, "502") ||
+		strings.Contains(contentLower, "503") ||
+		strings.Contains(contentLower, "server error"):
+		return ErrorTypeServerError
+	case strings.Contains(contentLower, "channel") &&
+		(strings.Contains(contentLower, "unavailable") ||
+			strings.Contains(contentLower, "not found") ||
+			strings.Contains(contentLower, "not available")):
+		return ErrorTypeChannelUnavail
+	case strings.Contains(contentLower, "invalid") ||
+		strings.Contains(contentLower, "parameter") ||
+		strings.Contains(contentLower, "bad request") ||
+		strings.Contains(contentLower, "validation"):
+		return ErrorTypeInvalidParam
+	case strings.Contains(contentLower, "network") ||
+		strings.Contains(contentLower, "connection") ||
+		strings.Contains(contentLower, "eof") ||
+		strings.Contains(contentLower, "refused"):
+		return ErrorTypeNetwork
+	default:
+		return ErrorTypeUnknown
+	}
+}
+
+func streamRequestSumExpr() string {
+	if common.UsingPostgreSQL {
+		return "SUM(CASE WHEN is_stream IS TRUE THEN 1 ELSE 0 END) as stream_request_count"
+	}
+	return "SUM(CASE WHEN is_stream <> 0 THEN 1 ELSE 0 END) as stream_request_count"
+}
+
+// percentileExpr 返回分位数表达式，兼容 PostgreSQL/MySQL/SQLite
+// percentile: 0.5 表示 P50, 0.9 表示 P90, 0.95 表示 P95
+func percentileExpr(percentile float64) string {
+	if common.UsingPostgreSQL {
+		return fmt.Sprintf("PERCENTILE_CONT(%g) WITHIN GROUP (ORDER BY use_time)", percentile)
+	}
+	if common.UsingMySQL {
+		return fmt.Sprintf("PERCENTILE_CONT(%g) WITHIN GROUP (ORDER BY use_time)", percentile)
+	}
+	// SQLite: 使用近似方法，通过 ROW_NUMBER 计算
+	return fmt.Sprintf("CAST((SELECT use_time FROM (SELECT use_time, ROW_NUMBER() OVER (ORDER BY use_time) as rn, COUNT(*) OVER () as total_cnt FROM logs WHERE type = %d AND channel_id > 0 AND use_time > 0) WHERE rn = CAST(total_cnt * %g AS INTEGER)) AS REAL)", LogTypeConsume, percentile)
+}
+
+// percentileExprForModel 返回模型分位数表达式
+func percentileExprForModel(percentile float64) string {
+	if common.UsingPostgreSQL {
+		return fmt.Sprintf("PERCENTILE_CONT(%g) WITHIN GROUP (ORDER BY use_time)", percentile)
+	}
+	if common.UsingMySQL {
+		return fmt.Sprintf("PERCENTILE_CONT(%g) WITHIN GROUP (ORDER BY use_time)", percentile)
+	}
+	return fmt.Sprintf("CAST((SELECT use_time FROM (SELECT use_time, ROW_NUMBER() OVER (ORDER BY use_time) as rn, COUNT(*) OVER () as total_cnt FROM logs WHERE type = %d AND user_id = %%d AND use_time > 0) WHERE rn = CAST(total_cnt * %g AS INTEGER)) AS REAL)", LogTypeConsume, percentile)
+}
+
+func GetChannelStats(startTimestamp int64, endTimestamp int64) ([]ChannelStats, error) {
+	streamSum := streamRequestSumExpr()
+
+	// PostgreSQL/MySQL 支持 PERCENTILE_CONT，SQLite 需要后处理
+	var selectConsume string
+	if common.UsingSQLite {
+		selectConsume = fmt.Sprintf(
+			"channel_id, COUNT(*) as total_requests, AVG(use_time) as avg_latency, MAX(use_time) as max_latency, MIN(NULLIF(use_time, 0)) as min_latency, SUM(quota) as total_quota, SUM(COALESCE(prompt_tokens,0) + COALESCE(completion_tokens,0)) as total_tokens, %s",
+			streamSum,
+		)
+	} else {
+		// PostgreSQL/MySQL: 直接在 SQL 中计算分位数
+		selectConsume = fmt.Sprintf(
+			"channel_id, COUNT(*) as total_requests, AVG(use_time) as avg_latency, MAX(use_time) as max_latency, MIN(NULLIF(use_time, 0)) as min_latency, SUM(quota) as total_quota, SUM(COALESCE(prompt_tokens,0) + COALESCE(completion_tokens,0)) as total_tokens, %s, %s as latency_p50, %s as latency_p90, %s as latency_p95",
+			streamSum,
+			percentileExpr(0.5),
+			percentileExpr(0.9),
+			percentileExpr(0.95),
+		)
+	}
+
+	var consumeStats []ChannelStats
+	consumeQuery := LOG_DB.Table("logs").
+		Select(selectConsume).
+		Where("type = ? AND channel_id > 0", LogTypeConsume)
+	if startTimestamp != 0 {
+		consumeQuery = consumeQuery.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		consumeQuery = consumeQuery.Where("created_at <= ?", endTimestamp)
+	}
+	if err := consumeQuery.Group("channel_id").Find(&consumeStats).Error; err != nil {
+		return nil, err
+	}
+
+	// SQLite 分位数后处理
+	if common.UsingSQLite {
+		for i := range consumeStats {
+			latencies := []float64{}
+			var latencyVals []float64
+			latencyQuery := LOG_DB.Table("logs").
+				Select("use_time").
+				Where("type = ? AND channel_id = ? AND use_time > 0", LogTypeConsume, consumeStats[i].ChannelId)
+			if startTimestamp != 0 {
+				latencyQuery = latencyQuery.Where("created_at >= ?", startTimestamp)
+			}
+			if endTimestamp != 0 {
+				latencyQuery = latencyQuery.Where("created_at <= ?", endTimestamp)
+			}
+			if err := latencyQuery.Order("use_time").Find(&latencyVals).Error; err == nil && len(latencyVals) > 0 {
+				consumeStats[i].LatencyP50 = percentileCalculate(latencyVals, 0.5)
+				consumeStats[i].LatencyP90 = percentileCalculate(latencyVals, 0.9)
+				consumeStats[i].LatencyP95 = percentileCalculate(latencyVals, 0.95)
+				_ = latencies // silence
+			}
+		}
+	}
+
+	type errorCount struct {
+		ChannelId     int   `json:"channel_id"`
+		ErrorRequests int64 `json:"error_requests"`
+	}
+	var errorStats []errorCount
+	errorQuery := LOG_DB.Table("logs").
+		Select("channel_id, COUNT(*) as error_requests").
+		Where("type = ? AND channel_id > 0", LogTypeError)
+	if startTimestamp != 0 {
+		errorQuery = errorQuery.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		errorQuery = errorQuery.Where("created_at <= ?", endTimestamp)
+	}
+	if err := errorQuery.Group("channel_id").Find(&errorStats).Error; err != nil {
+		return nil, err
+	}
+
+	errorMap := make(map[int]int64, len(errorStats))
+	for _, e := range errorStats {
+		errorMap[e.ChannelId] = e.ErrorRequests
+	}
+
+	// 获取错误日志详情用于错误类型分类
+	type errorLogContent struct {
+		ChannelId int
+		Content   string
+		CreatedAt int64
+	}
+	var errorLogs []errorLogContent
+	errorLogsQuery := LOG_DB.Table("logs").
+		Select("channel_id, content, created_at").
+		Where("type = ? AND channel_id > 0", LogTypeError)
+	if startTimestamp != 0 {
+		errorLogsQuery = errorLogsQuery.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		errorLogsQuery = errorLogsQuery.Where("created_at <= ?", endTimestamp)
+	}
+	if err := errorLogsQuery.Order("created_at desc").Find(&errorLogs).Error; err != nil {
+		// 如果出错，继续处理不影响主流程
+	}
+
+	// 按渠道分组错误日志，并统计错误类型
+	errorBreakdownMap := make(map[int]map[string]int64)
+	consecutiveFailuresMap := make(map[int]int64)
+	for _, log := range errorLogs {
+		if _, ok := errorBreakdownMap[log.ChannelId]; !ok {
+			errorBreakdownMap[log.ChannelId] = make(map[string]int64)
+		}
+		errorType := classifyError(log.Content)
+		errorBreakdownMap[log.ChannelId][errorType]++
+	}
+
+	// 计算连续失败次数（从最新的错误日志往前数）
+	for channelId := range errorBreakdownMap {
+		var consecutiveCount int64
+		for _, log := range errorLogs {
+			if log.ChannelId != channelId {
+				continue
+			}
+			consecutiveCount++
+		}
+		consecutiveFailuresMap[channelId] = consecutiveCount
+	}
+
+	// 计算时间范围（秒），用于 QPS/TPM 计算
+	timeRange := endTimestamp - startTimestamp
+	if timeRange <= 0 {
+		timeRange = 86400 // 默认 24 小时
+	}
+
+	seenConsume := make(map[int]struct{}, len(consumeStats))
+	for i := range consumeStats {
+		seenConsume[consumeStats[i].ChannelId] = struct{}{}
+		if errCount, ok := errorMap[consumeStats[i].ChannelId]; ok {
+			consumeStats[i].ErrorRequests = errCount
+		}
+		total := consumeStats[i].TotalRequests + consumeStats[i].ErrorRequests
+		if total > 0 {
+			consumeStats[i].ErrorRate = float64(consumeStats[i].ErrorRequests) / float64(total)
+		}
+		if consumeStats[i].TotalRequests > 0 {
+			consumeStats[i].AvgTokensPerRequest = float64(consumeStats[i].TotalTokens) / float64(consumeStats[i].TotalRequests)
+			consumeStats[i].StreamRatio = float64(consumeStats[i].StreamRequestCount) / float64(consumeStats[i].TotalRequests)
+			// QPS = 总请求数 / 时间范围秒数
+			consumeStats[i].QPS = float64(consumeStats[i].TotalRequests) / float64(timeRange)
+			// TPM = 总 Token 数 / 时间范围分钟数
+			consumeStats[i].TPM = float64(consumeStats[i].TotalTokens) / (float64(timeRange) / 60.0)
+		}
+		// 可用率 = 1 - 错误率
+		consumeStats[i].Availability = 1 - consumeStats[i].ErrorRate
+		// 健康度评分 = 可用率(30%) * 100 + 延迟得分(40%) + 错误率得分(30%)
+		// 延迟得分：假设 1s 以内为满分，线性递减
+		latencyScore := 1.0
+		if consumeStats[i].AvgLatency > 0 {
+			latencyScore = 1.0 / (1.0 + consumeStats[i].AvgLatency/2.0)
+		}
+		errorScore := 1.0 - consumeStats[i].ErrorRate
+		consumeStats[i].HealthScore = consumeStats[i].Availability*100*0.3 + latencyScore*100*0.4 + errorScore*100*0.3
+		// 添加错误类型分布
+		if breakdown, ok := errorBreakdownMap[consumeStats[i].ChannelId]; ok {
+			consumeStats[i].ErrorBreakdown = breakdown
+		}
+		// 添加连续失败次数
+		if cf, ok := consecutiveFailuresMap[consumeStats[i].ChannelId]; ok {
+			consumeStats[i].ConsecutiveFailures = cf
+		}
+		// 标记是否健康：健康度 >= 70 且错误率 < 10%
+		consumeStats[i].IsHealthy = consumeStats[i].HealthScore >= 70 && consumeStats[i].ErrorRate < 0.1
+	}
+
+	// 仅有错误、无成功消费记录的渠道也要展示，便于 MaaS 运维发现「全失败」渠道
+	for _, e := range errorStats {
+		if _, ok := seenConsume[e.ChannelId]; ok {
+			continue
+		}
+		newChannel := ChannelStats{
+			ChannelId:     e.ChannelId,
+			ErrorRequests: e.ErrorRequests,
+			ErrorRate:     1,
+			Availability:  0,
+			HealthScore:   0,
+			IsHealthy:     false,
+		}
+		if breakdown, ok := errorBreakdownMap[e.ChannelId]; ok {
+			newChannel.ErrorBreakdown = breakdown
+		}
+		if cf, ok := consecutiveFailuresMap[e.ChannelId]; ok {
+			newChannel.ConsecutiveFailures = cf
+		}
+		consumeStats = append(consumeStats, newChannel)
+	}
+
+	channelIds := types.NewSet[int]()
+	for i := range consumeStats {
+		channelIds.Add(consumeStats[i].ChannelId)
+	}
+	if channelIds.Len() > 0 {
+		var channels []struct {
+			Id   int    `gorm:"column:id"`
+			Name string `gorm:"column:name"`
+		}
+		if common.MemoryCacheEnabled {
+			for _, channelId := range channelIds.Items() {
+				if cacheChannel, err := CacheGetChannel(channelId); err == nil {
+					channels = append(channels, struct {
+						Id   int    `gorm:"column:id"`
+						Name string `gorm:"column:name"`
+					}{
+						Id:   channelId,
+						Name: cacheChannel.Name,
+					})
+				}
+			}
+		} else {
+			if err := DB.Table("channels").Select("id, name").Where("id IN ?", channelIds.Items()).Find(&channels).Error; err != nil {
+				return consumeStats, nil
+			}
+		}
+		channelMap := make(map[int]string, len(channels))
+		for _, ch := range channels {
+			channelMap[ch.Id] = ch.Name
+		}
+		for i := range consumeStats {
+			consumeStats[i].ChannelName = channelMap[consumeStats[i].ChannelId]
+		}
+	}
+
+	return consumeStats, nil
+}
+
+// percentileCalculate 从已排序的数值切片中计算分位数
+func percentileCalculate(sortedVals []float64, percentile float64) float64 {
+	if len(sortedVals) == 0 {
+		return 0
+	}
+	idx := percentile * float64(len(sortedVals)-1)
+	lower := int(idx)
+	upper := lower + 1
+	if upper >= len(sortedVals) {
+		return sortedVals[len(sortedVals)-1]
+	}
+	frac := idx - float64(lower)
+	return sortedVals[lower]*(1-frac) + sortedVals[upper]*frac
+}
+
+func GetModelPerformanceStats(userId int, startTimestamp int64, endTimestamp int64) ([]ModelPerformanceStats, error) {
+	streamSum := streamRequestSumExpr()
+	selectConsume := fmt.Sprintf(
+		"model_name, COUNT(*) as total_requests, AVG(use_time) as avg_latency, MAX(use_time) as max_latency, MIN(NULLIF(use_time, 0)) as min_latency, SUM(COALESCE(prompt_tokens,0) + COALESCE(completion_tokens,0)) as total_tokens, %s",
+		streamSum,
+	)
+
+	var consumeStats []ModelPerformanceStats
+	consumeQuery := LOG_DB.Table("logs").
+		Select(selectConsume).
+		Where("type = ? AND user_id = ?", LogTypeConsume, userId)
+	if startTimestamp != 0 {
+		consumeQuery = consumeQuery.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		consumeQuery = consumeQuery.Where("created_at <= ?", endTimestamp)
+	}
+	if err := consumeQuery.Group("model_name").Find(&consumeStats).Error; err != nil {
+		return nil, err
+	}
+
+	type errorCount struct {
+		ModelName     string `json:"model_name"`
+		ErrorRequests int64  `json:"error_requests"`
+	}
+	var errorStats []errorCount
+	errorQuery := LOG_DB.Table("logs").
+		Select("model_name, COUNT(*) as error_requests").
+		Where("type = ? AND user_id = ?", LogTypeError, userId)
+	if startTimestamp != 0 {
+		errorQuery = errorQuery.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		errorQuery = errorQuery.Where("created_at <= ?", endTimestamp)
+	}
+	if err := errorQuery.Group("model_name").Find(&errorStats).Error; err != nil {
+		return nil, err
+	}
+
+	errorMap := make(map[string]int64, len(errorStats))
+	for _, e := range errorStats {
+		errorMap[e.ModelName] = e.ErrorRequests
+	}
+
+	seenModel := make(map[string]struct{}, len(consumeStats))
+	for i := range consumeStats {
+		seenModel[consumeStats[i].ModelName] = struct{}{}
+		if errCount, ok := errorMap[consumeStats[i].ModelName]; ok {
+			consumeStats[i].ErrorRequests = errCount
+		}
+		total := consumeStats[i].TotalRequests + consumeStats[i].ErrorRequests
+		if total > 0 {
+			consumeStats[i].ErrorRate = float64(consumeStats[i].ErrorRequests) / float64(total)
+		}
+		if consumeStats[i].TotalRequests > 0 {
+			consumeStats[i].AvgTokensPerRequest = float64(consumeStats[i].TotalTokens) / float64(consumeStats[i].TotalRequests)
+			consumeStats[i].StreamRatio = float64(consumeStats[i].StreamRequestCount) / float64(consumeStats[i].TotalRequests)
+		}
+	}
+
+	for _, e := range errorStats {
+		if e.ModelName == "" {
+			continue
+		}
+		if _, ok := seenModel[e.ModelName]; ok {
+			continue
+		}
+		consumeStats = append(consumeStats, ModelPerformanceStats{
+			ModelName:     e.ModelName,
+			ErrorRequests: e.ErrorRequests,
+			ErrorRate:     1,
+		})
+	}
+
+	return consumeStats, nil
 }
 
 func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {
