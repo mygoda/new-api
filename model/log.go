@@ -572,15 +572,13 @@ func streamRequestSumExpr() string {
 
 // percentileExpr 返回分位数表达式，兼容 PostgreSQL/MySQL/SQLite
 // percentile: 0.5 表示 P50, 0.9 表示 P90, 0.95 表示 P95
+// 注意：MySQL 8.0.28+ 才支持 PERCENTILE_CONT，因此统一使用 Go 后处理方式计算分位数
 func percentileExpr(percentile float64) string {
 	if common.UsingPostgreSQL {
 		return fmt.Sprintf("PERCENTILE_CONT(%g) WITHIN GROUP (ORDER BY use_time)", percentile)
 	}
-	if common.UsingMySQL {
-		return fmt.Sprintf("PERCENTILE_CONT(%g) WITHIN GROUP (ORDER BY use_time)", percentile)
-	}
-	// SQLite: 使用近似方法，通过 ROW_NUMBER 计算
-	return fmt.Sprintf("CAST((SELECT use_time FROM (SELECT use_time, ROW_NUMBER() OVER (ORDER BY use_time) as rn, COUNT(*) OVER () as total_cnt FROM logs WHERE type = %d AND channel_id > 0 AND use_time > 0) WHERE rn = CAST(total_cnt * %g AS INTEGER)) AS REAL)", LogTypeConsume, percentile)
+	// MySQL 和 SQLite: 分位数通过 Go 后处理计算（见 GetChannelStats 函数中的 SQLite 处理逻辑）
+	return "NULL"
 }
 
 // percentileExprForModel 返回模型分位数表达式
@@ -588,10 +586,7 @@ func percentileExprForModel(percentile float64) string {
 	if common.UsingPostgreSQL {
 		return fmt.Sprintf("PERCENTILE_CONT(%g) WITHIN GROUP (ORDER BY use_time)", percentile)
 	}
-	if common.UsingMySQL {
-		return fmt.Sprintf("PERCENTILE_CONT(%g) WITHIN GROUP (ORDER BY use_time)", percentile)
-	}
-	return fmt.Sprintf("CAST((SELECT use_time FROM (SELECT use_time, ROW_NUMBER() OVER (ORDER BY use_time) as rn, COUNT(*) OVER () as total_cnt FROM logs WHERE type = %d AND user_id = %%d AND use_time > 0) WHERE rn = CAST(total_cnt * %g AS INTEGER)) AS REAL)", LogTypeConsume, percentile)
+	return "NULL"
 }
 
 func GetChannelStats(startTimestamp int64, endTimestamp int64) ([]ChannelStats, error) {
@@ -629,10 +624,9 @@ func GetChannelStats(startTimestamp int64, endTimestamp int64) ([]ChannelStats, 
 		return nil, err
 	}
 
-	// SQLite 分位数后处理
-	if common.UsingSQLite {
+	// PostgreSQL 直接用 SQL 计算分位数，MySQL/SQLite 通过 Go 后处理计算
+	if !common.UsingPostgreSQL {
 		for i := range consumeStats {
-			latencies := []float64{}
 			var latencyVals []float64
 			latencyQuery := LOG_DB.Table("logs").
 				Select("use_time").
@@ -647,7 +641,6 @@ func GetChannelStats(startTimestamp int64, endTimestamp int64) ([]ChannelStats, 
 				consumeStats[i].LatencyP50 = percentileCalculate(latencyVals, 0.5)
 				consumeStats[i].LatencyP90 = percentileCalculate(latencyVals, 0.9)
 				consumeStats[i].LatencyP95 = percentileCalculate(latencyVals, 0.95)
-				_ = latencies // silence
 			}
 		}
 	}
