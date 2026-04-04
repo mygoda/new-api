@@ -146,22 +146,16 @@ const Dashboard = () => {
   // ========== Effects ==========
   useEffect(() => {
     initChart();
-    // 加载渠道/模型统计数据
-    if (dashboardData.isAdminUser) {
-      channelAnalysis.loadChannelStats();
-    } else {
-      channelAnalysis.loadModelPerformanceStats();
-    }
   }, []);
 
-  // 当时间范围变化时重新加载渠道统计数据
+  // 加载渠道/模型统计数据（依赖 channelAnalysis 对象，当 inputs 变化时会重新创建）
   useEffect(() => {
     if (dashboardData.isAdminUser) {
       channelAnalysis.loadChannelStats();
     } else {
       channelAnalysis.loadModelPerformanceStats();
     }
-  }, [dashboardData.inputs.start_timestamp, dashboardData.inputs.end_timestamp]);
+  }, [channelAnalysis]);
 
   return (
     <div className='h-full'>
