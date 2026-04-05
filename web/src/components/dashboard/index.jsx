@@ -306,6 +306,7 @@ const Dashboard = () => {
             isAdminUser={dashboardData.isAdminUser}
             activeTab={activeChannelTab}
             setActiveTab={setActiveChannelTab}
+            inputs={dashboardData.inputs}
             CARD_PROPS={CARD_PROPS}
             CHART_CONFIG={CHART_CONFIG}
             FLEX_CENTER_GAP2={FLEX_CENTER_GAP2}

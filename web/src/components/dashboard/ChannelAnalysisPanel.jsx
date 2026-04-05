@@ -17,7 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Tabs, TabPane, Table, Tag, Empty, Tooltip, AutoComplete } from '@douyinfe/semi-ui';
 import { BarChart3 } from 'lucide-react';
 import { VChart } from '@visactor/react-vchart';
@@ -50,12 +51,29 @@ const ChannelAnalysisPanel = ({
   isAdminUser,
   activeTab,
   setActiveTab,
+  inputs,
   CARD_PROPS,
   CHART_CONFIG,
   FLEX_CENTER_GAP2,
   t,
 }) => {
+  const navigate = useNavigate();
   const data = isAdminUser ? channelStats : modelPerformanceStats;
+
+  // Build URL to navigate to error logs with pre-populated filters
+  const buildLogUrl = useCallback((channelId, modelName, errorsOnly = true) => {
+    const params = new URLSearchParams();
+    if (channelId) params.set('channel', channelId);
+    if (modelName) params.set('model_name', modelName);
+    if (errorsOnly) params.set('type', '5');
+    if (inputs) {
+      const startTs = Math.floor(Date.parse(inputs.start_timestamp) / 1000);
+      const endTs = Math.floor(Date.parse(inputs.end_timestamp) / 1000);
+      if (startTs) params.set('start_timestamp', startTs);
+      if (endTs) params.set('end_timestamp', endTs);
+    }
+    return `/console/log?${params.toString()}`;
+  }, [inputs]);
 
   const getErrorRateColor = (rate) => {
     if (rate > 0.1) return 'red';
@@ -76,7 +94,14 @@ const ChannelAnalysisPanel = ({
       title: t('渠道名称'),
       dataIndex: 'channel_name',
       sorter: (a, b) => (a.channel_name || '').localeCompare(b.channel_name || ''),
-      render: (text, record) => text || `ID:${record.channel_id}`,
+      render: (text, record) => (
+        <a
+          className='cursor-pointer text-blue-600 hover:underline'
+          onClick={() => navigate(buildLogUrl(record.channel_id, '', false))}
+        >
+          {text || `ID:${record.channel_id}`}
+        </a>
+      ),
     },
     {
       title: t('健康度'),
@@ -116,7 +141,18 @@ const ChannelAnalysisPanel = ({
       title: t('错误次数'),
       dataIndex: 'error_requests',
       sorter: (a, b) => a.error_requests - b.error_requests,
-      render: (text) => (text || 0).toLocaleString(),
+      render: (text, record) => {
+        const count = text || 0;
+        if (count === 0) return '0';
+        return (
+          <a
+            className='cursor-pointer text-red-600 hover:underline'
+            onClick={() => navigate(buildLogUrl(record.channel_id, ''))}
+          >
+            {count.toLocaleString()}
+          </a>
+        );
+      },
     },
     {
       title: t('错误率'),
@@ -295,7 +331,14 @@ const ChannelAnalysisPanel = ({
       title: t('渠道'),
       dataIndex: 'channel_name',
       sorter: (a, b) => (a.channel_name || '').localeCompare(b.channel_name || ''),
-      render: (text, record) => text || `ID:${record.channel_id}`,
+      render: (text, record) => (
+        <a
+          className='cursor-pointer text-blue-600 hover:underline'
+          onClick={() => navigate(buildLogUrl(record.channel_id, record.model_name, false))}
+        >
+          {text || `ID:${record.channel_id}`}
+        </a>
+      ),
     },
     {
       title: t('请求次数'),
@@ -307,7 +350,18 @@ const ChannelAnalysisPanel = ({
       title: t('错误次数'),
       dataIndex: 'error_requests',
       sorter: (a, b) => a.error_requests - b.error_requests,
-      render: (text) => (text || 0).toLocaleString(),
+      render: (text, record) => {
+        const count = text || 0;
+        if (count === 0) return '0';
+        return (
+          <a
+            className='cursor-pointer text-red-600 hover:underline'
+            onClick={() => navigate(buildLogUrl(record.channel_id, record.model_name))}
+          >
+            {count.toLocaleString()}
+          </a>
+        );
+      },
     },
     {
       title: t('错误率'),

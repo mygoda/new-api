@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@douyinfe/semi-ui';
 import {
@@ -43,6 +44,7 @@ import ParamOverrideEntry from '../../components/table/usage-logs/components/Par
 
 export const useLogsData = () => {
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Define column keys for selection
   const COLUMN_KEYS = {
@@ -92,18 +94,32 @@ export const useLogsData = () => {
   // Form state
   const [formApi, setFormApi] = useState(null);
   let now = new Date();
+
+  // Read URL search params for pre-filtering (e.g., from dashboard drill-down)
+  const urlChannel = searchParams.get('channel') || '';
+  const urlModelName = searchParams.get('model_name') || '';
+  const urlLogType = searchParams.get('type') || '0';
+  const urlStartTs = searchParams.get('start_timestamp') || '';
+  const urlEndTs = searchParams.get('end_timestamp') || '';
+
+  const defaultDateRange = [
+    timestamp2string(getTodayStartTimestamp()),
+    timestamp2string(now.getTime() / 1000 + 3600),
+  ];
+  // If URL provides timestamps, use them for the date range
+  const dateRange = urlStartTs && urlEndTs
+    ? [timestamp2string(Number(urlStartTs)), timestamp2string(Number(urlEndTs))]
+    : defaultDateRange;
+
   const formInitValues = {
     username: '',
     token_name: '',
-    model_name: '',
-    channel: '',
+    model_name: urlModelName,
+    channel: urlChannel,
     group: '',
     request_id: '',
-    dateRange: [
-      timestamp2string(getTodayStartTimestamp()),
-      timestamp2string(now.getTime() / 1000 + 3600),
-    ],
-    logType: '0',
+    dateRange,
+    logType: urlLogType,
   };
 
   // Get default column visibility based on user role
