@@ -891,6 +891,12 @@ func ClaudeStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.
 	}
 
 	HandleStreamFinalResponse(c, info, claudeInfo)
+
+	// Store response text for Doris logging
+	if responseText := claudeInfo.ResponseText.String(); responseText != "" {
+		service.SetResponseContent(c, responseText)
+	}
+
 	return claudeInfo.Usage, nil
 }
 
