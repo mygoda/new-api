@@ -146,5 +146,10 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 
 	usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 
+	// Store response text for Doris logging
+	if responseText := responseTextBuilder.String(); responseText != "" {
+		service.SetResponseContent(c, responseText)
+	}
+
 	return usage, nil
 }
