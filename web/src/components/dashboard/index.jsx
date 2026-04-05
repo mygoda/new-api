@@ -148,7 +148,7 @@ const Dashboard = () => {
     initChart();
   }, []);
 
-  // 加载渠道/模型统计数据（依赖 channelAnalysis 对象，当 inputs 变化时会重新创建）
+  // 加载渠道/模型统计数据（依赖具体的加载函数，避免整个对象引用变化导致无限循环）
   useEffect(() => {
     if (dashboardData.isAdminUser) {
       channelAnalysis.loadChannelStats();
@@ -156,7 +156,7 @@ const Dashboard = () => {
     } else {
       channelAnalysis.loadModelPerformanceStats();
     }
-  }, [channelAnalysis]);
+  }, [channelAnalysis.loadChannelStats, channelAnalysis.loadModelPerformanceStats, channelAnalysis.loadModelChannelCrossStats]);
 
   return (
     <div className='h-full'>
