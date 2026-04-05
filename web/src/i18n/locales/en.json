@@ -3385,6 +3385,22 @@
     "模型或渠道名": "Model or channel name",
     "渠道ID": "Channel ID",
     "关键词": "Keyword",
-    "搜索": "Search"
+    "搜索": "Search",
+    "配置说明": "Config Guide",
+    "收起说明": "Hide Guide",
+    "路由选择规则": "Routing Rules",
+    "系统根据请求的分组和模型，查找所有匹配的可用渠道记录": "The system finds all available channel records matching the requested group and model",
+    "按优先级从高到低分层，优先使用高优先级的渠道": "Channels are layered by priority from high to low; higher priority channels are preferred",
+    "同一优先级内，按权重随机分配流量（权重越高，被选中概率越大）": "Within the same priority level, traffic is randomly distributed by weight (higher weight = higher selection probability)",
+    "当前优先级的渠道全部失败后，自动降级到下一优先级": "When all channels in the current priority level fail, the system automatically falls back to the next priority level",
+    "配置示例": "Configuration Example",
+    "首选，约70%流量": "Primary, ~70% traffic",
+    "首选，约30%流量": "Primary, ~30% traffic",
+    "A和B都失败后的备用渠道": "Fallback channel after A and B both fail",
+    "注意事项": "Notes",
+    "优先级数值越大越优先（如 10 > 5 > 0）": "Higher priority value means higher priority (e.g. 10 > 5 > 0)",
+    "权重为 0 的渠道仍会被选中，系统会自动补偿最低权重": "Channels with weight 0 can still be selected; the system auto-compensates with minimum weight",
+    "此处修改仅影响当前模型在该渠道的配比，不影响其他模型": "Changes here only affect this model's routing on this channel, not other models",
+    "通过渠道管理修改渠道默认优先级/权重时，仅对新增的记录生效，不会覆盖此处的独立配置": "Changing default priority/weight via channel management only applies to new records, not overriding independent configs here"
   }
 }

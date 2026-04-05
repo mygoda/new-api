@@ -11,10 +11,15 @@ import {
   Tag,
   Spin,
   AutoComplete,
+  Collapsible,
+  Typography,
+  Descriptions,
 } from '@douyinfe/semi-ui';
-import { IconSearch, IconRefresh } from '@douyinfe/semi-icons';
+import { IconSearch, IconRefresh, IconHelpCircle } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { API } from '../../helpers/api';
+
+const { Text } = Typography;
 
 const AbilityPage = () => {
   const { t } = useTranslation();
@@ -23,6 +28,7 @@ const AbilityPage = () => {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [showGuide, setShowGuide] = useState(false);
 
   // filters
   const [filterModel, setFilterModel] = useState('');
@@ -219,9 +225,90 @@ const AbilityPage = () => {
   return (
     <div className='mt-[60px] px-2'>
       <Card
-        title={t('模型渠道配置')}
+        title={
+          <div className='flex items-center gap-2'>
+            {t('模型渠道配置')}
+            <Button
+              size='small'
+              type='tertiary'
+              icon={<IconHelpCircle />}
+              onClick={() => setShowGuide(!showGuide)}
+            >
+              {showGuide ? t('收起说明') : t('配置说明')}
+            </Button>
+          </div>
+        }
         bordered={false}
       >
+        <Collapsible isOpen={showGuide}>
+          <div className='mb-4 p-4 rounded-lg bg-[var(--semi-color-fill-0)] border border-[var(--semi-color-border)]'>
+            <Typography.Title heading={6} className='!mb-3'>{t('路由选择规则')}</Typography.Title>
+            <div className='space-y-2 text-sm text-[var(--semi-color-text-1)]'>
+              <div className='flex items-start gap-2'>
+                <Tag color='blue' size='small' className='shrink-0 !mt-0.5'>1</Tag>
+                <span>{t('系统根据请求的分组和模型，查找所有匹配的可用渠道记录')}</span>
+              </div>
+              <div className='flex items-start gap-2'>
+                <Tag color='blue' size='small' className='shrink-0 !mt-0.5'>2</Tag>
+                <span>{t('按优先级从高到低分层，优先使用高优先级的渠道')}</span>
+              </div>
+              <div className='flex items-start gap-2'>
+                <Tag color='blue' size='small' className='shrink-0 !mt-0.5'>3</Tag>
+                <span>{t('同一优先级内，按权重随机分配流量（权重越高，被选中概率越大）')}</span>
+              </div>
+              <div className='flex items-start gap-2'>
+                <Tag color='blue' size='small' className='shrink-0 !mt-0.5'>4</Tag>
+                <span>{t('当前优先级的渠道全部失败后，自动降级到下一优先级')}</span>
+              </div>
+            </div>
+
+            <Typography.Title heading={6} className='!mt-4 !mb-3'>{t('配置示例')}</Typography.Title>
+            <div className='overflow-x-auto'>
+              <table className='text-sm w-full border-collapse'>
+                <thead>
+                  <tr className='bg-[var(--semi-color-fill-1)]'>
+                    <th className='px-3 py-1.5 text-left border border-[var(--semi-color-border)]'>{t('模型')}</th>
+                    <th className='px-3 py-1.5 text-left border border-[var(--semi-color-border)]'>{t('渠道')}</th>
+                    <th className='px-3 py-1.5 text-left border border-[var(--semi-color-border)]'>{t('优先级')}</th>
+                    <th className='px-3 py-1.5 text-left border border-[var(--semi-color-border)]'>{t('权重')}</th>
+                    <th className='px-3 py-1.5 text-left border border-[var(--semi-color-border)]'>{t('效果')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'>gpt-4</td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'>{t('渠道')} A</td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'><Tag size='small' color='blue'>10</Tag></td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'><Tag size='small'>70</Tag></td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'>{t('首选，约70%流量')}</td>
+                  </tr>
+                  <tr>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'>gpt-4</td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'>{t('渠道')} B</td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'><Tag size='small' color='blue'>10</Tag></td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'><Tag size='small'>30</Tag></td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'>{t('首选，约30%流量')}</td>
+                  </tr>
+                  <tr>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'>gpt-4</td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'>{t('渠道')} C</td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'><Tag size='small' color='orange'>5</Tag></td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'><Tag size='small'>100</Tag></td>
+                    <td className='px-3 py-1.5 border border-[var(--semi-color-border)]'>{t('A和B都失败后的备用渠道')}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <Typography.Title heading={6} className='!mt-4 !mb-2'>{t('注意事项')}</Typography.Title>
+            <ul className='text-sm text-[var(--semi-color-text-2)] list-disc pl-5 space-y-1'>
+              <li>{t('优先级数值越大越优先（如 10 > 5 > 0）')}</li>
+              <li>{t('权重为 0 的渠道仍会被选中，系统会自动补偿最低权重')}</li>
+              <li>{t('此处修改仅影响当前模型在该渠道的配比，不影响其他模型')}</li>
+              <li>{t('通过渠道管理修改渠道默认优先级/权重时，仅对新增的记录生效，不会覆盖此处的独立配置')}</li>
+            </ul>
+          </div>
+        </Collapsible>
         <div className='mb-4 flex flex-wrap gap-2 items-end'>
           <div>
             <div className='text-xs text-gray-500 mb-1'>{t('模型')}</div>
