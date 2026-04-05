@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 
 	"github.com/gin-gonic/gin"
@@ -58,4 +59,9 @@ func IOCopyBytesGracefully(c *gin.Context, src *http.Response, data []byte) {
 		logger.LogError(c, fmt.Sprintf("failed to copy response body: %s", err.Error()))
 	}
 	c.Writer.Flush()
+
+	// Fallback: store response body for Doris logging if not already captured
+	if _, exists := common.GetContextKey(c, constant.ContextKeyResponseContent); !exists && len(data) > 0 {
+		SetResponseContent(c, string(data))
+	}
 }
