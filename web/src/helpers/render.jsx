@@ -76,6 +76,7 @@ import {
   Server,
   CalendarClock,
   ScrollText,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   SiAtlassian,
@@ -137,6 +138,8 @@ export function getLucideIcon(key, selected = false) {
       return <CreditCard {...commonProps} color={iconColor} />;
     case 'channel':
       return <Layers {...commonProps} color={iconColor} />;
+    case 'ability':
+      return <SlidersHorizontal {...commonProps} color={iconColor} />;
     case 'redemption':
       return <Gift {...commonProps} color={iconColor} />;
     case 'user':

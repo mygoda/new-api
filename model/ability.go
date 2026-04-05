@@ -28,6 +28,11 @@ type AbilityWithChannel struct {
 	ChannelType int `json:"channel_type"`
 }
 
+type AbilityListItem struct {
+	Ability
+	ChannelName string `json:"channel_name"`
+}
+
 func GetAllEnableAbilityWithChannels() ([]AbilityWithChannel, error) {
 	var abilities []AbilityWithChannel
 	err := DB.Table("abilities").
@@ -280,6 +285,74 @@ func UpdateAbilityByTag(tag string, newTag *string, priority *int64, weight *uin
 		ability.Weight = *weight
 	}
 	return DB.Model(&Ability{}).Where("tag = ?", tag).Updates(ability).Error
+}
+
+func GetAbilityList(modelName, group string, channelId int, keyword string, page, pageSize int) ([]AbilityListItem, int64, error) {
+	var items []AbilityListItem
+	var total int64
+
+	query := DB.Table("abilities").
+		Select("abilities.*, channels.name as channel_name").
+		Joins("LEFT JOIN channels ON abilities.channel_id = channels.id")
+
+	if modelName != "" {
+		query = query.Where("abilities.model = ?", modelName)
+	}
+	if group != "" {
+		query = query.Where("abilities."+commonGroupCol+" = ?", group)
+	}
+	if channelId > 0 {
+		query = query.Where("abilities.channel_id = ?", channelId)
+	}
+	if keyword != "" {
+		likeKeyword := "%" + keyword + "%"
+		query = query.Where("(abilities.model LIKE ? OR channels.name LIKE ?)", likeKeyword, likeKeyword)
+	}
+
+	err := query.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+
+	err = query.Order("abilities.model, abilities.channel_id").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Scan(&items).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return items, total, nil
+}
+
+func UpdateAbilityPriorityWeight(group, modelName string, channelId int, priority *int64, weight *uint) error {
+	updates := make(map[string]interface{})
+	if priority != nil {
+		updates["priority"] = *priority
+	}
+	if weight != nil {
+		updates["weight"] = *weight
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	result := DB.Model(&Ability{}).
+		Where(commonGroupCol+" = ? AND model = ? AND channel_id = ?", group, modelName, channelId).
+		Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("ability not found")
+	}
+	return nil
 }
 
 var fixLock = sync.Mutex{}

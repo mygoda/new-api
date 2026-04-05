@@ -909,6 +909,183 @@ func GetModelPerformanceStats(userId int, startTimestamp int64, endTimestamp int
 	return consumeStats, nil
 }
 
+// ModelChannelCrossStats represents aggregated performance metrics per model-channel combination
+type ModelChannelCrossStats struct {
+	ModelName           string  `json:"model_name"`
+	ChannelId           int     `json:"channel_id"`
+	ChannelName         string  `json:"channel_name" gorm:"-"`
+	TotalRequests       int64   `json:"total_requests"`
+	ErrorRequests       int64   `json:"error_requests"`
+	ErrorRate           float64 `json:"error_rate" gorm:"-"`
+	AvgLatency          float64 `json:"avg_latency"`
+	MaxLatency          float64 `json:"max_latency"`
+	MinLatency          float64 `json:"min_latency"`
+	LatencyP50          float64 `json:"latency_p50"`
+	LatencyP90          float64 `json:"latency_p90"`
+	LatencyP95          float64 `json:"latency_p95"`
+	StreamRequestCount  int64   `json:"stream_request_count"`
+	StreamRatio         float64 `json:"stream_ratio" gorm:"-"`
+	AvgTokensPerRequest float64 `json:"avg_tokens_per_request" gorm:"-"`
+	TotalQuota          int64   `json:"total_quota"`
+	TotalTokens         int64   `json:"total_tokens"`
+}
+
+func GetModelChannelCrossStats(modelName string, startTimestamp int64, endTimestamp int64) ([]ModelChannelCrossStats, error) {
+	streamSum := streamRequestSumExpr()
+
+	var selectConsume string
+	if common.UsingSQLite {
+		selectConsume = fmt.Sprintf(
+			"model_name, channel_id, COUNT(*) as total_requests, AVG(use_time) as avg_latency, MAX(use_time) as max_latency, MIN(NULLIF(use_time, 0)) as min_latency, SUM(quota) as total_quota, SUM(COALESCE(prompt_tokens,0) + COALESCE(completion_tokens,0)) as total_tokens, %s",
+			streamSum,
+		)
+	} else {
+		selectConsume = fmt.Sprintf(
+			"model_name, channel_id, COUNT(*) as total_requests, AVG(use_time) as avg_latency, MAX(use_time) as max_latency, MIN(NULLIF(use_time, 0)) as min_latency, SUM(quota) as total_quota, SUM(COALESCE(prompt_tokens,0) + COALESCE(completion_tokens,0)) as total_tokens, %s, %s as latency_p50, %s as latency_p90, %s as latency_p95",
+			streamSum,
+			percentileExpr(0.5),
+			percentileExpr(0.9),
+			percentileExpr(0.95),
+		)
+	}
+
+	var consumeStats []ModelChannelCrossStats
+	consumeQuery := LOG_DB.Table("logs").
+		Select(selectConsume).
+		Where("type = ? AND channel_id > 0", LogTypeConsume)
+	if modelName != "" {
+		consumeQuery = consumeQuery.Where("model_name = ?", modelName)
+	}
+	if startTimestamp != 0 {
+		consumeQuery = consumeQuery.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		consumeQuery = consumeQuery.Where("created_at <= ?", endTimestamp)
+	}
+	if err := consumeQuery.Group("model_name, channel_id").Find(&consumeStats).Error; err != nil {
+		return nil, err
+	}
+
+	// 非 PostgreSQL: 后处理计算分位数
+	if !common.UsingPostgreSQL {
+		for i := range consumeStats {
+			var latencyVals []float64
+			latencyQuery := LOG_DB.Table("logs").
+				Select("use_time").
+				Where("type = ? AND channel_id = ? AND model_name = ? AND use_time > 0", LogTypeConsume, consumeStats[i].ChannelId, consumeStats[i].ModelName)
+			if startTimestamp != 0 {
+				latencyQuery = latencyQuery.Where("created_at >= ?", startTimestamp)
+			}
+			if endTimestamp != 0 {
+				latencyQuery = latencyQuery.Where("created_at <= ?", endTimestamp)
+			}
+			if err := latencyQuery.Order("use_time").Find(&latencyVals).Error; err == nil && len(latencyVals) > 0 {
+				consumeStats[i].LatencyP50 = percentileCalculate(latencyVals, 0.5)
+				consumeStats[i].LatencyP90 = percentileCalculate(latencyVals, 0.9)
+				consumeStats[i].LatencyP95 = percentileCalculate(latencyVals, 0.95)
+			}
+		}
+	}
+
+	type errorCount struct {
+		ModelName     string `json:"model_name"`
+		ChannelId     int    `json:"channel_id"`
+		ErrorRequests int64  `json:"error_requests"`
+	}
+	var errorStats []errorCount
+	errorQuery := LOG_DB.Table("logs").
+		Select("model_name, channel_id, COUNT(*) as error_requests").
+		Where("type = ? AND channel_id > 0", LogTypeError)
+	if modelName != "" {
+		errorQuery = errorQuery.Where("model_name = ?", modelName)
+	}
+	if startTimestamp != 0 {
+		errorQuery = errorQuery.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		errorQuery = errorQuery.Where("created_at <= ?", endTimestamp)
+	}
+	if err := errorQuery.Group("model_name, channel_id").Find(&errorStats).Error; err != nil {
+		return nil, err
+	}
+
+	type crossKey struct {
+		ModelName string
+		ChannelId int
+	}
+	errorMap := make(map[crossKey]int64, len(errorStats))
+	for _, e := range errorStats {
+		errorMap[crossKey{e.ModelName, e.ChannelId}] = e.ErrorRequests
+	}
+
+	seenKeys := make(map[crossKey]struct{}, len(consumeStats))
+	for i := range consumeStats {
+		key := crossKey{consumeStats[i].ModelName, consumeStats[i].ChannelId}
+		seenKeys[key] = struct{}{}
+		if errCount, ok := errorMap[key]; ok {
+			consumeStats[i].ErrorRequests = errCount
+		}
+		total := consumeStats[i].TotalRequests + consumeStats[i].ErrorRequests
+		if total > 0 {
+			consumeStats[i].ErrorRate = float64(consumeStats[i].ErrorRequests) / float64(total)
+		}
+		if consumeStats[i].TotalRequests > 0 {
+			consumeStats[i].AvgTokensPerRequest = float64(consumeStats[i].TotalTokens) / float64(consumeStats[i].TotalRequests)
+			consumeStats[i].StreamRatio = float64(consumeStats[i].StreamRequestCount) / float64(consumeStats[i].TotalRequests)
+		}
+	}
+
+	// 仅有错误的 model-channel 组合
+	for _, e := range errorStats {
+		key := crossKey{e.ModelName, e.ChannelId}
+		if _, ok := seenKeys[key]; ok {
+			continue
+		}
+		consumeStats = append(consumeStats, ModelChannelCrossStats{
+			ModelName:     e.ModelName,
+			ChannelId:     e.ChannelId,
+			ErrorRequests: e.ErrorRequests,
+			ErrorRate:     1,
+		})
+	}
+
+	// 填充渠道名称
+	channelIds := types.NewSet[int]()
+	for i := range consumeStats {
+		channelIds.Add(consumeStats[i].ChannelId)
+	}
+	if channelIds.Len() > 0 {
+		var channels []struct {
+			Id   int    `gorm:"column:id"`
+			Name string `gorm:"column:name"`
+		}
+		if common.MemoryCacheEnabled {
+			for _, channelId := range channelIds.Items() {
+				if cacheChannel, err := CacheGetChannel(channelId); err == nil {
+					channels = append(channels, struct {
+						Id   int    `gorm:"column:id"`
+						Name string `gorm:"column:name"`
+					}{
+						Id:   channelId,
+						Name: cacheChannel.Name,
+					})
+				}
+			}
+		} else {
+			DB.Table("channels").Select("id, name").Where("id IN ?", channelIds.Items()).Find(&channels)
+		}
+		channelMap := make(map[int]string, len(channels))
+		for _, ch := range channels {
+			channelMap[ch.Id] = ch.Name
+		}
+		for i := range consumeStats {
+			consumeStats[i].ChannelName = channelMap[consumeStats[i].ChannelId]
+		}
+	}
+
+	return consumeStats, nil
+}
+
 func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {
 	var total int64 = 0
 

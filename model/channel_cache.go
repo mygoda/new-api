@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -14,8 +13,14 @@ import (
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 )
 
-var group2model2channels map[string]map[string][]int // enabled channel
-var channelsIDM map[int]*Channel                     // all channels include disabled
+type CachedAbility struct {
+	ChannelId int
+	Priority  int64
+	Weight    int
+}
+
+var group2model2channels map[string]map[string][]CachedAbility // enabled channel abilities
+var channelsIDM map[int]*Channel                               // all channels include disabled
 var channelSyncLock sync.RWMutex
 
 func InitChannelCache() {
@@ -30,37 +35,41 @@ func InitChannelCache() {
 	}
 	var abilities []*Ability
 	DB.Find(&abilities)
-	groups := make(map[string]bool)
+
+	newGroup2model2channels := make(map[string]map[string][]CachedAbility)
 	for _, ability := range abilities {
-		groups[ability.Group] = true
-	}
-	newGroup2model2channels := make(map[string]map[string][]int)
-	for group := range groups {
-		newGroup2model2channels[group] = make(map[string][]int)
-	}
-	for _, channel := range channels {
-		if channel.Status != common.ChannelStatusEnabled {
-			continue // skip disabled channels
+		if !ability.Enabled {
+			continue
 		}
-		groups := strings.Split(channel.Group, ",")
-		for _, group := range groups {
-			models := strings.Split(channel.Models, ",")
-			for _, model := range models {
-				if _, ok := newGroup2model2channels[group][model]; !ok {
-					newGroup2model2channels[group][model] = make([]int, 0)
-				}
-				newGroup2model2channels[group][model] = append(newGroup2model2channels[group][model], channel.Id)
-			}
+		// skip if channel doesn't exist or is disabled
+		ch, ok := newChannelId2channel[ability.ChannelId]
+		if !ok || ch.Status != common.ChannelStatusEnabled {
+			continue
 		}
+		if _, ok := newGroup2model2channels[ability.Group]; !ok {
+			newGroup2model2channels[ability.Group] = make(map[string][]CachedAbility)
+		}
+		priority := int64(0)
+		if ability.Priority != nil {
+			priority = *ability.Priority
+		}
+		ca := CachedAbility{
+			ChannelId: ability.ChannelId,
+			Priority:  priority,
+			Weight:    int(ability.Weight),
+		}
+		newGroup2model2channels[ability.Group][ability.Model] = append(
+			newGroup2model2channels[ability.Group][ability.Model], ca,
+		)
 	}
 
-	// sort by priority
+	// sort by priority (descending)
 	for group, model2channels := range newGroup2model2channels {
-		for model, channels := range model2channels {
-			sort.Slice(channels, func(i, j int) bool {
-				return newChannelId2channel[channels[i]].GetPriority() > newChannelId2channel[channels[j]].GetPriority()
+		for model, cas := range model2channels {
+			sort.Slice(cas, func(i, j int) bool {
+				return cas[i].Priority > cas[j].Priority
 			})
-			newGroup2model2channels[group][model] = channels
+			newGroup2model2channels[group][model] = cas
 		}
 	}
 
@@ -103,55 +112,57 @@ func GetRandomSatisfiedChannel(group string, model string, retry int) (*Channel,
 	defer channelSyncLock.RUnlock()
 
 	// First, try to find channels with the exact model name.
-	channels := group2model2channels[group][model]
+	cachedAbilities := group2model2channels[group][model]
 
 	// If no channels found, try to find channels with the normalized model name.
-	if len(channels) == 0 {
+	if len(cachedAbilities) == 0 {
 		normalizedModel := ratio_setting.FormatMatchingModelName(model)
-		channels = group2model2channels[group][normalizedModel]
+		cachedAbilities = group2model2channels[group][normalizedModel]
 	}
 
-	if len(channels) == 0 {
+	if len(cachedAbilities) == 0 {
 		return nil, nil
 	}
 
-	if len(channels) == 1 {
-		if channel, ok := channelsIDM[channels[0]]; ok {
+	if len(cachedAbilities) == 1 {
+		if channel, ok := channelsIDM[cachedAbilities[0].ChannelId]; ok {
 			return channel, nil
 		}
-		return nil, fmt.Errorf("数据库一致性错误，渠道# %d 不存在，请联系管理员修复", channels[0])
+		return nil, fmt.Errorf("数据库一致性错误，渠道# %d 不存在，请联系管理员修复", cachedAbilities[0].ChannelId)
 	}
 
-	uniquePriorities := make(map[int]bool)
-	for _, channelId := range channels {
-		if channel, ok := channelsIDM[channelId]; ok {
-			uniquePriorities[int(channel.GetPriority())] = true
-		} else {
-			return nil, fmt.Errorf("数据库一致性错误，渠道# %d 不存在，请联系管理员修复", channelId)
-		}
+	uniquePriorities := make(map[int64]bool)
+	for _, ca := range cachedAbilities {
+		uniquePriorities[ca.Priority] = true
 	}
-	var sortedUniquePriorities []int
+	var sortedUniquePriorities []int64
 	for priority := range uniquePriorities {
 		sortedUniquePriorities = append(sortedUniquePriorities, priority)
 	}
-	sort.Sort(sort.Reverse(sort.IntSlice(sortedUniquePriorities)))
+	sort.Slice(sortedUniquePriorities, func(i, j int) bool {
+		return sortedUniquePriorities[i] > sortedUniquePriorities[j]
+	})
 
 	if retry >= len(uniquePriorities) {
 		retry = len(uniquePriorities) - 1
 	}
-	targetPriority := int64(sortedUniquePriorities[retry])
+	targetPriority := sortedUniquePriorities[retry]
 
-	// get the priority for the given retry number
+	// get channels at target priority
 	var sumWeight = 0
-	var targetChannels []*Channel
-	for _, channelId := range channels {
-		if channel, ok := channelsIDM[channelId]; ok {
-			if channel.GetPriority() == targetPriority {
-				sumWeight += channel.GetWeight()
-				targetChannels = append(targetChannels, channel)
+	type targetEntry struct {
+		channel *Channel
+		weight  int
+	}
+	var targetChannels []targetEntry
+	for _, ca := range cachedAbilities {
+		if ca.Priority == targetPriority {
+			if channel, ok := channelsIDM[ca.ChannelId]; ok {
+				sumWeight += ca.Weight
+				targetChannels = append(targetChannels, targetEntry{channel: channel, weight: ca.Weight})
+			} else {
+				return nil, fmt.Errorf("数据库一致性错误，渠道# %d 不存在，请联系管理员修复", ca.ChannelId)
 			}
-		} else {
-			return nil, fmt.Errorf("数据库一致性错误，渠道# %d 不存在，请联系管理员修复", channelId)
 		}
 	}
 
@@ -164,29 +175,21 @@ func GetRandomSatisfiedChannel(group string, model string, retry int) (*Channel,
 	smoothingAdjustment := 0
 
 	if sumWeight == 0 {
-		// when all channels have weight 0, set sumWeight to the number of channels and set smoothing adjustment to 100
-		// each channel's effective weight = 100
 		sumWeight = len(targetChannels) * 100
 		smoothingAdjustment = 100
 	} else if sumWeight/len(targetChannels) < 10 {
-		// when the average weight is less than 10, set smoothing factor to 100
 		smoothingFactor = 100
 	}
 
-	// Calculate the total weight of all channels up to endIdx
 	totalWeight := sumWeight * smoothingFactor
-
-	// Generate a random value in the range [0, totalWeight)
 	randomWeight := rand.Intn(totalWeight)
 
-	// Find a channel based on its weight
-	for _, channel := range targetChannels {
-		randomWeight -= channel.GetWeight()*smoothingFactor + smoothingAdjustment
+	for _, entry := range targetChannels {
+		randomWeight -= entry.weight*smoothingFactor + smoothingAdjustment
 		if randomWeight < 0 {
-			return channel, nil
+			return entry.channel, nil
 		}
 	}
-	// return null if no channel is not found
 	return nil, errors.New("channel not found")
 }
 
@@ -234,11 +237,11 @@ func CacheUpdateChannelStatus(id int, status int) {
 	if status != common.ChannelStatusEnabled {
 		// delete the channel from group2model2channels
 		for group, model2channels := range group2model2channels {
-			for model, channels := range model2channels {
-				for i, channelId := range channels {
-					if channelId == id {
-						// remove the channel from the slice
-						group2model2channels[group][model] = append(channels[:i], channels[i+1:]...)
+			for model, cas := range model2channels {
+				for i, ca := range cas {
+					if ca.ChannelId == id {
+						// remove the entry from the slice
+						group2model2channels[group][model] = append(cas[:i], cas[i+1:]...)
 						break
 					}
 				}

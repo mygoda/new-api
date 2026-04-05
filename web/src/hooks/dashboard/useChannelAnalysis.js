@@ -25,6 +25,8 @@ export const useChannelAnalysis = (isAdminUser, inputs, dataExportDefaultTime) =
   const { t } = useTranslation();
   const [channelStats, setChannelStats] = useState([]);
   const [modelPerformanceStats, setModelPerformanceStats] = useState([]);
+  const [modelChannelCrossStats, setModelChannelCrossStats] = useState([]);
+  const [crossStatsModelFilter, setCrossStatsModelFilter] = useState('');
   const [loading, setLoading] = useState(false);
 
   const loadChannelStats = useCallback(async () => {
@@ -63,6 +65,31 @@ export const useChannelAnalysis = (isAdminUser, inputs, dataExportDefaultTime) =
       const { success, message, data } = res.data;
       if (success) {
         setModelPerformanceStats(data || []);
+      } else {
+        showError(message);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAdminUser, inputs]);
+
+  const loadModelChannelCrossStats = useCallback(async (modelName) => {
+    if (!isAdminUser) return;
+    setLoading(true);
+    try {
+      const { start_timestamp, end_timestamp } = inputs;
+      const startTs = Math.floor(Date.parse(start_timestamp) / 1000);
+      const endTs = Math.floor(Date.parse(end_timestamp) / 1000);
+      let url = `/api/data/dashboard/model_channel?start_timestamp=${startTs}&end_timestamp=${endTs}`;
+      if (modelName) {
+        url += `&model_name=${encodeURIComponent(modelName)}`;
+      }
+      const res = await API.get(url);
+      const { success, message, data } = res.data;
+      if (success) {
+        setModelChannelCrossStats(data || []);
       } else {
         showError(message);
       }
@@ -414,9 +441,13 @@ export const useChannelAnalysis = (isAdminUser, inputs, dataExportDefaultTime) =
   return {
     channelStats,
     modelPerformanceStats,
+    modelChannelCrossStats,
+    crossStatsModelFilter,
+    setCrossStatsModelFilter,
     loading,
     loadChannelStats,
     loadModelPerformanceStats,
+    loadModelChannelCrossStats,
     latencyChartSpec,
     latencyPercentileChartSpec,
     errorRateChartSpec,

@@ -3378,6 +3378,13 @@
     "错误消息": "Error Message",
     "使用分组": "Using Group",
     "已复制": "Copied",
-    "否": "No"
+    "否": "No",
+    "模型渠道配置": "Model-Channel Config",
+    "模型渠道交叉分析": "Model-Channel Analysis",
+    "输入模型名筛选": "Filter by model name",
+    "模型或渠道名": "Model or channel name",
+    "渠道ID": "Channel ID",
+    "关键词": "Keyword",
+    "搜索": "Search"
   }
 }

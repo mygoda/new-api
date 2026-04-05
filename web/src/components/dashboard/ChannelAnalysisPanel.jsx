@@ -17,8 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React from 'react';
-import { Card, Tabs, TabPane, Table, Tag, Empty, Tooltip } from '@douyinfe/semi-ui';
+import React, { useMemo } from 'react';
+import { Card, Tabs, TabPane, Table, Tag, Empty, Tooltip, AutoComplete } from '@douyinfe/semi-ui';
 import { BarChart3 } from 'lucide-react';
 import { VChart } from '@visactor/react-vchart';
 import { renderQuota } from '../../helpers';
@@ -38,6 +38,9 @@ const ERROR_TYPE_LABELS = {
 const ChannelAnalysisPanel = ({
   channelStats,
   modelPerformanceStats,
+  modelChannelCrossStats,
+  crossStatsModelFilter,
+  onCrossStatsModelFilterChange,
   loading,
   latencyChartSpec,
   latencyPercentileChartSpec,
@@ -281,6 +284,104 @@ const ChannelAnalysisPanel = ({
     },
   ];
 
+  const crossColumns = [
+    {
+      title: t('模型'),
+      dataIndex: 'model_name',
+      sorter: (a, b) => (a.model_name || '').localeCompare(b.model_name || ''),
+      render: (text) => <Tag size='small' color='blue'>{text}</Tag>,
+    },
+    {
+      title: t('渠道'),
+      dataIndex: 'channel_name',
+      sorter: (a, b) => (a.channel_name || '').localeCompare(b.channel_name || ''),
+      render: (text, record) => text || `ID:${record.channel_id}`,
+    },
+    {
+      title: t('请求次数'),
+      dataIndex: 'total_requests',
+      sorter: (a, b) => a.total_requests - b.total_requests,
+      render: (text) => (text || 0).toLocaleString(),
+    },
+    {
+      title: t('错误次数'),
+      dataIndex: 'error_requests',
+      sorter: (a, b) => a.error_requests - b.error_requests,
+      render: (text) => (text || 0).toLocaleString(),
+    },
+    {
+      title: t('错误率'),
+      dataIndex: 'error_rate',
+      sorter: (a, b) => a.error_rate - b.error_rate,
+      render: (val) => (
+        <Tag color={getErrorRateColor(val)} size='small'>
+          {(val * 100).toFixed(2)}%
+        </Tag>
+      ),
+    },
+    {
+      title: t('平均延迟'),
+      dataIndex: 'avg_latency',
+      sorter: (a, b) => a.avg_latency - b.avg_latency,
+      render: (val) => `${(val || 0).toFixed(2)}s`,
+    },
+    {
+      title: 'P50',
+      dataIndex: 'latency_p50',
+      sorter: (a, b) => (a.latency_p50 || 0) - (b.latency_p50 || 0),
+      render: (val) => `${(val || 0).toFixed(2)}s`,
+    },
+    {
+      title: 'P90',
+      dataIndex: 'latency_p90',
+      sorter: (a, b) => (a.latency_p90 || 0) - (b.latency_p90 || 0),
+      render: (val) => `${(val || 0).toFixed(2)}s`,
+    },
+    {
+      title: 'P95',
+      dataIndex: 'latency_p95',
+      sorter: (a, b) => (a.latency_p95 || 0) - (b.latency_p95 || 0),
+      render: (val) => `${(val || 0).toFixed(2)}s`,
+    },
+    {
+      title: t('最大延迟'),
+      dataIndex: 'max_latency',
+      sorter: (a, b) => a.max_latency - b.max_latency,
+      render: (val) => `${(val || 0).toFixed(2)}s`,
+    },
+    {
+      title: t('Stream占比'),
+      dataIndex: 'stream_ratio',
+      sorter: (a, b) => (a.stream_ratio || 0) - (b.stream_ratio || 0),
+      render: (val) => `${((val || 0) * 100).toFixed(1)}%`,
+    },
+    {
+      title: t('每请求Tokens'),
+      dataIndex: 'avg_tokens_per_request',
+      sorter: (a, b) => (a.avg_tokens_per_request || 0) - (b.avg_tokens_per_request || 0),
+      render: (val) => (val || 0).toFixed(1),
+    },
+    {
+      title: t('消耗额度'),
+      dataIndex: 'total_quota',
+      sorter: (a, b) => a.total_quota - b.total_quota,
+      render: (val) => renderQuota(val || 0, 2),
+    },
+    {
+      title: t('总Tokens'),
+      dataIndex: 'total_tokens',
+      sorter: (a, b) => a.total_tokens - b.total_tokens,
+      render: (text) => (text || 0).toLocaleString(),
+    },
+  ];
+
+  // Extract unique model names for the cross-stats filter
+  const crossStatsModelOptions = useMemo(() => {
+    if (!modelChannelCrossStats || modelChannelCrossStats.length === 0) return [];
+    const models = [...new Set(modelChannelCrossStats.map((s) => s.model_name).filter(Boolean))];
+    return models.sort().map((m) => ({ value: m, label: m }));
+  }, [modelChannelCrossStats]);
+
   const columns = isAdminUser ? channelColumns : modelColumns;
   const panelTitle = isAdminUser ? t('渠道分析') : t('模型性能分析');
   const tableTabTitle = isAdminUser ? t('渠道性能') : t('模型性能');
@@ -306,6 +407,9 @@ const ChannelAnalysisPanel = ({
             <TabPane tab={<span>{t('错误率对比')}</span>} itemKey='3' />
             <TabPane tab={<span>{t('健康度')}</span>} itemKey='4' />
             <TabPane tab={<span>{t('QPS对比')}</span>} itemKey='5' />
+            {isAdminUser && (
+              <TabPane tab={<span>{t('模型渠道交叉分析')}</span>} itemKey='7' />
+            )}
           </Tabs>
         </div>
       }
@@ -372,6 +476,35 @@ const ChannelAnalysisPanel = ({
             <VChart spec={latencyPercentileChartSpec} option={CHART_CONFIG} />
           ) : (
             <Empty title={t('无数据')} style={{ padding: 40 }} />
+          )}
+        </div>
+      )}
+      {activeTab === '7' && isAdminUser && (
+        <div className='p-2'>
+          <div className='mb-3'>
+            <AutoComplete
+              data={crossStatsModelOptions}
+              value={crossStatsModelFilter || ''}
+              onChange={(val) => onCrossStatsModelFilterChange && onCrossStatsModelFilterChange(val)}
+              placeholder={t('输入模型名筛选')}
+              style={{ width: 280 }}
+              showClear
+            />
+          </div>
+          {modelChannelCrossStats && modelChannelCrossStats.length > 0 ? (
+            <Table
+              columns={crossColumns}
+              dataSource={modelChannelCrossStats}
+              rowKey={(record) => `${record.model_name}_${record.channel_id}`}
+              pagination={modelChannelCrossStats.length > 10 ? { pageSize: 10 } : false}
+              size='small'
+              loading={loading}
+            />
+          ) : (
+            <Empty
+              title={t('无数据')}
+              style={{ padding: 40 }}
+            />
           )}
         </div>
       )}

@@ -245,6 +245,8 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.POST("/upstream_updates/apply_all", controller.ApplyAllChannelUpstreamModelUpdates)
 			channelRoute.POST("/upstream_updates/detect", controller.DetectChannelUpstreamModelUpdates)
 			channelRoute.POST("/upstream_updates/detect_all", controller.DetectAllChannelUpstreamModelUpdates)
+			channelRoute.GET("/ability/list", controller.GetAbilityList)
+			channelRoute.PUT("/ability", controller.UpdateAbility)
 		}
 		tokenRoute := apiRouter.Group("/token")
 		tokenRoute.Use(middleware.UserAuth())
@@ -295,6 +297,7 @@ func SetApiRouter(router *gin.Engine) {
 		dataRoute.GET("/self", middleware.UserAuth(), controller.GetUserQuotaDates)
 		dataRoute.GET("/dashboard/channel", middleware.AdminAuth(), controller.GetChannelDashboardStats)
 		dataRoute.GET("/dashboard/model", middleware.UserAuth(), controller.GetModelPerformanceDashboardStats)
+		dataRoute.GET("/dashboard/model_channel", middleware.AdminAuth(), controller.GetModelChannelCrossDashboardStats)
 
 		logRoute.GET("/doris", middleware.AdminAuth(), controller.GetDorisLogs)
 		logRoute.GET("/doris/self", middleware.UserAuth(), controller.GetDorisLogsSelf)

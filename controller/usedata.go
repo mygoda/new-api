@@ -89,3 +89,19 @@ func GetModelPerformanceDashboardStats(c *gin.Context) {
 		"data":    stats,
 	})
 }
+
+func GetModelChannelCrossDashboardStats(c *gin.Context) {
+	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	modelName := c.Query("model_name")
+	stats, err := model.GetModelChannelCrossStats(modelName, startTimestamp, endTimestamp)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    stats,
+	})
+}

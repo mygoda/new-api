@@ -152,6 +152,7 @@ const Dashboard = () => {
   useEffect(() => {
     if (dashboardData.isAdminUser) {
       channelAnalysis.loadChannelStats();
+      channelAnalysis.loadModelChannelCrossStats(channelAnalysis.crossStatsModelFilter);
     } else {
       channelAnalysis.loadModelPerformanceStats();
     }
@@ -290,6 +291,12 @@ const Dashboard = () => {
           <ChannelAnalysisPanel
             channelStats={channelAnalysis.channelStats}
             modelPerformanceStats={channelAnalysis.modelPerformanceStats}
+            modelChannelCrossStats={channelAnalysis.modelChannelCrossStats}
+            crossStatsModelFilter={channelAnalysis.crossStatsModelFilter}
+            onCrossStatsModelFilterChange={(val) => {
+              channelAnalysis.setCrossStatsModelFilter(val);
+              channelAnalysis.loadModelChannelCrossStats(val);
+            }}
             loading={channelAnalysis.loading}
             latencyChartSpec={channelAnalysis.latencyChartSpec}
             latencyPercentileChartSpec={channelAnalysis.latencyPercentileChartSpec}
