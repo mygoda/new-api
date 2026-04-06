@@ -1035,6 +1035,9 @@ func FetchModels(c *gin.Context) {
 
 	client := &http.Client{}
 	url := fmt.Sprintf("%s/v1/models", baseURL)
+	if req.Type == constant.ChannelTypeAli {
+		url = fmt.Sprintf("%s/compatible-mode/v1/models", baseURL)
+	}
 
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {

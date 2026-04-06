@@ -63,6 +63,65 @@ func GetDorisLogs(c *gin.Context) {
 	common.ApiSuccess(c, pageInfo)
 }
 
+func GetDorisLogDetail(c *gin.Context) {
+	if !common.DorisEnabled || !setting.DorisLogEnabled {
+		common.ApiErrorMsg(c, "Doris 日志功能未启用")
+		return
+	}
+
+	requestId := c.Query("request_id")
+	if requestId == "" {
+		common.ApiErrorMsg(c, "request_id 不能为空")
+		return
+	}
+
+	log, err := service.QueryDorisLogDetail(requestId)
+	if err != nil {
+		common.ApiErrorMsg(c, "查询 Doris 日志详情失败: "+err.Error())
+		return
+	}
+	if log == nil {
+		common.ApiErrorMsg(c, "日志不存在")
+		return
+	}
+
+	common.ApiSuccess(c, log)
+}
+
+func GetDorisLogDetailSelf(c *gin.Context) {
+	if !common.DorisEnabled || !setting.DorisLogEnabled {
+		common.ApiErrorMsg(c, "Doris 日志功能未启用")
+		return
+	}
+
+	requestId := c.Query("request_id")
+	if requestId == "" {
+		common.ApiErrorMsg(c, "request_id 不能为空")
+		return
+	}
+
+	userId := c.GetInt("id")
+	log, err := service.QueryDorisLogDetail(requestId)
+	if err != nil {
+		common.ApiErrorMsg(c, "查询 Doris 日志详情失败: "+err.Error())
+		return
+	}
+	if log == nil || log.UserId != userId {
+		common.ApiErrorMsg(c, "日志不存在")
+		return
+	}
+
+	// 脱敏
+	log.ClientIp = ""
+	log.ChannelId = 0
+	log.ChannelType = 0
+	log.ChannelName = ""
+	log.UpstreamModel = ""
+	log.TokenKey = ""
+
+	common.ApiSuccess(c, log)
+}
+
 func GetDorisLogsSelf(c *gin.Context) {
 	if !common.DorisEnabled || !setting.DorisLogEnabled {
 		common.ApiErrorMsg(c, "Doris 日志功能未启用")

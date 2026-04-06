@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 
@@ -31,8 +32,9 @@ func getDorisDB() (*sql.DB, error) {
 			initErr = err
 			return
 		}
-		db.SetMaxOpenConns(5)
-		db.SetMaxIdleConns(2)
+		db.SetMaxOpenConns(20)
+		db.SetMaxIdleConns(10)
+		db.SetConnMaxLifetime(30 * time.Minute)
 		dorisDB = db
 	})
 	if initErr != nil {
@@ -61,12 +63,30 @@ type DorisLogQueryResult struct {
 	Items []DorisRequestLog `json:"items"`
 }
 
-func QueryDorisLogs(filter DorisLogFilter, page, pageSize int) (*DorisLogQueryResult, error) {
-	db, err := getDorisDB()
-	if err != nil {
-		return nil, fmt.Errorf("doris connection: %w", err)
-	}
+// 列表查询使用的轻量列（不含 request_body 和 response_content 大字段）
+const dorisListColumns = "request_id, user_id, token_id, token_name, IFNULL(token_key, '') AS token_key, " +
+	"user_group, token_group, using_group, " +
+	"model_name, upstream_model, channel_id, channel_type, channel_name, " +
+	"is_stream, relay_mode, request_path, client_ip, " +
+	"prompt_tokens, completion_tokens, total_tokens, cache_tokens, " +
+	"quota, model_ratio, group_ratio, completion_ratio, model_price, " +
+	"use_time_ms, is_success, retry_count, status_code, " +
+	"IFNULL(error_type, '') AS error_type, IFNULL(error_message, '') AS error_message, " +
+	"created_at"
 
+// 详情查询使用的完整列（含大字段）
+const dorisDetailColumns = "request_id, user_id, token_id, token_name, IFNULL(token_key, '') AS token_key, " +
+	"user_group, token_group, using_group, " +
+	"model_name, upstream_model, channel_id, channel_type, channel_name, " +
+	"is_stream, relay_mode, request_path, client_ip, " +
+	"IFNULL(request_body, '') AS request_body, IFNULL(response_content, '') AS response_content, " +
+	"prompt_tokens, completion_tokens, total_tokens, cache_tokens, " +
+	"quota, model_ratio, group_ratio, completion_ratio, model_price, " +
+	"use_time_ms, is_success, retry_count, status_code, " +
+	"IFNULL(error_type, '') AS error_type, IFNULL(error_message, '') AS error_message, " +
+	"created_at"
+
+func buildDorisWhere(filter DorisLogFilter) (string, []interface{}) {
 	var conditions []string
 	var args []interface{}
 
@@ -127,33 +147,44 @@ func QueryDorisLogs(filter DorisLogFilter, page, pageSize int) (*DorisLogQueryRe
 	if len(conditions) > 0 {
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
+	return whereClause, args
+}
 
-	table := fmt.Sprintf("`%s`.`%s`", common.DorisDatabase, common.DorisTable)
-
-	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM %s %s", table, whereClause)
-	var total int
-	if err := db.QueryRow(countSQL, args...).Scan(&total); err != nil {
-		return nil, fmt.Errorf("doris count: %w", err)
+func QueryDorisLogs(filter DorisLogFilter, page, pageSize int) (*DorisLogQueryResult, error) {
+	db, err := getDorisDB()
+	if err != nil {
+		return nil, fmt.Errorf("doris connection: %w", err)
 	}
 
+	whereClause, args := buildDorisWhere(filter)
+	table := fmt.Sprintf("`%s`.`%s`", common.DorisDatabase, common.DorisTable)
+
+	// 并行执行 COUNT 和数据查询
+	type countResult struct {
+		total int
+		err   error
+	}
+	countCh := make(chan countResult, 1)
+	go func() {
+		countSQL := fmt.Sprintf("SELECT COUNT(*) FROM %s %s", table, whereClause)
+		var total int
+		if err := db.QueryRow(countSQL, args...).Scan(&total); err != nil {
+			countCh <- countResult{0, fmt.Errorf("doris count: %w", err)}
+		} else {
+			countCh <- countResult{total, nil}
+		}
+	}()
+
+	// 列表查询：不加载大字段（request_body, response_content）
 	offset := (page - 1) * pageSize
 	dataSQL := fmt.Sprintf(
-		"SELECT request_id, user_id, token_id, token_name, IFNULL(token_key, '') AS token_key, "+
-			"user_group, token_group, using_group, "+
-			"model_name, upstream_model, channel_id, channel_type, channel_name, "+
-			"is_stream, relay_mode, request_path, client_ip, "+
-			"IFNULL(request_body, '') AS request_body, IFNULL(response_content, '') AS response_content, "+
-			"prompt_tokens, completion_tokens, total_tokens, cache_tokens, "+
-			"quota, model_ratio, group_ratio, completion_ratio, model_price, "+
-			"use_time_ms, is_success, retry_count, status_code, "+
-			"IFNULL(error_type, '') AS error_type, IFNULL(error_message, '') AS error_message, "+
-			"created_at "+
-			"FROM %s %s ORDER BY created_at DESC LIMIT ? OFFSET ?",
-		table, whereClause)
+		"SELECT %s FROM %s %s ORDER BY created_at DESC LIMIT ? OFFSET ?",
+		dorisListColumns, table, whereClause)
 
-	dataArgs := append(args, pageSize, offset)
+	dataArgs := append(append([]interface{}{}, args...), pageSize, offset)
 	rows, err := db.Query(dataSQL, dataArgs...)
 	if err != nil {
+		<-countCh // drain goroutine
 		return nil, fmt.Errorf("doris query: %w", err)
 	}
 	defer rows.Close()
@@ -167,18 +198,19 @@ func QueryDorisLogs(filter DorisLogFilter, page, pageSize int) (*DorisLogQueryRe
 			&log.ModelName, &log.UpstreamModel,
 			&log.ChannelId, &log.ChannelType, &log.ChannelName,
 			&log.IsStream, &log.RelayMode, &log.RequestPath, &log.ClientIp,
-			&log.RequestBody, &log.ResponseContent,
 			&log.PromptTokens, &log.CompletionTokens, &log.TotalTokens, &log.CacheTokens,
 			&log.Quota, &log.ModelRatio, &log.GroupRatio, &log.CompletionRatio, &log.ModelPrice,
 			&log.UseTimeMs, &log.IsSuccess, &log.RetryCount, &log.StatusCode,
 			&log.ErrorType, &log.ErrorMessage,
 			&log.CreatedAt,
 		); err != nil {
+			<-countCh
 			return nil, fmt.Errorf("doris scan: %w", err)
 		}
 		items = append(items, log)
 	}
 	if err := rows.Err(); err != nil {
+		<-countCh
 		return nil, fmt.Errorf("doris rows: %w", err)
 	}
 
@@ -186,8 +218,47 @@ func QueryDorisLogs(filter DorisLogFilter, page, pageSize int) (*DorisLogQueryRe
 		items = []DorisRequestLog{}
 	}
 
+	cr := <-countCh
+	if cr.err != nil {
+		return nil, cr.err
+	}
+
 	return &DorisLogQueryResult{
-		Total: total,
+		Total: cr.total,
 		Items: items,
 	}, nil
+}
+
+// QueryDorisLogDetail 根据 request_id 查询单条日志详情（含 request_body 和 response_content）
+func QueryDorisLogDetail(requestId string) (*DorisRequestLog, error) {
+	db, err := getDorisDB()
+	if err != nil {
+		return nil, fmt.Errorf("doris connection: %w", err)
+	}
+
+	table := fmt.Sprintf("`%s`.`%s`", common.DorisDatabase, common.DorisTable)
+	dataSQL := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE request_id = ? LIMIT 1",
+		dorisDetailColumns, table)
+
+	var log DorisRequestLog
+	if err := db.QueryRow(dataSQL, requestId).Scan(
+		&log.RequestId, &log.UserId, &log.TokenId, &log.TokenName, &log.TokenKey,
+		&log.UserGroup, &log.TokenGroup, &log.UsingGroup,
+		&log.ModelName, &log.UpstreamModel,
+		&log.ChannelId, &log.ChannelType, &log.ChannelName,
+		&log.IsStream, &log.RelayMode, &log.RequestPath, &log.ClientIp,
+		&log.RequestBody, &log.ResponseContent,
+		&log.PromptTokens, &log.CompletionTokens, &log.TotalTokens, &log.CacheTokens,
+		&log.Quota, &log.ModelRatio, &log.GroupRatio, &log.CompletionRatio, &log.ModelPrice,
+		&log.UseTimeMs, &log.IsSuccess, &log.RetryCount, &log.StatusCode,
+		&log.ErrorType, &log.ErrorMessage,
+		&log.CreatedAt,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("doris detail: %w", err)
+	}
+	return &log, nil
 }

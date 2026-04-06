@@ -1,11 +1,12 @@
-import React, { useMemo } from 'react';
-import { Empty, Tag, Button, Descriptions } from '@douyinfe/semi-ui';
+import React, { useMemo, useState, useCallback } from 'react';
+import { Empty, Tag, Button, Descriptions, Spin } from '@douyinfe/semi-ui';
 import CardTable from '../../common/ui/CardTable';
 import {
   IllustrationNoResult,
   IllustrationNoResultDark,
 } from '@douyinfe/semi-illustrations';
 import { renderQuota } from '../../../helpers';
+import { API } from '../../../helpers/api';
 
 const RequestLogsTable = (logsData) => {
   const {
@@ -21,6 +22,35 @@ const RequestLogsTable = (logsData) => {
     isAdminUser,
     t,
   } = logsData;
+
+  // 缓存已加载的详情数据（request_body / response_content）
+  const [detailCache, setDetailCache] = useState({});
+  const [detailLoading, setDetailLoading] = useState({});
+
+  const fetchDetail = useCallback(async (requestId) => {
+    if (detailCache[requestId] || detailLoading[requestId]) return;
+    setDetailLoading((prev) => ({ ...prev, [requestId]: true }));
+    try {
+      const endpoint = isAdminUser
+        ? '/api/log/doris/detail'
+        : '/api/log/doris/detail/self';
+      const res = await API.get(`${endpoint}?request_id=${encodeURIComponent(requestId)}`);
+      const { success, data } = res.data;
+      if (success && data) {
+        setDetailCache((prev) => ({
+          ...prev,
+          [requestId]: {
+            request_body: data.request_body || '',
+            response_content: data.response_content || '',
+          },
+        }));
+      }
+    } catch {
+      // ignore
+    } finally {
+      setDetailLoading((prev) => ({ ...prev, [requestId]: false }));
+    }
+  }, [isAdminUser, detailCache, detailLoading]);
 
   const columns = useMemo(() => {
     const cols = [
@@ -183,22 +213,40 @@ const RequestLogsTable = (logsData) => {
     if (record.error_message) {
       expandItems.push({ key: t('错误消息'), value: record.error_message });
     }
-    if (record.request_body) {
+
+    // 大字段通过详情 API 按需加载
+    const detail = detailCache[record.request_id];
+    const isLoading = detailLoading[record.request_id];
+
+    if (detail) {
+      if (detail.request_body) {
+        expandItems.push({
+          key: t('请求体'),
+          value: (
+            <Button size='small' type='tertiary' onClick={() => showDetail(t('请求体'), detail.request_body)}>
+              {t('查看详情')}
+            </Button>
+          ),
+        });
+      }
+      if (detail.response_content) {
+        expandItems.push({
+          key: t('响应内容'),
+          value: (
+            <Button size='small' type='tertiary' onClick={() => showDetail(t('响应内容'), detail.response_content)}>
+              {t('查看详情')}
+            </Button>
+          ),
+        });
+      }
+    } else {
       expandItems.push({
-        key: t('请求体'),
-        value: (
-          <Button size='small' type='tertiary' onClick={() => showDetail(t('请求体'), record.request_body)}>
-            {t('查看详情')}
-          </Button>
-        ),
-      });
-    }
-    if (record.response_content) {
-      expandItems.push({
-        key: t('响应内容'),
-        value: (
-          <Button size='small' type='tertiary' onClick={() => showDetail(t('响应内容'), record.response_content)}>
-            {t('查看详情')}
+        key: t('请求体') + ' / ' + t('响应内容'),
+        value: isLoading ? (
+          <Spin size='small' />
+        ) : (
+          <Button size='small' type='tertiary' onClick={() => fetchDetail(record.request_id)}>
+            {t('加载详情')}
           </Button>
         ),
       });

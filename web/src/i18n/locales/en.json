@@ -3401,6 +3401,7 @@
     "优先级数值越大越优先（如 10 > 5 > 0）": "Higher priority value means higher priority (e.g. 10 > 5 > 0)",
     "权重为 0 的渠道仍会被选中，系统会自动补偿最低权重": "Channels with weight 0 can still be selected; the system auto-compensates with minimum weight",
     "此处修改仅影响当前模型在该渠道的配比，不影响其他模型": "Changes here only affect this model's routing on this channel, not other models",
-    "通过渠道管理修改渠道默认优先级/权重时，仅对新增的记录生效，不会覆盖此处的独立配置": "Changing default priority/weight via channel management only applies to new records, not overriding independent configs here"
+    "通过渠道管理修改渠道默认优先级/权重时，仅对新增的记录生效，不会覆盖此处的独立配置": "Changing default priority/weight via channel management only applies to new records, not overriding independent configs here",
+    "加载详情": "Load Details"
   }
 }

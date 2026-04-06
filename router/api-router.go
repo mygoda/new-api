@@ -301,6 +301,8 @@ func SetApiRouter(router *gin.Engine) {
 
 		logRoute.GET("/doris", middleware.AdminAuth(), controller.GetDorisLogs)
 		logRoute.GET("/doris/self", middleware.UserAuth(), controller.GetDorisLogsSelf)
+		logRoute.GET("/doris/detail", middleware.AdminAuth(), controller.GetDorisLogDetail)
+		logRoute.GET("/doris/detail/self", middleware.UserAuth(), controller.GetDorisLogDetailSelf)
 
 		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
 		{
