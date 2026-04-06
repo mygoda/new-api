@@ -70,6 +70,9 @@ const EditModelModal = (props) => {
   // 供应商列表
   const [vendors, setVendors] = useState([]);
 
+  // 渠道管理中已配置的模型列表（用于创建模型时模糊搜索）
+  const [channelModels, setChannelModels] = useState([]);
+
   // 预填组（标签、端点）
   const [tagGroups, setTagGroups] = useState([]);
   const [endpointGroups, setEndpointGroups] = useState([]);
@@ -81,6 +84,20 @@ const EditModelModal = (props) => {
       if (res.data.success) {
         const items = res.data.data.items || res.data.data || [];
         setVendors(Array.isArray(items) ? items : []);
+      }
+    } catch (error) {
+      // ignore
+    }
+  };
+
+  // 获取渠道管理中已启用的模型名列表
+  const fetchChannelModels = async () => {
+    try {
+      const res = await API.get('/api/channel/models_enabled');
+      if (res.data.success) {
+        const list = Array.isArray(res.data.data) ? res.data.data : [];
+        // 去重 + 排序
+        setChannelModels([...new Set(list)].sort());
       }
     } catch (error) {
       // ignore
@@ -109,6 +126,7 @@ const EditModelModal = (props) => {
     if (props.visiable) {
       fetchVendors();
       fetchPrefillGroups();
+      fetchChannelModels();
     }
   }, [props.visiable]);
 
@@ -302,12 +320,20 @@ const EditModelModal = (props) => {
                 </div>
                 <Row gutter={12}>
                   <Col span={24}>
-                    <Form.Input
+                    <Form.AutoComplete
                       field='model_name'
                       label={t('模型名称')}
                       placeholder={t('请输入模型名称，如：gpt-4')}
-                      rules={[{ required: true, message: t('请输入模型名称') }]}
+                      data={channelModels}
+                      filter
                       showClear
+                      maxHeight={260}
+                      emptyContent={t('无匹配的渠道模型')}
+                      style={{ width: '100%' }}
+                      rules={[{ required: true, message: t('请输入模型名称') }]}
+                      extraText={t(
+                        '输入关键字可模糊搜索「渠道管理」中已配置的模型；也可直接输入自定义名称',
+                      )}
                     />
                   </Col>
 
