@@ -72,6 +72,8 @@ const EditModelModal = (props) => {
 
   // 渠道管理中已配置的模型列表（用于创建模型时模糊搜索）
   const [channelModels, setChannelModels] = useState([]);
+  // 模型名输入框当前的搜索关键字（用于实时过滤下拉项）
+  const [modelNameSearch, setModelNameSearch] = useState('');
 
   // 预填组（标签、端点）
   const [tagGroups, setTagGroups] = useState([]);
@@ -129,6 +131,13 @@ const EditModelModal = (props) => {
       fetchChannelModels();
     }
   }, [props.visiable]);
+
+  // 根据用户输入实时计算下拉候选项（不区分大小写 substring 匹配）
+  const filteredChannelModels = useMemo(() => {
+    const kw = (modelNameSearch || '').trim().toLowerCase();
+    if (!kw) return channelModels;
+    return channelModels.filter((m) => m.toLowerCase().includes(kw));
+  }, [channelModels, modelNameSearch]);
 
   const getInitValues = () => ({
     model_name: props.editingModel?.model_name || '',
@@ -324,16 +333,22 @@ const EditModelModal = (props) => {
                       field='model_name'
                       label={t('模型名称')}
                       placeholder={t('请输入模型名称，如：gpt-4')}
-                      data={channelModels}
-                      filter={(input, option) => {
-                        if (!input) return true;
-                        const value = (option?.value ?? option?.label ?? option ?? '')
-                          .toString()
-                          .toLowerCase();
-                        return value.includes(input.toLowerCase());
-                      }}
+                      data={filteredChannelModels}
+                      filter={false}
                       onSearch={(val) => {
-                        formApiRef.current?.setValue('model_name', val);
+                        setModelNameSearch(val || '');
+                        formApiRef.current?.setValue('model_name', val || '');
+                      }}
+                      onChange={(val) => {
+                        setModelNameSearch(val || '');
+                      }}
+                      onSelect={(option) => {
+                        const val =
+                          typeof option === 'object'
+                            ? option?.value ?? option?.label ?? ''
+                            : option;
+                        setModelNameSearch(val || '');
+                        formApiRef.current?.setValue('model_name', val || '');
                       }}
                       showClear
                       maxHeight={260}
