@@ -50,6 +50,60 @@ func GetPricing(c *gin.Context) {
 	})
 }
 
+// PublicModelInfo 公开模型展示信息
+// 价格单位：美元 / 1M tokens（按倍率计费时）；按次计费时使用 price_per_request（美元/次）
+type PublicModelInfo struct {
+	ModelName       string   `json:"model_name"`
+	Description     string   `json:"description,omitempty"`
+	Icon            string   `json:"icon,omitempty"`
+	Tags            string   `json:"tags,omitempty"`
+	QuotaType       int      `json:"quota_type"` // 0 = 按量计费, 1 = 按次计费
+	InputPrice      float64  `json:"input_price,omitempty"`
+	OutputPrice     float64  `json:"output_price,omitempty"`
+	CachedPrice     *float64 `json:"cached_price,omitempty"`
+	PricePerRequest float64  `json:"price_per_request,omitempty"`
+	Currency        string   `json:"currency"`
+	Unit            string   `json:"unit"`
+}
+
+// GetPublicModels 公开的模型列表接口，无需登录即可访问
+// 仅返回模型详情介绍与价格等展示信息
+func GetPublicModels(c *gin.Context) {
+	pricing := model.GetPricing()
+	// 1 倍率 = $0.002 / 1K tokens = $2 / 1M tokens
+	const perMillion = 2.0
+
+	list := make([]PublicModelInfo, 0, len(pricing))
+	for _, p := range pricing {
+		info := PublicModelInfo{
+			ModelName:   p.ModelName,
+			Description: p.Description,
+			Icon:        p.Icon,
+			Tags:        p.Tags,
+			QuotaType:   p.QuotaType,
+			Currency:    "USD",
+			Unit:        "1M tokens",
+		}
+		if p.QuotaType == 1 {
+			info.PricePerRequest = p.ModelPrice
+			info.Unit = "per request"
+		} else {
+			info.InputPrice = p.ModelRatio * perMillion
+			info.OutputPrice = p.ModelRatio * p.CompletionRatio * perMillion
+			if p.CacheRatio != nil {
+				cached := p.ModelRatio * (*p.CacheRatio) * perMillion
+				info.CachedPrice = &cached
+			}
+		}
+		list = append(list, info)
+	}
+
+	c.JSON(200, gin.H{
+		"success": true,
+		"data":    list,
+	})
+}
+
 func ResetModelRatio(c *gin.Context) {
 	defaultStr := ratio_setting.DefaultModelRatio2JSONString()
 	err := model.UpdateOption("ModelRatio", defaultStr)
