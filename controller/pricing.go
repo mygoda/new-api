@@ -75,6 +75,10 @@ func GetPublicModels(c *gin.Context) {
 
 	list := make([]PublicModelInfo, 0, len(pricing))
 	for _, p := range pricing {
+		// 仅返回在「模型管理」中配置过的模型
+		if !model.IsModelConfigured(p.ModelName) {
+			continue
+		}
 		info := PublicModelInfo{
 			ModelName:   p.ModelName,
 			Description: p.Description,

@@ -46,8 +46,10 @@ var (
 	pricingMap           []Pricing
 	vendorsList          []PricingVendor
 	supportedEndpointMap map[string]common.EndpointInfo
-	lastGetPricingTime   time.Time
-	updatePricingLock    sync.Mutex
+	// configuredModelSet 记录在「模型管理」中配置过的模型名集合（已应用名称规则匹配）
+	configuredModelSet = make(map[string]bool)
+	lastGetPricingTime time.Time
+	updatePricingLock  sync.Mutex
 
 	// 缓存映射：模型名 -> 启用分组 / 计费类型
 	modelEnableGroups     = make(map[string][]string)
@@ -160,6 +162,12 @@ func updatePricing() {
 	vendorMap := make(map[int]*Vendor)
 	for i := range vendors {
 		vendorMap[vendors[i].Id] = &vendors[i]
+	}
+
+	// 刷新「已在模型管理中配置」的模型名集合
+	configuredModelSet = make(map[string]bool, len(metaMap))
+	for name := range metaMap {
+		configuredModelSet[name] = true
 	}
 
 	// 初始化默认供应商映射
@@ -343,4 +351,10 @@ func updatePricing() {
 // GetSupportedEndpointMap 返回全局端点到路径的映射
 func GetSupportedEndpointMap() map[string]common.EndpointInfo {
 	return supportedEndpointMap
+}
+
+// IsModelConfigured 判断模型是否已在「模型管理」中配置（含名称规则匹配）
+// 需先调用 GetPricing() 触发缓存构建
+func IsModelConfigured(modelName string) bool {
+	return configuredModelSet[modelName]
 }
