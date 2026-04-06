@@ -325,7 +325,16 @@ const EditModelModal = (props) => {
                       label={t('模型名称')}
                       placeholder={t('请输入模型名称，如：gpt-4')}
                       data={channelModels}
-                      filter
+                      filter={(input, option) => {
+                        if (!input) return true;
+                        const value = (option?.value ?? option?.label ?? option ?? '')
+                          .toString()
+                          .toLowerCase();
+                        return value.includes(input.toLowerCase());
+                      }}
+                      onSearch={(val) => {
+                        formApiRef.current?.setValue('model_name', val);
+                      }}
                       showClear
                       maxHeight={260}
                       emptyContent={t('无匹配的渠道模型')}
