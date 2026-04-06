@@ -147,6 +147,7 @@ const EditModelModal = (props) => {
     vendor_id: undefined,
     vendor: '',
     vendor_icon: '',
+    context_length: 0,
     endpoints: '',
     name_rule: props.editingModel?.model_name ? 0 : undefined, // 通过未配置模型过来的固定为精确匹配
     status: true,
@@ -494,6 +495,20 @@ const EditModelModal = (props) => {
                         }
                       }}
                       style={{ width: '100%' }}
+                    />
+                  </Col>
+                  <Col span={24}>
+                    <Form.InputNumber
+                      field='context_length'
+                      label={t('上下文长度')}
+                      placeholder={t('如：128000，0 表示未配置')}
+                      min={0}
+                      step={1024}
+                      hideButtons={false}
+                      style={{ width: '100%' }}
+                      extraText={t(
+                        '模型支持的最大上下文 tokens，仅作展示用，不参与实际调用限制',
+                      )}
                     />
                   </Col>
                   <Col span={24}>

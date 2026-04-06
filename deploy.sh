@@ -364,6 +364,35 @@ YAML
     info "生成 docker-compose.deploy.yml -> $(pwd)/docker-compose.deploy.yml"
 }
 
+do_migrate_models() {
+    info "执行 models 表结构迁移（幂等）..."
+    local compose_cmd
+    compose_cmd="$(get_compose_cmd)"
+
+    # 等待主应用容器就绪：models 表由 GORM AutoMigrate 在应用启动时建立
+    local max_retries=30
+    local retry=0
+    while [ $retry -lt $max_retries ]; do
+        if docker ps --format '{{.Names}}' | grep -q "^${COMPOSE_PROJECT}$"; then
+            # 等应用真正建表完成
+            if [ -n "$compose_cmd" ] && [ -f "$(pwd)/docker-compose.deploy.yml" ]; then
+                if $compose_cmd -f "$(pwd)/docker-compose.deploy.yml" -p "$COMPOSE_PROJECT" exec -T new-api sh -c "test -d /data || mkdir -p /data" >/dev/null 2>&1; then
+                    break
+                fi
+            else
+                break
+            fi
+        fi
+        retry=$((retry + 1))
+        sleep 1
+    done
+
+    DB_TYPE="$DB_TYPE" \
+    COMPOSE_PROJECT="$COMPOSE_PROJECT" \
+    COMPOSE_FILE="$(pwd)/docker-compose.deploy.yml" \
+    bash "$SCRIPT_DIR/scripts/migrate-models.sh" || warn "models 表迁移脚本返回非 0，请检查日志"
+}
+
 do_doris_setup() {
     if [ "$DORIS_ENABLED" != "true" ]; then
         warn "Doris 未启用 (DORIS_ENABLED!=true)，跳过建表"
@@ -436,6 +465,9 @@ do_up() {
     if [ "$DORIS_ENABLED" = "true" ]; then
         do_doris_setup
     fi
+
+    # 应用启动后执行 models 表结构迁移（幂等）
+    do_migrate_models
 
     echo ""
     info "========================================="
@@ -607,6 +639,7 @@ show_help() {
     echo "  start      启动已存在的 new-api 容器（与 stop 配对）"
     echo "  restart    重新生成 compose 并重启 new-api 服务"
     echo "  doris-setup 手动执行 Doris 建表/升级脚本"
+    echo "  migrate-models 手动执行 models 表结构迁移（幂等，新增 context_length 列）"
     echo "  logs       查看实时日志"
     echo "  status     查看服务状态"
     echo "  help       显示此帮助"
@@ -666,6 +699,9 @@ case "${1:-}" in
         ;;
     doris-setup)
         do_doris_setup
+        ;;
+    migrate-models)
+        do_migrate_models
         ;;
     logs)
         do_logs

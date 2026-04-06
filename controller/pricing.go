@@ -57,6 +57,7 @@ type PublicModelInfo struct {
 	Description     string   `json:"description,omitempty"`
 	Icon            string   `json:"icon,omitempty"`
 	Tags            string   `json:"tags,omitempty"`
+	ContextLength   int      `json:"context_length,omitempty"`
 	QuotaType       int      `json:"quota_type"` // 0 = 按量计费, 1 = 按次计费
 	InputPrice      float64  `json:"input_price,omitempty"`
 	OutputPrice     float64  `json:"output_price,omitempty"`
@@ -80,13 +81,14 @@ func GetPublicModels(c *gin.Context) {
 			continue
 		}
 		info := PublicModelInfo{
-			ModelName:   p.ModelName,
-			Description: p.Description,
-			Icon:        p.Icon,
-			Tags:        p.Tags,
-			QuotaType:   p.QuotaType,
-			Currency:    "USD",
-			Unit:        "1M tokens",
+			ModelName:     p.ModelName,
+			Description:   p.Description,
+			Icon:          p.Icon,
+			Tags:          p.Tags,
+			ContextLength: p.ContextLength,
+			QuotaType:     p.QuotaType,
+			Currency:      "USD",
+			Unit:          "1M tokens",
 		}
 		if p.QuotaType == 1 {
 			info.PricePerRequest = p.ModelPrice
