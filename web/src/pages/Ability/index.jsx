@@ -39,6 +39,18 @@ const AbilityPage = () => {
   // model list for autocomplete
   const [modelOptions, setModelOptions] = useState([]);
 
+  // 根据当前输入实时过滤模型下拉项（不区分大小写 substring 包含）
+  const filteredModelOptions = useMemo(() => {
+    const kw = (filterModel || '').trim().toLowerCase();
+    if (!kw) return modelOptions;
+    return modelOptions.filter((m) =>
+      (typeof m === 'string' ? m : m?.value ?? m?.label ?? '')
+        .toString()
+        .toLowerCase()
+        .includes(kw),
+    );
+  }, [modelOptions, filterModel]);
+
   const loadAbilities = useCallback(async (p, ps, model, group, channelId, keyword) => {
     setLoading(true);
     try {
@@ -313,11 +325,15 @@ const AbilityPage = () => {
           <div>
             <div className='text-xs text-gray-500 mb-1'>{t('模型')}</div>
             <AutoComplete
-              data={modelOptions}
+              data={filteredModelOptions}
               value={filterModel}
               onChange={setFilterModel}
+              onSearch={(val) => setFilterModel(val || '')}
+              filter={false}
               placeholder={t('选择模型')}
               style={{ width: 220 }}
+              maxHeight={260}
+              emptyContent={t('无匹配的模型')}
               showClear
             />
           </div>
