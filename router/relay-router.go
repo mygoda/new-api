@@ -66,6 +66,18 @@ func SetRelayRouter(router *gin.Engine) {
 	{
 		playgroundRouter.POST("/chat/completions", controller.Playground)
 	}
+
+	// /api/playground/* — formal external API endpoint for logged-in users.
+	// Accepts session auth or personal access token via middleware.UserAuth().
+	// Registered here (not in api-router.go) to bypass the gzip middleware
+	// on /api, which would break SSE streaming.
+	playgroundApiRouter := router.Group("/api/playground")
+	playgroundApiRouter.Use(middleware.RouteTag("relay"))
+	playgroundApiRouter.Use(middleware.SystemPerformanceCheck())
+	playgroundApiRouter.Use(middleware.UserAuth(), middleware.Distribute())
+	{
+		playgroundApiRouter.POST("/chat/completions", controller.Playground)
+	}
 	relayV1Router := router.Group("/v1")
 	relayV1Router.Use(middleware.RouteTag("relay"))
 	relayV1Router.Use(middleware.SystemPerformanceCheck())
