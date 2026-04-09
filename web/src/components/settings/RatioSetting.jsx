@@ -26,6 +26,7 @@ import ModelRatioSettings from '../../pages/Setting/Ratio/ModelRatioSettings';
 import ModelSettingsVisualEditor from '../../pages/Setting/Ratio/ModelSettingsVisualEditor';
 import ModelRatioNotSetEditor from '../../pages/Setting/Ratio/ModelRationNotSetEditor';
 import UpstreamRatioSync from '../../pages/Setting/Ratio/UpstreamRatioSync';
+import CurrencySettings from '../../pages/Setting/Ratio/CurrencySettings';
 
 import { API, showError, toBoolean } from '../../helpers';
 
@@ -43,6 +44,8 @@ const RatioSetting = () => {
     ImageRatio: '',
     AudioRatio: '',
     AudioCompletionRatio: '',
+    CurrencyRates: '',
+    ModelCurrency: '',
     AutoGroups: '',
     DefaultUseAutoGroup: false,
     ExposeRatioEnabled: false,
@@ -112,6 +115,9 @@ const RatioSetting = () => {
           </Tabs.TabPane>
           <Tabs.TabPane tab={t('上游倍率同步')} itemKey='upstream_sync'>
             <UpstreamRatioSync options={inputs} refresh={onRefresh} />
+          </Tabs.TabPane>
+          <Tabs.TabPane tab={t('汇率设置')} itemKey='currency'>
+            <CurrencySettings options={inputs} refresh={onRefresh} />
           </Tabs.TabPane>
         </Tabs>
       </Card>

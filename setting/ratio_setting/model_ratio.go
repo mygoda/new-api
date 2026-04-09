@@ -358,6 +358,7 @@ func UpdateModelPriceByJSONString(jsonStr string) error {
 }
 
 // GetModelPrice 返回模型的价格，如果模型不存在则返回-1，false
+// 返回值已经过 currency 归一化（按 ModelCurrency / CurrencyRates 折算到 USD）
 func GetModelPrice(name string, printErr bool) (float64, bool) {
 	name = FormatMatchingModelName(name)
 
@@ -369,7 +370,7 @@ func GetModelPrice(name string, printErr bool) (float64, bool) {
 			}
 			return -1, false
 		}
-		return price, true
+		return ConvertModelValueToUSD(name, price), true
 	}
 
 	price, ok := modelPriceMap.Get(name)
@@ -379,7 +380,7 @@ func GetModelPrice(name string, printErr bool) (float64, bool) {
 		}
 		return -1, false
 	}
-	return price, true
+	return ConvertModelValueToUSD(name, price), true
 }
 
 func UpdateModelRatioByJSONString(jsonStr string) error {
@@ -394,6 +395,7 @@ func handleThinkingBudgetModel(name, prefix, wildcard string) string {
 	return name
 }
 
+// GetModelRatio 返回模型倍率与匹配名。返回值已按 ModelCurrency 归一化到 USD。
 func GetModelRatio(name string) (float64, bool, string) {
 	name = FormatMatchingModelName(name)
 
@@ -401,13 +403,13 @@ func GetModelRatio(name string) (float64, bool, string) {
 	if !ok {
 		if strings.HasSuffix(name, CompactModelSuffix) {
 			if wildcardRatio, ok := modelRatioMap.Get(CompactWildcardModelKey); ok {
-				return wildcardRatio, true, name
+				return ConvertModelValueToUSD(name, wildcardRatio), true, name
 			}
 			//return 0, true, name
 		}
 		return 37.5, operation_setting.SelfUseModeEnabled, name
 	}
-	return ratio, true, name
+	return ConvertModelValueToUSD(name, ratio), true, name
 }
 
 func DefaultModelRatio2JSONString() string {
@@ -688,12 +690,25 @@ func UpdateAudioCompletionRatioByJSONString(jsonStr string) error {
 	return types.LoadFromJsonStringWithCallback(audioCompletionRatioMap, jsonStr, InvalidateExposedDataCache)
 }
 
+// GetModelRatioCopy 返回所有模型倍率的快照，已按 ModelCurrency 归一化到 USD。
+// 用于公共定价页 (exposed_cache) 等下游展示。
 func GetModelRatioCopy() map[string]float64 {
-	return modelRatioMap.ReadAll()
+	raw := modelRatioMap.ReadAll()
+	out := make(map[string]float64, len(raw))
+	for name, ratio := range raw {
+		out[name] = ConvertModelValueToUSD(name, ratio)
+	}
+	return out
 }
 
+// GetModelPriceCopy 返回所有模型按次价格的快照，已按 ModelCurrency 归一化到 USD。
 func GetModelPriceCopy() map[string]float64 {
-	return modelPriceMap.ReadAll()
+	raw := modelPriceMap.ReadAll()
+	out := make(map[string]float64, len(raw))
+	for name, price := range raw {
+		out[name] = ConvertModelValueToUSD(name, price)
+	}
+	return out
 }
 
 func GetCompletionRatioCopy() map[string]float64 {

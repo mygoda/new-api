@@ -224,6 +224,24 @@ func UpdateOption(c *gin.Context) {
 			})
 			return
 		}
+	case "CurrencyRates":
+		err = ratio_setting.UpdateCurrencyRatesByJSONString(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "汇率设置失败: " + err.Error(),
+			})
+			return
+		}
+	case "ModelCurrency":
+		err = ratio_setting.UpdateModelCurrencyByJSONString(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "模型币种设置失败: " + err.Error(),
+			})
+			return
+		}
 	case "CreateCacheRatio":
 		err = ratio_setting.UpdateCreateCacheRatioByJSONString(option.Value.(string))
 		if err != nil {
