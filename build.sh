@@ -4,7 +4,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-IMAGE_NAME="${1:-${IMAGE_NAME:-new-api}}"
+if [[ -z "${1:-}" ]]; then
+    echo "Usage: ./build.sh <镜像名>" >&2
+    exit 1
+fi
+IMAGE_NAME="$1"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')}"
 PLATFORM="linux/$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')"
 
