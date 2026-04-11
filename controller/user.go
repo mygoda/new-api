@@ -520,15 +520,27 @@ func GetUserModels(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	groups := service.GetUserUsableGroups(user.Group)
+
 	var models []string
-	for group := range groups {
-		for _, g := range model.GetGroupEnabledModels(group) {
-			if !common.StringsContains(models, g) {
-				models = append(models, g)
+	if filterGroup := c.Query("group"); filterGroup != "" {
+		// 按指定分组过滤
+		if !service.GroupInUserUsableGroups(user.Group, filterGroup) {
+			common.ApiErrorMsg(c, "无权访问该分组")
+			return
+		}
+		models = model.GetGroupEnabledModels(filterGroup)
+	} else {
+		// 返回所有可用分组的模型并集
+		groups := service.GetUserUsableGroups(user.Group)
+		for group := range groups {
+			for _, g := range model.GetGroupEnabledModels(group) {
+				if !common.StringsContains(models, g) {
+					models = append(models, g)
+				}
 			}
 		}
 	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",

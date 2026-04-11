@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { API, processModelsData, processGroupsData } from '../../helpers';
 import { API_ENDPOINTS } from '../../constants/playground.constants';
@@ -30,29 +30,36 @@ export const useDataLoader = (
   setGroups,
 ) => {
   const { t } = useTranslation();
+  const prevGroupRef = useRef(inputs.group);
 
-  const loadModels = useCallback(async () => {
-    try {
-      const res = await API.get(API_ENDPOINTS.USER_MODELS);
-      const { success, message, data } = res.data;
+  const loadModels = useCallback(
+    async (group) => {
+      try {
+        const url = group
+          ? `${API_ENDPOINTS.USER_MODELS}?group=${encodeURIComponent(group)}`
+          : API_ENDPOINTS.USER_MODELS;
+        const res = await API.get(url);
+        const { success, message, data } = res.data;
 
-      if (success) {
-        const { modelOptions, selectedModel } = processModelsData(
-          data,
-          inputs.model,
-        );
-        setModels(modelOptions);
+        if (success) {
+          const { modelOptions, selectedModel } = processModelsData(
+            data,
+            inputs.model,
+          );
+          setModels(modelOptions);
 
-        if (selectedModel !== inputs.model) {
-          handleInputChange('model', selectedModel);
+          if (selectedModel !== inputs.model) {
+            handleInputChange('model', selectedModel);
+          }
+        } else {
+          showError(t(message));
         }
-      } else {
-        showError(t(message));
+      } catch (error) {
+        showError(t('加载模型失败'));
       }
-    } catch (error) {
-      showError(t('加载模型失败'));
-    }
-  }, [inputs.model, handleInputChange, setModels, t]);
+    },
+    [inputs.model, handleInputChange, setModels, t],
+  );
 
   const loadGroups = useCallback(async () => {
     try {
@@ -69,24 +76,43 @@ export const useDataLoader = (
         const hasCurrentGroup = groupOptions.some(
           (option) => option.value === inputs.group,
         );
+        const selectedGroup = hasCurrentGroup
+          ? inputs.group
+          : groupOptions[0]?.value || '';
+
         if (!hasCurrentGroup) {
-          handleInputChange('group', groupOptions[0]?.value || '');
+          handleInputChange('group', selectedGroup);
         }
+
+        // Load models for the resolved group
+        return selectedGroup;
       } else {
         showError(t(message));
       }
     } catch (error) {
       showError(t('加载分组失败'));
     }
+    return null;
   }, [userState, inputs.group, handleInputChange, setGroups, t]);
 
-  // 自动加载数据
+  // Initial load: groups first, then models with the selected group
   useEffect(() => {
     if (userState?.user) {
-      loadModels();
-      loadGroups();
+      loadGroups().then((group) => {
+        if (group) {
+          loadModels(group);
+        }
+      });
     }
-  }, [userState?.user, loadModels, loadGroups]);
+  }, [userState?.user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reload models when group changes (after initial load)
+  useEffect(() => {
+    if (inputs.group && inputs.group !== prevGroupRef.current) {
+      prevGroupRef.current = inputs.group;
+      loadModels(inputs.group);
+    }
+  }, [inputs.group, loadModels]);
 
   return {
     loadModels,
