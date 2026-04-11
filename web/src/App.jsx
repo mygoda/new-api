@@ -32,6 +32,7 @@ import { StatusContext } from './context/Status';
 import PasswordResetForm from './components/auth/PasswordResetForm';
 import PasswordResetConfirm from './components/auth/PasswordResetConfirm';
 import Channel from './pages/Channel';
+import Group from './pages/Group';
 import Ability from './pages/Ability';
 import Token from './pages/Token';
 import Redemption from './pages/Redemption';
@@ -138,6 +139,14 @@ function App() {
           element={
             <AdminRoute>
               <Channel />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path='/console/group'
+          element={
+            <AdminRoute>
+              <Group />
             </AdminRoute>
           }
         />

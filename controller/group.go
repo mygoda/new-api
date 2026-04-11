@@ -3,6 +3,8 @@ package controller
 import (
 	"net/http"
 
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
@@ -49,4 +51,72 @@ func GetUserGroups(c *gin.Context) {
 		"message": "",
 		"data":    usableGroups,
 	})
+}
+
+// GetGroupList returns all groups with full details (ratio, description, counts).
+func GetGroupList(c *gin.Context) {
+	groups, err := service.ListAllGroups()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, groups)
+}
+
+// CreateGroupHandler creates a new group.
+func CreateGroupHandler(c *gin.Context) {
+	var req dto.CreateGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := service.CreateGroup(&req); err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
+// UpdateGroupHandler updates an existing group.
+func UpdateGroupHandler(c *gin.Context) {
+	var req dto.UpdateGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := service.UpdateGroup(&req); err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
+// DeleteGroupHandler deletes a group by name.
+func DeleteGroupHandler(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		common.ApiErrorMsg(c, "缺少分组名称")
+		return
+	}
+	force := c.Query("force") == "true"
+	if err := service.DeleteGroup(name, force); err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
+// GetGroupChannelsHandler returns channels belonging to the specified group.
+func GetGroupChannelsHandler(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		common.ApiErrorMsg(c, "缺少分组名称")
+		return
+	}
+	channels, err := service.GetGroupChannels(name)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, channels)
 }
