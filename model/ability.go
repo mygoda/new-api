@@ -412,3 +412,40 @@ func FixAbility() (int, int, error) {
 	InitChannelCache()
 	return successCount, failCount, nil
 }
+
+// GetGroupChannelWeights returns the effective weight for each channel within a group.
+// Since a channel may have multiple ability records (one per model), we use MAX(weight) as representative.
+func GetGroupChannelWeights(group string) (map[int]uint, error) {
+	type result struct {
+		ChannelId int  `gorm:"column:channel_id"`
+		Weight    uint `gorm:"column:weight"`
+	}
+	var results []result
+	err := DB.Model(&Ability{}).
+		Select("channel_id, MAX(weight) as weight").
+		Where(commonGroupCol+" = ?", group).
+		Group("channel_id").
+		Scan(&results).Error
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[int]uint, len(results))
+	for _, r := range results {
+		m[r.ChannelId] = r.Weight
+	}
+	return m, nil
+}
+
+// UpdateGroupChannelWeight updates the weight of all ability records matching (group, channel_id).
+func UpdateGroupChannelWeight(group string, channelId int, weight uint) error {
+	result := DB.Model(&Ability{}).
+		Where(commonGroupCol+" = ? AND channel_id = ?", group, channelId).
+		Update("weight", weight)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("no ability records found for this group and channel")
+	}
+	return nil
+}

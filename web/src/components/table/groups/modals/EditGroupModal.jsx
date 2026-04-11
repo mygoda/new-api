@@ -9,6 +9,7 @@ import {
   Spin,
   Table,
   Collapsible,
+  InputNumber,
 } from '@douyinfe/semi-ui';
 import { IconSave } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
@@ -62,6 +63,27 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
       // ignore
     } finally {
       setLoadingChannels(false);
+    }
+  };
+
+  const handleUpdateChannelWeight = async (channelId, weight) => {
+    try {
+      const res = await API.put(
+        `/api/group/${encodeURIComponent(editingGroup.name)}/channel_weight`,
+        { channel_id: channelId, weight },
+      );
+      if (res.data.success) {
+        showSuccess(t('更新成功'));
+        setChannels((prev) =>
+          prev.map((ch) =>
+            ch.id === channelId ? { ...ch, group_weight: weight } : ch,
+          ),
+        );
+      } else {
+        showError(res.data.message || t('更新失败'));
+      }
+    } catch {
+      showError(t('更新失败'));
     }
   };
 
@@ -126,6 +148,26 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
         ) : (
           <Tag color='red'>{t('禁用')}</Tag>
         ),
+    },
+    {
+      title: t('权重'),
+      dataIndex: 'group_weight',
+      key: 'group_weight',
+      width: 120,
+      render: (value, record) => (
+        <InputNumber
+          size='small'
+          value={value ?? 0}
+          min={0}
+          style={{ width: 100 }}
+          onBlur={(e) => {
+            const newVal = parseInt(e.target.value, 10);
+            if (!isNaN(newVal) && newVal !== (value ?? 0)) {
+              handleUpdateChannelWeight(record.id, newVal);
+            }
+          }}
+        />
+      ),
     },
   ];
 

@@ -106,17 +106,38 @@ func DeleteGroupHandler(c *gin.Context) {
 	common.ApiSuccess(c, nil)
 }
 
-// GetGroupChannelsHandler returns channels belonging to the specified group.
+// GetGroupChannelsHandler returns channels belonging to the specified group, with group-specific weights.
 func GetGroupChannelsHandler(c *gin.Context) {
 	name := c.Param("name")
 	if name == "" {
 		common.ApiErrorMsg(c, "缺少分组名称")
 		return
 	}
-	channels, err := service.GetGroupChannels(name)
+	channels, err := service.GetGroupChannelsWithWeight(name)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
 	common.ApiSuccess(c, channels)
+}
+
+// UpdateGroupChannelWeightHandler updates the weight of a channel within a group.
+func UpdateGroupChannelWeightHandler(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		common.ApiErrorMsg(c, "缺少分组名称")
+		return
+	}
+	var req dto.UpdateGroupChannelWeightRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiErrorMsg(c, "参数错误")
+		return
+	}
+	err := service.UpdateGroupChannelWeight(name, req.ChannelId, req.Weight)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	model.InitChannelCache()
+	common.ApiSuccess(c, nil)
 }

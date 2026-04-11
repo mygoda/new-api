@@ -318,6 +318,7 @@ func SetApiRouter(router *gin.Engine) {
 			groupRoute.PUT("/", controller.UpdateGroupHandler)
 			groupRoute.DELETE("/:name", controller.DeleteGroupHandler)
 			groupRoute.GET("/:name/channels", controller.GetGroupChannelsHandler)
+			groupRoute.PUT("/:name/channel_weight", controller.UpdateGroupChannelWeightHandler)
 		}
 
 		prefillGroupRoute := apiRouter.Group("/prefill_group")

@@ -283,3 +283,35 @@ func DeleteGroup(name string, force bool) error {
 func GetGroupChannels(name string) ([]*model.Channel, error) {
 	return model.GetChannelsByGroup(name)
 }
+
+// GetGroupChannelsWithWeight returns channels enriched with their group-specific weight from the abilities table.
+func GetGroupChannelsWithWeight(name string) ([]dto.GroupChannelInfo, error) {
+	channels, err := model.GetChannelsByGroup(name)
+	if err != nil {
+		return nil, err
+	}
+	weightMap, err := model.GetGroupChannelWeights(name)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]dto.GroupChannelInfo, 0, len(channels))
+	for _, ch := range channels {
+		info := dto.GroupChannelInfo{
+			Id:     ch.Id,
+			Name:   ch.Name,
+			Type:   ch.Type,
+			Status: ch.Status,
+		}
+		if w, ok := weightMap[ch.Id]; ok {
+			wCopy := w
+			info.GroupWeight = &wCopy
+		}
+		result = append(result, info)
+	}
+	return result, nil
+}
+
+// UpdateGroupChannelWeight updates the weight of all ability records for a channel within a group.
+func UpdateGroupChannelWeight(group string, channelId int, weight uint) error {
+	return model.UpdateGroupChannelWeight(group, channelId, weight)
+}
