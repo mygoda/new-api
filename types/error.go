@@ -399,6 +399,174 @@ func ErrOptionWithHideErrMsg(replaceStr string) NewAPIErrorOptions {
 	}
 }
 
+// SanitizeForUser 对返回给用户的错误进行脱敏处理。
+// 用户可操作的错误（参数错误、限流、配额不足等）保留原始消息；
+// 内部实现错误（渠道配置、上游认证、网络故障等）替换为通用提示。
+// 注意：必须在日志记录之后调用，确保原始错误已被记录。
+func (e *NewAPIError) SanitizeForUser() {
+	if e == nil {
+		return
+	}
+	if isUserVisibleError(e) {
+		return
+	}
+	msg := genericMessageForError(e)
+	e.Err = errors.New(msg)
+	// 同时替换 RelayError 中的 Message，防止 ToOpenAIError/ToClaudeError 使用原始消息
+	switch re := e.RelayError.(type) {
+	case OpenAIError:
+		re.Message = msg
+		re.Metadata = nil
+		e.RelayError = re
+	case ClaudeError:
+		re.Message = msg
+		e.RelayError = re
+	}
+	e.Metadata = nil
+}
+
+// isUserVisibleError 判断该错误是否应当对用户可见。
+func isUserVisibleError(e *NewAPIError) bool {
+	// 1. 白名单：已知的用户可操作错误码，无条件对用户可见
+	if isUserVisibleErrorCode(e.errorCode) {
+		return true
+	}
+	// 2. 黑名单：已知的内部错误码，无条件隐藏
+	if isInternalErrorCode(e.errorCode) {
+		return false
+	}
+	// 3. 其余情况（包括上游 provider 返回的错误码，如 "invalid_api_key", "rate_limit_exceeded" 等）
+	//    按 provider error type/code 和 HTTP 状态码分类
+	return isUserVisibleUpstreamError(e)
+}
+
+// isUserVisibleErrorCode 白名单：这些错误码的消息对用户有意义，应当保留。
+func isUserVisibleErrorCode(code ErrorCode) bool {
+	switch code {
+	case ErrorCodeInvalidRequest,
+		ErrorCodeBadRequestBody,
+		ErrorCodeReadRequestBodyFailed,
+		ErrorCodeConvertRequestFailed,
+		ErrorCodeInsufficientUserQuota,
+		ErrorCodePreConsumeTokenQuotaFailed,
+		ErrorCodeModelNotFound,
+		ErrorCodePromptBlocked,
+		ErrorCodeEmptyResponse,
+		ErrorCodeSensitiveWordsDetected,
+		ErrorCodeAccessDenied,
+		ErrorCodeViolationFeeGrokCSAM,
+		ErrorCodeCountTokenFailed,
+		ErrorCodeModelPriceError:
+		return true
+	default:
+		return false
+	}
+}
+
+// isInternalErrorCode 黑名单：这些错误码属于内部实现细节，不应暴露给用户。
+func isInternalErrorCode(code ErrorCode) bool {
+	if strings.HasPrefix(string(code), "channel:") {
+		return true
+	}
+	switch code {
+	case ErrorCodeDoRequestFailed,
+		ErrorCodeGetChannelFailed,
+		ErrorCodeGenRelayInfoFailed,
+		ErrorCodeInvalidApiType,
+		ErrorCodeJsonMarshalFailed,
+		ErrorCodeReadResponseBodyFailed,
+		ErrorCodeBadResponse,
+		ErrorCodeBadResponseBody,
+		ErrorCodeAwsInvokeError,
+		ErrorCodeQueryDataError,
+		ErrorCodeUpdateDataError:
+		return true
+	default:
+		return false
+	}
+}
+
+// isUserVisibleUpstreamError 对 bad_response_status_code 类错误做进一步分类。
+// 先按上游返回的 error type / code 判断，再按 HTTP 状态码兜底。
+func isUserVisibleUpstreamError(e *NewAPIError) bool {
+	// 1. 按上游 error type 判断
+	if oaiErr, ok := e.RelayError.(OpenAIError); ok {
+		switch oaiErr.Type {
+		case "authentication_error", "permission_error", "insufficient_quota":
+			return false
+		case "invalid_request_error", "rate_limit_error":
+			return true
+		}
+		// 2. 按上游 error code 判断
+		codeStr := fmt.Sprintf("%v", oaiErr.Code)
+		switch codeStr {
+		case "invalid_api_key", "account_deactivated", "billing_not_active":
+			return false
+		}
+	}
+	if claudeErr, ok := e.RelayError.(ClaudeError); ok {
+		switch claudeErr.Type {
+		case "authentication_error", "permission_error", "not_found_error":
+			return false
+		case "invalid_request_error", "rate_limit_error":
+			return true
+		}
+	}
+	// 3. 按 HTTP 状态码兜底
+	switch {
+	case e.StatusCode == 400, e.StatusCode == 404,
+		e.StatusCode == 413, e.StatusCode == 422,
+		e.StatusCode == 429:
+		return true
+	case e.StatusCode == 401, e.StatusCode == 403:
+		return false
+	case e.StatusCode >= 500:
+		return false
+	default:
+		return false
+	}
+}
+
+// genericMessageForError 根据错误类型返回对应的通用提示消息。
+func genericMessageForError(e *NewAPIError) string {
+	if strings.HasPrefix(string(e.errorCode), "channel:") {
+		return "请求处理失败，请稍后重试或联系管理员"
+	}
+	switch e.errorCode {
+	case ErrorCodeDoRequestFailed:
+		return "请求上游服务失败，请稍后重试"
+	case ErrorCodeGetChannelFailed:
+		return "当前无可用渠道，请稍后重试"
+	case ErrorCodeReadResponseBodyFailed, ErrorCodeBadResponse, ErrorCodeBadResponseBody:
+		return "上游服务响应异常，请稍后重试"
+	case ErrorCodeAwsInvokeError:
+		return "请求上游服务失败，请稍后重试"
+	case ErrorCodeBadResponseStatusCode:
+		return genericMessageForUpstreamStatus(e.StatusCode)
+	default:
+		// 对于上游 provider 返回的错误码（如 "invalid_api_key"、"server_error" 等），
+		// 根据 HTTP 状态码生成通用提示
+		if e.StatusCode >= 400 {
+			return genericMessageForUpstreamStatus(e.StatusCode)
+		}
+		return "请求处理失败，请稍后重试或联系管理员"
+	}
+}
+
+// genericMessageForUpstreamStatus 根据上游 HTTP 状态码返回通用提示。
+func genericMessageForUpstreamStatus(statusCode int) string {
+	switch {
+	case statusCode == 401 || statusCode == 403:
+		return "上游服务认证失败，请联系管理员"
+	case statusCode == 408 || statusCode == 504 || statusCode == 524:
+		return "上游服务响应超时，请稍后重试"
+	case statusCode >= 500:
+		return "上游服务暂时不可用，请稍后重试"
+	default:
+		return "上游服务请求失败，请稍后重试"
+	}
+}
+
 func IsRecordErrorLog(e *NewAPIError) bool {
 	if e == nil {
 		return false

@@ -19,7 +19,13 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { API, processModelsData, processGroupsData } from '../../helpers';
+import {
+  API,
+  processModelsData,
+  processGroupsData,
+  showError,
+  isAdmin,
+} from '../../helpers';
 import { API_ENDPOINTS } from '../../constants/playground.constants';
 
 export const useDataLoader = (
@@ -70,7 +76,19 @@ export const useDataLoader = (
         const userGroup =
           userState?.user?.group ||
           JSON.parse(localStorage.getItem('user'))?.group;
-        const groupOptions = processGroupsData(data, userGroup);
+
+        let groupOptions;
+        if (isAdmin()) {
+          // 管理员可见所有可用分组
+          groupOptions = processGroupsData(data, userGroup);
+        } else {
+          // 非管理员仅可见自己所属分组
+          const filteredData = {};
+          if (userGroup && data[userGroup]) {
+            filteredData[userGroup] = data[userGroup];
+          }
+          groupOptions = processGroupsData(filteredData, userGroup);
+        }
         setGroups(groupOptions);
 
         const hasCurrentGroup = groupOptions.some(

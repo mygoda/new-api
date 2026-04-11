@@ -89,6 +89,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	defer func() {
 		if newAPIError != nil {
 			logger.LogError(c, fmt.Sprintf("relay error: %s", newAPIError.Error()))
+			newAPIError.SanitizeForUser()
 			newAPIError.SetMessage(common.MessageWithRequestId(newAPIError.Error(), requestId))
 			switch relayFormat {
 			case types.RelayFormatOpenAIRealtime:
@@ -603,12 +604,25 @@ func RelayTask(c *gin.Context) {
 	}
 }
 
-// respondTaskError 统一输出 Task 错误响应（含 429 限流提示改写）
+// respondTaskError 统一输出 Task 错误响应（含错误脱敏）
 func respondTaskError(c *gin.Context, taskErr *dto.TaskError) {
-	if taskErr.StatusCode == http.StatusTooManyRequests {
-		taskErr.Message = "当前分组上游负载已饱和，请稍后再试"
-	}
+	sanitizeTaskErrorForUser(taskErr)
 	c.JSON(taskErr.StatusCode, taskErr)
+}
+
+// sanitizeTaskErrorForUser 对 Task 错误做脱敏，非本地产生的上游错误替换为通用提示。
+func sanitizeTaskErrorForUser(taskErr *dto.TaskError) {
+	if taskErr == nil || taskErr.LocalError {
+		return
+	}
+	switch {
+	case taskErr.StatusCode == http.StatusTooManyRequests:
+		taskErr.Message = "当前分组上游负载已饱和，请稍后再试"
+	case taskErr.StatusCode == 401 || taskErr.StatusCode == 403:
+		taskErr.Message = "上游服务认证失败，请联系管理员"
+	case taskErr.StatusCode >= 500:
+		taskErr.Message = "上游服务暂时不可用，请稍后重试"
+	}
 }
 
 func shouldRetryTaskRelay(c *gin.Context, channelId int, taskErr *dto.TaskError, retryTimes int) bool {
