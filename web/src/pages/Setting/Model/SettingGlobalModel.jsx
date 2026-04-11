@@ -44,6 +44,12 @@ const thinkingExample = JSON.stringify(
   2,
 );
 
+const forceAnthropicExample = JSON.stringify(
+  ['claude', 'opus', 'sonnet', 'haiku'],
+  null,
+  2,
+);
+
 const chatCompletionsToResponsesPolicyExample = JSON.stringify(
   {
     enabled: true,
@@ -69,6 +75,7 @@ const chatCompletionsToResponsesPolicyAllChannelsExample = JSON.stringify(
 const defaultGlobalSettingInputs = {
   'global.pass_through_request_enabled': false,
   'global.thinking_model_blacklist': '[]',
+  'global.force_anthropic_keywords': '[]',
   'global.chat_completions_to_responses_policy': '{}',
   'general_setting.ping_interval_enabled': false,
   'general_setting.ping_interval_seconds': 60,
@@ -95,7 +102,10 @@ export default function SettingGlobalModel(props) {
   };
 
   const normalizeValueBeforeSave = (key, value) => {
-    if (key === 'global.thinking_model_blacklist') {
+    if (
+      key === 'global.thinking_model_blacklist' ||
+      key === 'global.force_anthropic_keywords'
+    ) {
       const text = typeof value === 'string' ? value.trim() : '';
       return text === '' ? '[]' : value;
     }
@@ -147,6 +157,16 @@ export default function SettingGlobalModel(props) {
       if (props.options[key] !== undefined) {
         let value = props.options[key];
         if (key === 'global.thinking_model_blacklist') {
+          try {
+            value =
+              value && String(value).trim() !== ''
+                ? JSON.stringify(JSON.parse(value), null, 2)
+                : defaultGlobalSettingInputs[key];
+          } catch (error) {
+            value = defaultGlobalSettingInputs[key];
+          }
+        }
+        if (key === 'global.force_anthropic_keywords') {
           try {
             value =
               value && String(value).trim() !== ''
@@ -228,6 +248,34 @@ export default function SettingGlobalModel(props) {
                     setInputs({
                       ...inputs,
                       'global.thinking_model_blacklist': value,
+                    })
+                  }
+                />
+              </Col>
+            </Row>
+            <Row>
+              <Col span={24}>
+                <Form.TextArea
+                  label={t('强制 Anthropic 协议关键词')}
+                  field={'global.force_anthropic_keywords'}
+                  placeholder={t('例如：') + '\n' + forceAnthropicExample}
+                  rows={4}
+                  rules={[
+                    {
+                      validator: (rule, value) => {
+                        if (!value || value.trim() === '') return true;
+                        return verifyJSON(value);
+                      },
+                      message: t('不是合法的 JSON 字符串'),
+                    },
+                  ]}
+                  extraText={t(
+                    '当客户端使用 OpenAI 协议请求时，如果模型名称包含列表中的关键词（不区分大小写），将自动切换为 Anthropic 协议转发。默认值：["claude", "opus", "sonnet", "haiku"]',
+                  )}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      'global.force_anthropic_keywords': value,
                     })
                   }
                 />

@@ -35,6 +35,7 @@ func (p ChatCompletionsToResponsesPolicy) IsChannelEnabled(channelID int, channe
 type GlobalSettings struct {
 	PassThroughRequestEnabled        bool                             `json:"pass_through_request_enabled"`
 	ThinkingModelBlacklist           []string                         `json:"thinking_model_blacklist"`
+	ForceAnthropicKeywords           []string                         `json:"force_anthropic_keywords"`
 	ChatCompletionsToResponsesPolicy ChatCompletionsToResponsesPolicy `json:"chat_completions_to_responses_policy"`
 }
 
@@ -44,6 +45,12 @@ var defaultOpenaiSettings = GlobalSettings{
 	ThinkingModelBlacklist: []string{
 		"moonshotai/kimi-k2-thinking",
 		"kimi-k2-thinking",
+	},
+	ForceAnthropicKeywords: []string{
+		"claude",
+		"opus",
+		"sonnet",
+		"haiku",
 	},
 	ChatCompletionsToResponsesPolicy: ChatCompletionsToResponsesPolicy{
 		Enabled:     false,
@@ -72,6 +79,20 @@ func ShouldPreserveThinkingSuffix(modelName string) bool {
 
 	for _, entry := range globalSettings.ThinkingModelBlacklist {
 		if strings.TrimSpace(entry) == target {
+			return true
+		}
+	}
+	return false
+}
+
+// IsForceAnthropicModel 判断模型名称是否匹配强制走 Anthropic 协议的关键词列表
+func IsForceAnthropicModel(modelName string) bool {
+	if len(globalSettings.ForceAnthropicKeywords) == 0 {
+		return false
+	}
+	m := strings.ToLower(modelName)
+	for _, keyword := range globalSettings.ForceAnthropicKeywords {
+		if keyword != "" && strings.Contains(m, strings.ToLower(keyword)) {
 			return true
 		}
 	}

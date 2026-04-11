@@ -249,7 +249,10 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
               </Button>
               <Collapsible isOpen={showChannels}>
                 <div style={{ marginTop: 8 }}>
-                  <Spin spinning={loadingChannels}>
+                  <Typography.Text type='tertiary' size='small'>
+                    {t('权重决定同优先级下各渠道的流量分配比例，值越大分配到的请求越多。每个渠道基础权重为 10，设置为 0 时仍会分配少量流量。此处权重仅对当前分组生效，不影响其他分组。')}
+                  </Typography.Text>
+                  <Spin spinning={loadingChannels} style={{ marginTop: 8 }}>
                     <Table
                       columns={channelColumns}
                       dataSource={channels}

@@ -21,6 +21,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
 
@@ -122,9 +123,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
-	// 如果客户端使用 OpenAI 协议但模型名称是 Claude 系列，标记强制走 Anthropic 适配器
-	if relayFormat == types.RelayFormatOpenAI && isClaudeModel(relayInfo.OriginModelName) {
-		logger.LogInfo(c, fmt.Sprintf("[协议切换] 模型 %q 为 Claude 系列，客户端请求路径 /v1/chat/completions (OpenAI协议)，强制切换为 Anthropic 协议 (/v1/messages)", relayInfo.OriginModelName))
+	// 如果客户端使用 OpenAI 协议但模型名称匹配强制 Anthropic 关键词，标记强制走 Anthropic 适配器
+	if relayFormat == types.RelayFormatOpenAI && model_setting.IsForceAnthropicModel(relayInfo.OriginModelName) {
+		logger.LogInfo(c, fmt.Sprintf("[协议切换] 模型 %q 匹配强制 Anthropic 关键词，客户端请求路径 /v1/chat/completions (OpenAI协议)，强制切换为 Anthropic 协议 (/v1/messages)", relayInfo.OriginModelName))
 		c.Set(string(constant.ContextKeyForceAnthropicAPI), true)
 	}
 
@@ -652,11 +653,3 @@ func shouldRetryTaskRelay(c *gin.Context, channelId int, taskErr *dto.TaskError,
 	return true
 }
 
-// isClaudeModel 检查模型名称是否为 Claude 系列模型
-func isClaudeModel(model string) bool {
-	m := strings.ToLower(model)
-	return strings.Contains(m, "claude") ||
-		strings.Contains(m, "opus") ||
-		strings.Contains(m, "sonnet") ||
-		strings.Contains(m, "haiku")
-}
