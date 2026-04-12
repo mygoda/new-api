@@ -522,20 +522,31 @@ func GetUserModels(c *gin.Context) {
 	}
 
 	var models []string
-	if filterGroup := c.Query("group"); filterGroup != "" {
-		// 按指定分组过滤
-		if !service.GroupInUserUsableGroups(user.Group, filterGroup) {
-			common.ApiErrorMsg(c, "无权访问该分组")
-			return
+	userRole := c.GetInt("role")
+
+	if userRole >= common.RoleAdminUser {
+		// 管理员返回全部启用的模型
+		if filterGroup := c.Query("group"); filterGroup != "" {
+			models = model.GetGroupEnabledModels(filterGroup)
+		} else {
+			models = model.GetEnabledModels()
 		}
-		models = model.GetGroupEnabledModels(filterGroup)
 	} else {
-		// 返回所有可用分组的模型并集
-		groups := service.GetUserUsableGroups(user.Group)
-		for group := range groups {
-			for _, g := range model.GetGroupEnabledModels(group) {
-				if !common.StringsContains(models, g) {
-					models = append(models, g)
+		if filterGroup := c.Query("group"); filterGroup != "" {
+			// 按指定分组过滤
+			if !service.GroupInUserUsableGroups(user.Group, filterGroup) {
+				common.ApiErrorMsg(c, "无权访问该分组")
+				return
+			}
+			models = model.GetGroupEnabledModels(filterGroup)
+		} else {
+			// 返回所有可用分组的模型并集
+			groups := service.GetUserUsableGroups(user.Group)
+			for group := range groups {
+				for _, g := range model.GetGroupEnabledModels(group) {
+					if !common.StringsContains(models, g) {
+						models = append(models, g)
+					}
 				}
 			}
 		}

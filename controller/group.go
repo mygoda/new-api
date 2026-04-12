@@ -27,25 +27,37 @@ func GetGroups(c *gin.Context) {
 
 func GetUserGroups(c *gin.Context) {
 	usableGroups := make(map[string]map[string]interface{})
-	userGroup := ""
 	userId := c.GetInt("id")
-	userGroup, _ = model.GetUserGroup(userId, false)
-	userUsableGroups := service.GetUserUsableGroups(userGroup)
-	for groupName, _ := range ratio_setting.GetGroupRatioCopy() {
-		// UserUsableGroups contains the groups that the user can use
-		if desc, ok := userUsableGroups[groupName]; ok {
+	userGroup, _ := model.GetUserGroup(userId, false)
+	userRole := c.GetInt("role")
+
+	if userRole >= common.RoleAdminUser {
+		// 管理员可以看到全部分组
+		for groupName := range ratio_setting.GetGroupRatioCopy() {
 			usableGroups[groupName] = map[string]interface{}{
-				"ratio": service.GetUserGroupRatio(userGroup, groupName),
-				"desc":  desc,
+				"ratio": ratio_setting.GetGroupRatio(groupName),
+				"desc":  setting.GetUsableGroupDescription(groupName),
+			}
+		}
+	} else {
+		// 普通用户只能看到自己可用的分组
+		userUsableGroups := service.GetUserUsableGroups(userGroup)
+		for groupName := range ratio_setting.GetGroupRatioCopy() {
+			if desc, ok := userUsableGroups[groupName]; ok {
+				usableGroups[groupName] = map[string]interface{}{
+					"ratio": service.GetUserGroupRatio(userGroup, groupName),
+					"desc":  desc,
+				}
+			}
+		}
+		if _, ok := userUsableGroups["auto"]; ok {
+			usableGroups["auto"] = map[string]interface{}{
+				"ratio": "自动",
+				"desc":  setting.GetUsableGroupDescription("auto"),
 			}
 		}
 	}
-	if _, ok := userUsableGroups["auto"]; ok {
-		usableGroups["auto"] = map[string]interface{}{
-			"ratio": "自动",
-			"desc":  setting.GetUsableGroupDescription("auto"),
-		}
-	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
