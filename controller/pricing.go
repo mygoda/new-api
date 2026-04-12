@@ -57,7 +57,7 @@ type PublicModelInfo struct {
 	Description     string   `json:"description,omitempty"`
 	Icon            string   `json:"icon,omitempty"`
 	Tags            string   `json:"tags,omitempty"`
-	ContextLength   int      `json:"context_length,omitempty"`
+	ContextLength   string   `json:"context_length,omitempty"`
 	QuotaType       int      `json:"quota_type"` // 0 = 按量计费, 1 = 按次计费
 	InputPrice      float64  `json:"input_price,omitempty"`
 	OutputPrice     float64  `json:"output_price,omitempty"`

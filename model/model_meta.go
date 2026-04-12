@@ -28,7 +28,7 @@ type Model struct {
 	Tags         string         `json:"tags,omitempty" gorm:"type:varchar(255)"`
 	VendorID     int            `json:"vendor_id,omitempty" gorm:"index"`
 	Endpoints    string         `json:"endpoints,omitempty" gorm:"type:text"`
-	ContextLength int           `json:"context_length" gorm:"default:0"`
+	ContextLength string         `json:"context_length" gorm:"type:varchar(32);default:''"`
 	Status       int            `json:"status" gorm:"default:1"`
 	SyncOfficial int            `json:"sync_official" gorm:"default:1"`
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
