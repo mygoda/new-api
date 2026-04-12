@@ -1,12 +1,63 @@
 package model
 
 import (
+	"database/sql/driver"
+	"fmt"
 	"strconv"
 
 	"github.com/QuantumNous/new-api/common"
 
 	"gorm.io/gorm"
 )
+
+// FlexString 兼容 JSON 数字和字符串两种格式的字符串类型。
+// JSON 输入 "128K" 或 128000 均可正确解析为字符串。
+// 同时兼容数据库 BIGINT → VARCHAR 迁移期间的列读取。
+type FlexString string
+
+func (f *FlexString) UnmarshalJSON(data []byte) error {
+	s := string(data)
+	if s == "null" {
+		return nil
+	}
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		s = s[1 : len(s)-1]
+	}
+	*f = FlexString(s)
+	return nil
+}
+
+func (f FlexString) MarshalJSON() ([]byte, error) {
+	return common.Marshal(string(f))
+}
+
+// Scan implements sql.Scanner for reading from DB (handles int64, string, []byte).
+func (f *FlexString) Scan(value interface{}) error {
+	if value == nil {
+		*f = ""
+		return nil
+	}
+	switch v := value.(type) {
+	case string:
+		*f = FlexString(v)
+	case []byte:
+		*f = FlexString(v)
+	case int64:
+		if v == 0 {
+			*f = ""
+		} else {
+			*f = FlexString(strconv.FormatInt(v, 10))
+		}
+	default:
+		*f = FlexString(fmt.Sprintf("%v", v))
+	}
+	return nil
+}
+
+// Value implements driver.Valuer for writing to DB.
+func (f FlexString) Value() (driver.Value, error) {
+	return string(f), nil
+}
 
 const (
 	NameRuleExact = iota
@@ -28,7 +79,7 @@ type Model struct {
 	Tags         string         `json:"tags,omitempty" gorm:"type:varchar(255)"`
 	VendorID     int            `json:"vendor_id,omitempty" gorm:"index"`
 	Endpoints    string         `json:"endpoints,omitempty" gorm:"type:text"`
-	ContextLength string         `json:"context_length" gorm:"type:varchar(32);default:''"`
+	ContextLength FlexString      `json:"context_length" gorm:"type:varchar(32);default:''"`
 	Status       int            `json:"status" gorm:"default:1"`
 	SyncOfficial int            `json:"sync_official" gorm:"default:1"`
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`

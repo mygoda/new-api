@@ -300,7 +300,7 @@ func updatePricing() {
 			pricing.Icon = meta.Icon
 			pricing.Tags = meta.Tags
 			pricing.VendorID = meta.VendorID
-			pricing.ContextLength = meta.ContextLength
+			pricing.ContextLength = string(meta.ContextLength)
 		}
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
 		if findPrice {

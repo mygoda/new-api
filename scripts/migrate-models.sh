@@ -61,19 +61,30 @@ migrate_mysql() {
     local sql="ALTER TABLE \`models\` ADD COLUMN IF NOT EXISTS \`context_length\` BIGINT NOT NULL DEFAULT 0;"
     if run_in_service mysql sh -c "mysql -uroot -p123456 new-api -e \"$sql\"" 2>/tmp/mig_models.err; then
         info "MySQL: 迁移成功（或列已存在，已幂等跳过）"
-        return 0
+    else
+        # 5.7 兼容回退：先 SELECT 检查
+        warn "ALTER ... IF NOT EXISTS 失败，尝试 5.7 兼容路径"
+        local check_sql="SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='models' AND COLUMN_NAME='context_length';"
+        local exists
+        exists=$(run_in_service mysql sh -c "mysql -uroot -p123456 -N -B new-api -e \"$check_sql\"" 2>/dev/null || echo 0)
+        if [ "${exists:-0}" = "0" ]; then
+            run_in_service mysql sh -c "mysql -uroot -p123456 new-api -e \"ALTER TABLE \\\`models\\\` ADD COLUMN \\\`context_length\\\` BIGINT NOT NULL DEFAULT 0;\""
+            info "MySQL: 列已新增"
+        else
+            info "MySQL: 列已存在，跳过"
+        fi
     fi
 
-    # 5.7 兼容回退：先 SELECT 检查
-    warn "ALTER ... IF NOT EXISTS 失败，尝试 5.7 兼容路径"
-    local check_sql="SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='models' AND COLUMN_NAME='context_length';"
-    local exists
-    exists=$(run_in_service mysql sh -c "mysql -uroot -p123456 -N -B new-api -e \"$check_sql\"" 2>/dev/null || echo 0)
-    if [ "${exists:-0}" = "0" ]; then
-        run_in_service mysql sh -c "mysql -uroot -p123456 new-api -e \"ALTER TABLE \\\`models\\\` ADD COLUMN \\\`context_length\\\` BIGINT NOT NULL DEFAULT 0;\""
-        info "MySQL: 列已新增"
+    # 将 context_length 从 BIGINT 迁移为 VARCHAR(32)，支持 "128K"/"1M" 等描述性配置
+    local type_sql="SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='models' AND COLUMN_NAME='context_length';"
+    local col_type
+    col_type=$(run_in_service mysql sh -c "mysql -uroot -p123456 -N -B new-api -e \"$type_sql\"" 2>/dev/null || echo "")
+    if [ "$col_type" != "varchar" ]; then
+        info "MySQL: 将 context_length 从 $col_type 迁移为 VARCHAR(32) ..."
+        run_in_service mysql sh -c "mysql -uroot -p123456 new-api -e \"ALTER TABLE \\\`models\\\` MODIFY COLUMN \\\`context_length\\\` VARCHAR(32) NOT NULL DEFAULT '';\""
+        info "MySQL: context_length 类型迁移完成"
     else
-        info "MySQL: 列已存在，跳过"
+        info "MySQL: context_length 已是 VARCHAR 类型，跳过"
     fi
 }
 
@@ -83,6 +94,18 @@ migrate_postgres() {
     local sql="ALTER TABLE models ADD COLUMN IF NOT EXISTS context_length BIGINT NOT NULL DEFAULT 0;"
     run_in_service postgres psql -U root -d new-api -c "$sql"
     info "PostgreSQL: 迁移成功（或列已存在，已幂等跳过）"
+
+    # 将 context_length 从 BIGINT 迁移为 VARCHAR(32)
+    local type_sql="SELECT data_type FROM information_schema.columns WHERE table_name='models' AND column_name='context_length';"
+    local col_type
+    col_type=$(run_in_service postgres psql -U root -d new-api -t -A -c "$type_sql" 2>/dev/null || echo "")
+    if [ "$col_type" != "character varying" ]; then
+        info "PostgreSQL: 将 context_length 从 $col_type 迁移为 VARCHAR(32) ..."
+        run_in_service postgres psql -U root -d new-api -c "ALTER TABLE models ALTER COLUMN context_length TYPE VARCHAR(32) USING context_length::text, ALTER COLUMN context_length SET DEFAULT '';"
+        info "PostgreSQL: context_length 类型迁移完成"
+    else
+        info "PostgreSQL: context_length 已是 VARCHAR 类型，跳过"
+    fi
 }
 
 migrate_sqlite() {
