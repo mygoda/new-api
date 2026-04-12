@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	sentrypkg "github.com/QuantumNous/new-api/sentry"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -558,6 +559,11 @@ func handleConfigUpdate(key, value string) bool {
 	if configName == "performance_setting" {
 		// 同步磁盘缓存配置到 common 包
 		performance_setting.UpdateAndSync()
+	}
+	if configName == "sentry" {
+		if sentrypkg.ReinitFunc != nil {
+			sentrypkg.ReinitFunc()
+		}
 	}
 
 	return true // 已处理

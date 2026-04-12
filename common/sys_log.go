@@ -21,11 +21,17 @@ func SysLog(s string) {
 	LogWriterMu.RUnlock()
 }
 
+// SysErrorHook 可选的错误上报回调（如 Sentry），在 main.go 中注入。
+var SysErrorHook func(msg string)
+
 func SysError(s string) {
 	t := time.Now()
 	LogWriterMu.RLock()
 	_, _ = fmt.Fprintf(gin.DefaultErrorWriter, "[SYS] %v | %s \n", t.Format("2006/01/02 - 15:04:05"), s)
 	LogWriterMu.RUnlock()
+	if SysErrorHook != nil {
+		SysErrorHook(s)
+	}
 }
 
 func FatalLog(v ...any) {

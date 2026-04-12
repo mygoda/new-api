@@ -81,8 +81,14 @@ func LogWarn(ctx context.Context, msg string) {
 	logHelper(ctx, loggerWarn, msg)
 }
 
+// LogErrorHook 可选的错误上报回调（如 Sentry），在 main.go 中注入。
+var LogErrorHook func(ctx context.Context, msg string)
+
 func LogError(ctx context.Context, msg string) {
 	logHelper(ctx, loggerError, msg)
+	if LogErrorHook != nil {
+		LogErrorHook(ctx, msg)
+	}
 }
 
 func LogDebug(ctx context.Context, msg string, args ...any) {

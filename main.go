@@ -21,9 +21,11 @@ import (
 	"github.com/QuantumNous/new-api/oauth"
 	"github.com/QuantumNous/new-api/relay"
 	"github.com/QuantumNous/new-api/router"
+	sentrypkg "github.com/QuantumNous/new-api/sentry"
 	"github.com/QuantumNous/new-api/service"
 	_ "github.com/QuantumNous/new-api/setting/performance_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-contrib/sessions"
@@ -63,6 +65,7 @@ func main() {
 			common.FatalLog("failed to close database: " + err.Error())
 		}
 	}()
+	defer sentrypkg.Flush(2 * time.Second)
 
 	if common.RedisEnabled {
 		// for compatibility with old versions
@@ -165,6 +168,7 @@ func main() {
 	// This will cause SSE not to work!!!
 	//server.Use(gzip.Gzip(gzip.DefaultCompression))
 	server.Use(middleware.RequestId())
+	server.Use(sentrypkg.GinMiddleware())
 	server.Use(middleware.PoweredBy())
 	server.Use(middleware.I18n())
 	middleware.SetUpLogger(server)
@@ -239,6 +243,33 @@ func InjectGoogleAnalytics() {
 	indexPage = bytes.ReplaceAll(indexPage, []byte("<!--Google Analytics-->\n"), []byte(analyticsInject))
 }
 
+func initSentry() {
+	sentrySettings := system_setting.GetSentrySettings()
+	dsn := common.GetEnvOrDefaultString("SENTRY_DSN", sentrySettings.DSN)
+	env := common.GetEnvOrDefaultString("SENTRY_ENVIRONMENT", sentrySettings.Environment)
+	if dsn == "" {
+		return
+	}
+	if err := sentrypkg.Init(sentrypkg.Options{
+		DSN:              dsn,
+		Environment:      env,
+		Release:          common.Version,
+		SampleRate:       sentrySettings.SampleRate,
+		EnableTracing:    sentrySettings.EnableTracing,
+		TracesSampleRate: sentrySettings.TracesSampleRate,
+		RequestIDKey:     common.RequestIdKey,
+	}); err != nil {
+		common.SysError("sentry init failed: " + err.Error())
+		return
+	}
+	common.SysLog("Sentry initialized, environment: " + env)
+	// Wire hooks
+	common.SysErrorHook = sentrypkg.CaptureMessage
+	logger.LogErrorHook = sentrypkg.CaptureErrorWithContext
+	// Allow hot-reload from config system
+	sentrypkg.ReinitFunc = initSentry
+}
+
 func InitResources() error {
 	// Initialize resources here if needed
 	// This is a placeholder function for future resource initialization
@@ -272,6 +303,9 @@ func InitResources() error {
 
 	// Initialize options, should after model.InitDB()
 	model.InitOptionMap()
+
+	// Initialize Sentry error reporting
+	initSentry()
 
 	// 清理旧的磁盘缓存文件
 	common.CleanupOldCacheFiles()

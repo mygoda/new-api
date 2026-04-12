@@ -100,6 +100,13 @@ const SystemSetting = () => {
     LinuxDOClientSecret: '',
     LinuxDOMinimumTrustLevel: '',
     ServerAddress: '',
+    // Sentry 错误监控配置
+    'sentry.enabled': '',
+    'sentry.dsn': '',
+    'sentry.environment': '',
+    'sentry.sample_rate': '',
+    'sentry.enable_tracing': '',
+    'sentry.traces_sample_rate': '',
     // SSRF防护配置
     'fetch_setting.enable_ssrf_protection': true,
     'fetch_setting.allow_private_ip': '',
@@ -188,6 +195,8 @@ const SystemSetting = () => {
           case 'passkey.enabled':
           case 'passkey.allow_insecure_origin':
           case 'WorkerAllowHttpImageRequestEnabled':
+          case 'sentry.enabled':
+          case 'sentry.enable_tracing':
             item.value = toBoolean(item.value);
             break;
           case 'passkey.origins':
@@ -498,6 +507,24 @@ const SystemSetting = () => {
       });
     }
 
+    if (options.length > 0) {
+      await updateOptions(options);
+    }
+  };
+
+  const submitSentrySettings = async () => {
+    const options = [];
+    const keys = [
+      'sentry.dsn',
+      'sentry.environment',
+      'sentry.sample_rate',
+      'sentry.traces_sample_rate',
+    ];
+    for (const key of keys) {
+      if (originInputs[key] !== inputs[key] && inputs[key] !== '') {
+        options.push({ key, value: String(inputs[key]) });
+      }
+    }
     if (options.length > 0) {
       await updateOptions(options);
     }
@@ -1593,6 +1620,80 @@ const SystemSetting = () => {
                   </Row>
                   <Button onClick={submitTelegramSettings}>
                     {t('保存 Telegram 登录设置')}
+                  </Button>
+                </Form.Section>
+              </Card>
+
+              <Card>
+                <Form.Section text={t('Sentry 错误监控')}>
+                  <Text>{t('配置 Sentry 以集中收集错误和异常信息')}</Text>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                  >
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Checkbox
+                        field="['sentry.enabled']"
+                        noLabel
+                        onChange={(e) =>
+                          handleCheckboxChange('sentry.enabled', e)
+                        }
+                      >
+                        {t('启用 Sentry 错误监控')}
+                      </Form.Checkbox>
+                    </Col>
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Checkbox
+                        field="['sentry.enable_tracing']"
+                        noLabel
+                        onChange={(e) =>
+                          handleCheckboxChange('sentry.enable_tracing', e)
+                        }
+                      >
+                        {t('启用性能追踪')}
+                      </Form.Checkbox>
+                    </Col>
+                  </Row>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                  >
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Input
+                        field="['sentry.dsn']"
+                        label={t('Sentry DSN')}
+                        type='password'
+                        placeholder={t('敏感信息不会发送到前端显示')}
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Input
+                        field="['sentry.environment']"
+                        label={t('环境标识')}
+                        placeholder='production'
+                      />
+                    </Col>
+                  </Row>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                  >
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Input
+                        field="['sentry.sample_rate']"
+                        label={t('错误采样率')}
+                        placeholder='1.0'
+                        extraText={t('0.0 ~ 1.0，1.0 表示全量上报')}
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Input
+                        field="['sentry.traces_sample_rate']"
+                        label={t('性能追踪采样率')}
+                        placeholder='0.1'
+                        extraText={t('0.0 ~ 1.0，仅在启用性能追踪时生效')}
+                      />
+                    </Col>
+                  </Row>
+                  <Button onClick={submitSentrySettings}>
+                    {t('保存 Sentry 设置')}
                   </Button>
                 </Form.Section>
               </Card>

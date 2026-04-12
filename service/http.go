@@ -2,9 +2,11 @@ package service
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"syscall"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -12,6 +14,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// isClientDisconnectError 判断是否为客户端主动断开连接导致的写入错误（broken pipe / connection reset）。
+func isClientDisconnectError(err error) bool {
+	return errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET)
+}
 
 func CloseResponseBodyGracefully(httpResponse *http.Response) {
 	if httpResponse == nil || httpResponse.Body == nil {
@@ -56,7 +63,11 @@ func IOCopyBytesGracefully(c *gin.Context, src *http.Response, data []byte) {
 
 	_, err := io.Copy(c.Writer, body)
 	if err != nil {
-		logger.LogError(c, fmt.Sprintf("failed to copy response body: %s", err.Error()))
+		if isClientDisconnectError(err) {
+			logger.LogWarn(c, fmt.Sprintf("client disconnected during response: %s", err.Error()))
+		} else {
+			logger.LogError(c, fmt.Sprintf("failed to copy response body: %s", err.Error()))
+		}
 	}
 	c.Writer.Flush()
 

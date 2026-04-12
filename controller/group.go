@@ -40,20 +40,11 @@ func GetUserGroups(c *gin.Context) {
 			}
 		}
 	} else {
-		// 普通用户只能看到自己可用的分组
-		userUsableGroups := service.GetUserUsableGroups(userGroup)
-		for groupName := range ratio_setting.GetGroupRatioCopy() {
-			if desc, ok := userUsableGroups[groupName]; ok {
-				usableGroups[groupName] = map[string]interface{}{
-					"ratio": service.GetUserGroupRatio(userGroup, groupName),
-					"desc":  desc,
-				}
-			}
-		}
-		if _, ok := userUsableGroups["auto"]; ok {
-			usableGroups["auto"] = map[string]interface{}{
-				"ratio": "自动",
-				"desc":  setting.GetUsableGroupDescription("auto"),
+		// 普通用户只能看到自己所在的分组
+		if userGroup != "" {
+			usableGroups[userGroup] = map[string]interface{}{
+				"ratio": ratio_setting.GetGroupRatio(userGroup),
+				"desc":  setting.GetUsableGroupDescription(userGroup),
 			}
 		}
 	}
