@@ -40,6 +40,8 @@ export const useModelsData = () => {
   const [editingModel, setEditingModel] = useState({
     id: undefined,
   });
+  const [showPricing, setShowPricing] = useState(false);
+  const [pricingModel, setPricingModel] = useState(null);
 
   // Row selection
   const [selectedKeys, setSelectedKeys] = useState([]);
@@ -77,6 +79,14 @@ export const useModelsData = () => {
     setShowEdit(false);
     setTimeout(() => {
       setEditingModel({ id: undefined });
+    }, 500);
+  };
+
+  // Close pricing modal
+  const closePricing = () => {
+    setShowPricing(false);
+    setTimeout(() => {
+      setPricingModel(null);
     }, 500);
   };
 
@@ -448,6 +458,11 @@ export const useModelsData = () => {
     setEditingModel,
     setShowEdit,
     closeEdit,
+    showPricing,
+    pricingModel,
+    setPricingModel,
+    setShowPricing,
+    closePricing,
 
     // Form state
     formInitValues,

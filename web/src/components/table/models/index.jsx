@@ -26,6 +26,7 @@ import ModelsActions from './ModelsActions';
 import ModelsFilters from './ModelsFilters';
 import ModelsTabs from './ModelsTabs';
 import EditModelModal from './modals/EditModelModal';
+import ConfigurePriceModal from './modals/ConfigurePriceModal';
 import EditVendorModal from './modals/EditVendorModal';
 import { useModelsData } from '../../../hooks/models/useModelsData';
 import { useIsMobile } from '../../../hooks/common/useIsMobile';
@@ -44,6 +45,13 @@ const ModelsPage = () => {
     editingModel,
     closeEdit,
     refresh,
+
+    // Pricing state
+    showPricing,
+    pricingModel,
+    closePricing,
+    setPricingModel,
+    setShowPricing,
 
     // Actions state
     selectedKeys,
@@ -114,6 +122,13 @@ const ModelsPage = () => {
         editingModel={editingModel}
         visiable={showEdit}
         handleClose={closeEdit}
+      />
+
+      <ConfigurePriceModal
+        visible={showPricing}
+        modelName={pricingModel?.model_name || ''}
+        onClose={closePricing}
+        onSuccess={refresh}
       />
 
       <EditVendorModal

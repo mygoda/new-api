@@ -53,7 +53,7 @@ import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 const { Text } = Typography;
 const EMPTY_CANDIDATE_MODEL_NAMES = [];
 
-const PriceInput = ({
+export const PriceInput = ({
   label,
   value,
   placeholder,

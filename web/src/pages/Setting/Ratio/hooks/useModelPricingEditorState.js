@@ -5,7 +5,7 @@ export const PAGE_SIZE = 10;
 export const PRICE_SUFFIX = '$/1M tokens';
 const EMPTY_CANDIDATE_MODEL_NAMES = [];
 
-const EMPTY_MODEL = {
+export const EMPTY_MODEL = {
   name: '',
   billingMode: 'per-token',
   fixedPrice: '',
@@ -64,7 +64,7 @@ const toNormalizedNumber = (value) => {
   return formatted === '' ? null : Number(formatted);
 };
 
-const parseOptionJSON = (rawValue) => {
+export const parseOptionJSON = (rawValue) => {
   if (!rawValue || rawValue.trim() === '') {
     return {};
   }
@@ -97,7 +97,7 @@ const normalizeCompletionRatioMeta = (rawMeta) => {
   };
 };
 
-const buildModelState = (name, sourceMaps) => {
+export const buildModelState = (name, sourceMaps) => {
   const modelRatio = toNumericString(sourceMaps.ModelRatio[name]);
   const completionRatio = toNumericString(sourceMaps.CompletionRatio[name]);
   const completionRatioMeta = normalizeCompletionRatioMeta(
@@ -275,7 +275,7 @@ export const buildOptionalFieldToggles = (model) => ({
   audioOutputPrice: hasValue(model.audioOutputPrice),
 });
 
-const serializeModel = (model, t) => {
+export const serializeModel = (model, t) => {
   const result = {
     ModelPrice: null,
     ModelRatio: null,

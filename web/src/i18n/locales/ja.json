@@ -3289,6 +3289,10 @@
     "输入价格：{{symbol}}{{price}} / 1M tokens": "入力価格：{{symbol}}{{price}} / 1M tokens",
     "输出价格 {{symbol}}{{price}} / 1M tokens": "補完料金 {{symbol}}{{price}} / 1M tokens",
     "输出价格：{{symbol}}{{price}} / 1M tokens": "補完料金：{{symbol}}{{price}} / 1M tokens",
-    "输出价格：{{symbol}}{{total}} / 1M tokens": "補完料金：{{symbol}}{{total}} / 1M tokens"
+    "输出价格：{{symbol}}{{total}} / 1M tokens": "補完料金：{{symbol}}{{total}} / 1M tokens",
+    "配置价格": "価格設定",
+    "模型价格配置": "モデル価格設定",
+    "加载定价数据失败": "価格データの読み込みに失敗しました",
+    "保存价格配置成功": "価格設定を保存しました"
   }
 }

@@ -3322,6 +3322,10 @@
     "输入价格：{{symbol}}{{price}} / 1M tokens": "Цена ввода: {{symbol}}{{price}} / 1M tokens",
     "输出价格 {{symbol}}{{price}} / 1M tokens": "Цена вывода {{symbol}}{{price}} / 1M tokens",
     "输出价格：{{symbol}}{{price}} / 1M tokens": "Цена вывода: {{symbol}}{{price}} / 1M tokens",
-    "输出价格：{{symbol}}{{total}} / 1M tokens": "Цена вывода: {{symbol}}{{total}} / 1M tokens"
+    "输出价格：{{symbol}}{{total}} / 1M tokens": "Цена вывода: {{symbol}}{{total}} / 1M tokens",
+    "配置价格": "Настроить цену",
+    "模型价格配置": "Настройка цены модели",
+    "加载定价数据失败": "Не удалось загрузить данные о ценах",
+    "保存价格配置成功": "Конфигурация цены сохранена"
   }
 }
