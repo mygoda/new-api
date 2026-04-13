@@ -345,7 +345,7 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 		Group:            relayInfo.UsingGroup,
 		Other:            other,
 	})
-	EmitDorisLog(ctx, relayInfo, usage)
+	EmitDorisLog(ctx, relayInfo, usage, quota)
 }
 
 func PreConsumeTokenQuota(relayInfo *relaycommon.RelayInfo, quota int) error {

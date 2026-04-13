@@ -170,7 +170,7 @@ func billingStreamLoad(data []byte) error {
 }
 
 // EmitBillingRecord builds a BillingRecord from relay context and enqueues it.
-func EmitBillingRecord(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage) {
+func EmitBillingRecord(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, quota int) {
 	if !common.DorisEnabled || !setting.DorisLogEnabled {
 		return
 	}
@@ -187,6 +187,7 @@ func EmitBillingRecord(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage
 		UserGroup:  relayInfo.UserGroup,
 		UsingGroup: relayInfo.UsingGroup,
 		ModelName:  relayInfo.OriginModelName,
+		Quota:      quota,
 		IsSuccess:  true,
 		CreatedAt:  time.Now().UTC().Format("2006-01-02 15:04:05"),
 	}

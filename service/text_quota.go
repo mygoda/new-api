@@ -478,4 +478,29 @@ func emitDorisTextLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 	}
 	fillDorisBodyFields(ctx, &dorisLog)
 	RecordDorisLog(dorisLog)
+
+	// Emit billing record for text requests
+	RecordBillingLog(BillingRecord{
+		RequestId:        relayInfo.RequestId,
+		UserId:           relayInfo.UserId,
+		TokenId:          relayInfo.TokenId,
+		TokenName:        summary.TokenName,
+		TokenKey:         relayInfo.TokenKey,
+		UserGroup:        relayInfo.UserGroup,
+		UsingGroup:       relayInfo.UsingGroup,
+		ModelName:        summary.ModelName,
+		ChannelId:        dorisLog.ChannelId,
+		ChannelName:      dorisLog.ChannelName,
+		PromptTokens:     summary.PromptTokens,
+		CompletionTokens: summary.CompletionTokens,
+		TotalTokens:      summary.TotalTokens,
+		CacheTokens:      summary.CacheTokens,
+		Quota:            summary.Quota,
+		ModelRatio:        summary.ModelRatio,
+		GroupRatio:        summary.GroupRatio,
+		ModelPrice:       summary.ModelPrice,
+		IsSuccess:        true,
+		UseTimeMs:        summary.UseTimeSeconds * 1000,
+		CreatedAt:        dorisLog.CreatedAt,
+	})
 }

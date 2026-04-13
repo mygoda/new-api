@@ -27,7 +27,7 @@ func dorisRequestPathForLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) 
 
 // EmitDorisLog builds a DorisRequestLog from the relay context and enqueues it
 // for async batch write to Doris. Called after successful quota consumption.
-func EmitDorisLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage) {
+func EmitDorisLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, quota int) {
 	if !common.DorisEnabled || !setting.DorisLogEnabled {
 		return
 	}
@@ -66,6 +66,7 @@ func EmitDorisLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto
 		log.CacheTokens = usage.PromptTokensDetails.CachedTokens
 	}
 
+	log.Quota = quota
 	log.ModelRatio = relayInfo.PriceData.ModelRatio
 	log.GroupRatio = relayInfo.PriceData.GroupRatioInfo.GroupRatio
 	log.ModelPrice = relayInfo.PriceData.ModelPrice
@@ -78,7 +79,7 @@ func EmitDorisLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto
 	fillDorisBodyFields(ctx, &log)
 
 	RecordDorisLog(log)
-	EmitBillingRecord(ctx, relayInfo, usage)
+	EmitBillingRecord(ctx, relayInfo, usage, quota)
 }
 
 // EmitDorisLogWithSummary builds a DorisRequestLog using quota summary info
