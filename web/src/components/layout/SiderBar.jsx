@@ -50,6 +50,7 @@ const routerMap = {
   models: '/console/models',
   deployment: '/console/deployment',
   request_logs: '/console/request-logs',
+  billing: '/console/billing',
   playground: '/console/playground',
   personal: '/console/personal',
 };
@@ -96,6 +97,11 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         text: t('请求日志'),
         itemKey: 'request_logs',
         to: '/request_logs',
+      },
+      {
+        text: t('账单'),
+        itemKey: 'billing',
+        to: '/billing',
       },
       {
         text: t('绘图日志'),

@@ -78,6 +78,7 @@ func EmitDorisLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto
 	fillDorisBodyFields(ctx, &log)
 
 	RecordDorisLog(log)
+	EmitBillingRecord(ctx, relayInfo, usage)
 }
 
 // EmitDorisLogWithSummary builds a DorisRequestLog using quota summary info
@@ -127,6 +128,7 @@ func EmitDorisLogWithSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInfo,
 	fillDorisBodyFields(ctx, &log)
 
 	RecordDorisLog(log)
+	EmitBillingRecordWithSummary(ctx, relayInfo, totalTokens, promptTokens, completionTokens, quota)
 }
 
 // EmitDorisErrorLog records a failed request to Doris.

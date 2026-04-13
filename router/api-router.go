@@ -305,6 +305,14 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/doris/detail", middleware.AdminAuth(), controller.GetDorisLogDetail)
 		logRoute.GET("/doris/detail/self", middleware.UserAuth(), controller.GetDorisLogDetailSelf)
 
+		billingRoute := apiRouter.Group("/billing")
+		{
+			billingRoute.GET("/", middleware.AdminAuth(), controller.GetBillingRecords)
+			billingRoute.GET("/self", middleware.UserAuth(), controller.GetBillingRecordsSelf)
+			billingRoute.GET("/summary", middleware.AdminAuth(), controller.GetBillingSummary)
+			billingRoute.GET("/self/summary", middleware.UserAuth(), controller.GetBillingSummarySelf)
+		}
+
 		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
 		{
 			logRoute.GET("/token", middleware.TokenAuthReadOnly(), controller.GetLogByKey)

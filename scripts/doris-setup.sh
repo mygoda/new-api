@@ -111,7 +111,48 @@ add_column_if_missing "token_key"         "VARCHAR(512)  DEFAULT '' COMMENT 'API
 add_column_if_missing "request_body"      "STRING        DEFAULT '' COMMENT '请求体'"
 add_column_if_missing "response_content"  "STRING        DEFAULT '' COMMENT '响应内容'"
 
+# 4. Create billing_records table
+BILLING_TABLE="billing_records"
+echo "==> Creating table '${DORIS_DATABASE}.${BILLING_TABLE}' (if not exists) ..."
+run_sql "
+CREATE TABLE IF NOT EXISTS \`${DORIS_DATABASE}\`.\`${BILLING_TABLE}\` (
+    created_at          DATETIME        NOT NULL COMMENT '计费时间 (UTC)',
+    request_id          VARCHAR(128)    NOT NULL COMMENT '请求ID',
+    user_id             INT             NOT NULL COMMENT '用户ID',
+    token_id            INT             NOT NULL COMMENT '令牌ID',
+    token_name          VARCHAR(256)    DEFAULT '' COMMENT '令牌名称',
+    token_key           VARCHAR(512)    DEFAULT '' COMMENT 'API密钥',
+    user_group          VARCHAR(128)    DEFAULT '' COMMENT '用户分组',
+    using_group         VARCHAR(128)    DEFAULT '' COMMENT '实际使用分组',
+    model_name          VARCHAR(256)    DEFAULT '' COMMENT '请求模型',
+    channel_id          INT             DEFAULT 0  COMMENT '渠道ID',
+    channel_name        VARCHAR(256)    DEFAULT '' COMMENT '渠道名称',
+    prompt_tokens       INT             DEFAULT 0  COMMENT '输入Token',
+    completion_tokens   INT             DEFAULT 0  COMMENT '输出Token',
+    total_tokens        INT             DEFAULT 0  COMMENT '总Token',
+    cache_tokens        INT             DEFAULT 0  COMMENT '缓存Token',
+    quota               INT             DEFAULT 0  COMMENT '消耗额度',
+    model_ratio         DOUBLE          DEFAULT 0  COMMENT '模型倍率',
+    group_ratio         DOUBLE          DEFAULT 0  COMMENT '分组倍率',
+    model_price         DOUBLE          DEFAULT 0  COMMENT '模型价格',
+    is_success          TINYINT         DEFAULT 1  COMMENT '是否成功',
+    use_time_ms         BIGINT          DEFAULT 0  COMMENT '耗时(ms)'
+) ENGINE = OLAP
+DUPLICATE KEY(created_at, request_id)
+PARTITION BY RANGE(created_at) ()
+DISTRIBUTED BY HASH(request_id) BUCKETS AUTO
+PROPERTIES (
+    'replication_allocation' = 'tag.location.default: 1',
+    'dynamic_partition.enable' = 'true',
+    'dynamic_partition.time_unit' = 'DAY',
+    'dynamic_partition.start' = '-90',
+    'dynamic_partition.end' = '3',
+    'dynamic_partition.prefix' = 'p',
+    'dynamic_partition.create_history_partition' = 'true'
+);
+"
+
 echo "==> Doris setup completed successfully!"
 echo "    Database : ${DORIS_DATABASE}"
-echo "    Table    : ${DORIS_TABLE}"
+echo "    Tables   : ${DORIS_TABLE}, ${BILLING_TABLE}"
 echo "    Host     : ${DORIS_HOST}:${DORIS_QUERY_PORT}"
