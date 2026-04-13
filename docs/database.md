@@ -2,7 +2,17 @@
 
 ## Overview
 
-本项目使用 **GORM v2** 作为 ORM 框架，同时支持三种数据库：
+本项目使用三层数据存储架构：
+
+| 存储层         | 技术                      | 用途                                   |
+| -------------- | ------------------------- | -------------------------------------- |
+| **主数据库**   | MySQL / PostgreSQL / SQLite (GORM v2) | 用户、令牌、渠道、订阅等业务数据   |
+| **分析数据库** | Apache Doris (OLAP)       | 详细请求日志 + 账单记录（大数据量分析）|
+| **缓存**       | Redis (可选)              | 用户配额、令牌验证、订阅计划等热数据   |
+
+### 主数据库配置
+
+主数据库使用 **GORM v2** ORM 框架，同时支持三种数据库：
 
 | 数据库     | 最低版本 | 默认文件                              |
 | ---------- | -------- | ------------------------------------- |
@@ -581,6 +591,203 @@ WebAuthn/Passkey 登录凭证存储。
 | id             | uint        | PK   | 主键         |
 | version        | varchar(50) |      | 系统版本     |
 | initialized_at | bigint      |      | 初始化时间   |
+
+---
+
+## Doris 分析数据库（OLAP）
+
+项目使用 **Apache Doris** 作为独立的分析数据库，存储详细请求日志和账单记录，与主数据库完全解耦。
+
+- **写入方式**：异步批量 Stream Load（HTTP PUT），内存 buffer + 定时/阈值触发 flush
+- **查询方式**：MySQL 协议（端口 9030），`database/sql` 驱动直连
+- **开关控制**：需同时满足 `DORIS_HOST` 已配置 + `DorisLogEnabled` 选项为 true
+- **建表脚本**：`scripts/doris-setup.sh`
+
+### Doris 环境变量
+
+| 变量名                  | 默认值        | 说明                                       |
+| ----------------------- | ------------- | ------------------------------------------ |
+| `DORIS_HOST`            | (空，不启用)  | Doris FE 地址（Docker 内应填服务名如 doris）|
+| `DORIS_PORT`            | `8030`        | Doris FE HTTP 端口（Stream Load 写入）     |
+| `DORIS_QUERY_PORT`      | `9030`        | Doris MySQL 协议端口（查询用）             |
+| `DORIS_USER`            | `root`        | Doris 用户名                               |
+| `DORIS_PASSWORD`        | (空)          | Doris 密码                                 |
+| `DORIS_DATABASE`        | `new_api`     | Doris 数据库名                             |
+| `DORIS_TABLE`           | `request_logs`| Doris 请求日志表名                         |
+| `DORIS_FLUSH_INTERVAL`  | `5`           | 批量刷写间隔（秒）                         |
+| `DORIS_FLUSH_BATCH_SIZE`| `100`         | 触发即时刷写的缓冲区行数阈值               |
+
+### D1. request_logs — 请求日志表
+
+存储每一次 API 请求的完整详情（含请求体和响应内容），用于审计、调试和分析。
+
+| 字段              | 类型           | 说明                                         |
+| ----------------- | -------------- | -------------------------------------------- |
+| created_at        | DATETIME       | 请求时间 (UTC)                               |
+| request_id        | VARCHAR(128)   | 请求 ID                                     |
+| user_id           | INT            | 用户 ID                                     |
+| token_id          | INT            | 令牌 ID                                     |
+| token_name        | VARCHAR(256)   | 令牌名称                                     |
+| token_key         | VARCHAR(512)   | 完整 API 密钥（敏感，仅管理员可见）          |
+| user_group        | VARCHAR(128)   | 用户所在分组                                 |
+| token_group       | VARCHAR(128)   | 令牌分组                                     |
+| using_group       | VARCHAR(128)   | 实际使用的分组                               |
+| model_name        | VARCHAR(256)   | 请求模型名称                                 |
+| upstream_model    | VARCHAR(256)   | 上游实际模型名称                             |
+| channel_id        | INT            | 渠道 ID                                     |
+| channel_type      | INT            | 渠道类型                                     |
+| channel_name      | VARCHAR(256)   | 渠道名称                                     |
+| is_stream         | TINYINT        | 是否流式 (0/1)                               |
+| relay_mode        | INT            | 中继模式                                     |
+| request_path      | VARCHAR(512)   | 请求路径                                     |
+| client_ip         | VARCHAR(64)    | 客户端 IP                                   |
+| request_body      | STRING         | 请求体 JSON（无长度限制）                    |
+| response_content  | STRING         | 模型输出文本（无长度限制）                   |
+| prompt_tokens     | INT            | 输入 Token 数                                |
+| completion_tokens | INT            | 输出 Token 数                                |
+| total_tokens      | INT            | 总 Token 数                                  |
+| cache_tokens      | INT            | 缓存 Token 数                                |
+| quota             | INT            | 消耗额度                                     |
+| model_ratio       | DOUBLE         | 模型倍率                                     |
+| group_ratio       | DOUBLE         | 分组倍率                                     |
+| completion_ratio  | DOUBLE         | 补全倍率                                     |
+| model_price       | DOUBLE         | 模型价格                                     |
+| use_time_ms       | BIGINT         | 请求耗时（毫秒）                             |
+| is_success        | TINYINT        | 是否成功 (0/1)                               |
+| retry_count       | INT            | 重试次数                                     |
+| status_code       | INT            | HTTP 状态码                                  |
+| error_type        | VARCHAR(128)   | 错误类型                                     |
+| error_message     | VARCHAR(1024)  | 错误消息                                     |
+
+**表引擎**: OLAP DUPLICATE KEY(created_at, request_id)
+**分区**: 按天动态分区，保留 30 天（`dynamic_partition.start = -30`）
+**分桶**: HASH(request_id) BUCKETS AUTO
+
+**相关代码**:
+- 写入: `service/doris_logger.go`（buffer + Stream Load）
+- 查询: `service/doris_query.go`（MySQL 协议）
+- 触发: `service/doris_hook.go` → `EmitDorisLog` / `EmitDorisLogWithSummary` / `EmitDorisErrorLog`
+- API: `GET /api/log/doris`（管理员）、`GET /api/log/doris/self`（用户，脱敏 token_key）
+
+---
+
+### D2. billing_records — 账单记录表
+
+轻量级账单表，不含请求体/响应内容，保留周期更长（90 天），用于账单查询和多维度汇总。
+
+| 字段              | 类型           | 说明                           |
+| ----------------- | -------------- | ------------------------------ |
+| created_at        | DATETIME       | 计费时间 (UTC)                 |
+| request_id        | VARCHAR(128)   | 请求 ID                       |
+| user_id           | INT            | 用户 ID                       |
+| token_id          | INT            | 令牌 ID                       |
+| token_name        | VARCHAR(256)   | 令牌名称                       |
+| token_key         | VARCHAR(512)   | API 密钥                      |
+| user_group        | VARCHAR(128)   | 用户分组                       |
+| using_group       | VARCHAR(128)   | 实际使用分组                   |
+| model_name        | VARCHAR(256)   | 请求模型                       |
+| channel_id        | INT            | 渠道 ID                       |
+| channel_name      | VARCHAR(256)   | 渠道名称                       |
+| prompt_tokens     | INT            | 输入 Token                    |
+| completion_tokens | INT            | 输出 Token                    |
+| total_tokens      | INT            | 总 Token                      |
+| cache_tokens      | INT            | 缓存 Token                    |
+| quota             | INT            | 消耗额度                       |
+| model_ratio       | DOUBLE         | 模型倍率                       |
+| group_ratio       | DOUBLE         | 分组倍率                       |
+| model_price       | DOUBLE         | 模型价格                       |
+| is_success        | TINYINT        | 是否成功 (0/1)                 |
+| use_time_ms       | BIGINT         | 耗时（毫秒）                   |
+
+**表引擎**: OLAP DUPLICATE KEY(created_at, request_id)
+**分区**: 按天动态分区，保留 90 天（`dynamic_partition.start = -90`）
+**分桶**: HASH(request_id) BUCKETS AUTO
+
+**与 request_logs 的区别**:
+- 无 `request_body`、`response_content` 等大字段，存储更轻量
+- 保留 90 天 vs request_logs 的 30 天
+- 独立的 buffer/flush 循环，互不影响
+
+**相关代码**:
+- 写入: `service/doris_billing_logger.go`（独立 buffer + Stream Load）
+- 查询: `service/doris_billing_query.go`（明细 + 按天/Token/模型汇总）
+- 触发: 
+  - 文本请求: `service/text_quota.go` → `emitDorisTextLog` 末尾调用 `RecordBillingLog`
+  - 音频请求: `service/doris_hook.go` → `EmitDorisLog` → `EmitBillingRecord`
+  - WSS 请求: `service/doris_hook.go` → `EmitDorisLogWithSummary` → `EmitBillingRecordWithSummary`
+- API:
+  - `GET /api/billing/`（管理员，全量明细）
+  - `GET /api/billing/self`（用户，自己的明细，脱敏 channel/token_key）
+  - `GET /api/billing/summary?group_by=day|token|model`（管理员汇总）
+  - `GET /api/billing/self/summary?group_by=day|token|model`（用户汇总）
+
+**常用汇总查询示例**:
+
+```sql
+-- 按天汇总消耗额度
+SELECT DATE(created_at) AS dt, COUNT(*) AS requests,
+       SUM(quota) AS total_quota, SUM(total_tokens) AS total_tokens
+FROM billing_records
+WHERE created_at >= CURDATE() - INTERVAL 7 DAY
+GROUP BY dt ORDER BY dt DESC;
+
+-- 按模型汇总
+SELECT model_name, COUNT(*) AS requests,
+       SUM(quota) AS total_quota, SUM(total_tokens) AS total_tokens
+FROM billing_records
+WHERE created_at >= CURDATE() - INTERVAL 30 DAY
+GROUP BY model_name ORDER BY total_quota DESC;
+
+-- 按令牌汇总
+SELECT token_id, token_name, COUNT(*) AS requests,
+       SUM(quota) AS total_quota
+FROM billing_records
+WHERE user_id = 1 AND created_at >= CURDATE() - INTERVAL 30 DAY
+GROUP BY token_id, token_name ORDER BY total_quota DESC;
+```
+
+---
+
+### Doris 架构说明
+
+```
+API 请求 → 计费结算完成
+    │
+    ├── RecordDorisLog(dorisLog)       → dorisBuffer   → dorisFlushLoop   → Stream Load → request_logs
+    │
+    └── RecordBillingLog(billingRecord) → billingBuffer → billingFlushLoop → Stream Load → billing_records
+```
+
+- 两个表使用**独立的 buffer 和 flush 循环**，共享 `dorisHttpClient`（在 `InitDorisLogger` 中创建）
+- Stream Load 使用 HTTP PUT 到 FE 的 8030 端口，FE 会 307 重定向到 BE
+- Docker 环境下的重定向地址修正逻辑见 `dorisRedirectPolicy`
+- 写入失败时自动将 batch 重新放回 buffer 头部，下次 flush 重试
+
+---
+
+## Redis 缓存
+
+可选的 Redis 缓存层，用于减少主数据库压力。未配置 `REDIS_CONN_STRING` 时自动禁用。
+
+### Redis 环境变量
+
+| 变量名              | 默认值 | 说明                                      |
+| ------------------- | ------ | ----------------------------------------- |
+| `REDIS_CONN_STRING` | (空)   | Redis 连接 URL，格式 `redis://[:pwd]@host:port/db` |
+| `REDIS_POOL_SIZE`   | `10`   | 连接池大小                                |
+| `SYNC_FREQUENCY`    | `60`   | 缓存同步间隔（秒）                        |
+
+### 缓存 Key 模式
+
+| Key 模式                                        | 说明               |
+| ------------------------------------------------ | ------------------ |
+| `user:quota:{user_id}`                           | 用户配额余额       |
+| `user:group:{user_id}`                           | 用户分组           |
+| `user:setting:{user_id}`                         | 用户设置           |
+| `user:status:{user_id}`                          | 用户状态           |
+| `token:{key}`                                    | 令牌完整对象       |
+| `new-api:subscription_plan:v1:{plan_id}`         | 订阅计划缓存       |
+| `new-api:subscription_plan_info:v1:{plan_id}`    | 订阅计划信息       |
 
 ---
 
