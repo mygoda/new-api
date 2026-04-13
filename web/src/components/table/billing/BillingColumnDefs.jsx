@@ -24,10 +24,24 @@ export const getDetailColumns = (t, isAdminUser) => {
       ellipsis: true,
     },
     {
+      title: t('令牌 ID'),
+      dataIndex: 'token_id',
+      key: 'token_id',
+      width: 80,
+      align: 'right',
+    },
+    {
       title: t('令牌名称'),
       dataIndex: 'token_name',
       key: 'token_name',
       width: 120,
+      ellipsis: true,
+    },
+    {
+      title: t('分组'),
+      dataIndex: 'using_group',
+      key: 'using_group',
+      width: 100,
       ellipsis: true,
     },
     {
@@ -47,12 +61,36 @@ export const getDetailColumns = (t, isAdminUser) => {
       render: (val) => (val || 0).toLocaleString(),
     },
     {
+      title: t('总计'),
+      dataIndex: 'total_tokens',
+      key: 'total_tokens',
+      width: 80,
+      align: 'right',
+      render: (val) => (val || 0).toLocaleString(),
+    },
+    {
       title: t('额度'),
       dataIndex: 'quota',
       key: 'quota',
       width: 100,
       align: 'right',
       render: (val) => renderQuota(val, 4),
+    },
+    {
+      title: t('模型倍率'),
+      dataIndex: 'model_ratio',
+      key: 'model_ratio',
+      width: 90,
+      align: 'right',
+      render: (val) => (val != null ? val.toFixed(2) : '-'),
+    },
+    {
+      title: t('分组倍率'),
+      dataIndex: 'group_ratio',
+      key: 'group_ratio',
+      width: 90,
+      align: 'right',
+      render: (val) => (val != null ? val.toFixed(2) : '-'),
     },
     {
       title: t('耗时'),
@@ -82,9 +120,19 @@ export const getDetailColumns = (t, isAdminUser) => {
   ];
 
   if (isAdminUser) {
-    // Insert channel_name after token_name
-    const tokenIdx = cols.findIndex((c) => c.key === 'token_name');
-    cols.splice(tokenIdx + 1, 0, {
+    // Insert user_id after created_at
+    const timeIdx = cols.findIndex((c) => c.key === 'created_at');
+    cols.splice(timeIdx + 1, 0, {
+      title: t('用户 ID'),
+      dataIndex: 'user_id',
+      key: 'user_id',
+      width: 80,
+      align: 'right',
+    });
+
+    // Insert channel after using_group
+    const groupIdx = cols.findIndex((c) => c.key === 'using_group');
+    cols.splice(groupIdx + 1, 0, {
       title: t('渠道'),
       dataIndex: 'channel_name',
       key: 'channel_name',
