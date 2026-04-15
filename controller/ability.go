@@ -39,6 +39,7 @@ type AbilityUpdateRequest struct {
 	ChannelId int    `json:"channel_id" binding:"required"`
 	Priority  *int64 `json:"priority"`
 	Weight    *uint  `json:"weight"`
+	Enabled   *bool  `json:"enabled"`
 }
 
 func UpdateAbility(c *gin.Context) {
@@ -50,14 +51,14 @@ func UpdateAbility(c *gin.Context) {
 		})
 		return
 	}
-	if req.Priority == nil && req.Weight == nil {
+	if req.Priority == nil && req.Weight == nil && req.Enabled == nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "请至少提供优先级或权重",
+			"message": "请至少提供优先级、权重或启用状态",
 		})
 		return
 	}
-	err := model.UpdateAbilityPriorityWeight(req.Group, req.Model, req.ChannelId, req.Priority, req.Weight)
+	err := model.UpdateAbilityPriorityWeight(req.Group, req.Model, req.ChannelId, req.Priority, req.Weight, req.Enabled)
 	if err != nil {
 		common.ApiError(c, err)
 		return

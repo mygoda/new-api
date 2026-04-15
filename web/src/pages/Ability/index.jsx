@@ -14,6 +14,7 @@ import {
   Collapsible,
   Typography,
   Descriptions,
+  Switch,
 } from '@douyinfe/semi-ui';
 import { IconSearch, IconRefresh, IconHelpCircle } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
@@ -122,6 +123,8 @@ const AbilityPage = () => {
         body.priority = value;
       } else if (field === 'weight') {
         body.weight = value;
+      } else if (field === 'enabled') {
+        body.enabled = value;
       }
       const res = await API.put('/api/channel/ability', body);
       const { success, message } = res.data;
@@ -179,10 +182,12 @@ const AbilityPage = () => {
       dataIndex: 'enabled',
       key: 'enabled',
       width: 80,
-      render: (enabled) => (
-        <Tag color={enabled ? 'green' : 'red'} size='small'>
-          {enabled ? t('启用') : t('禁用')}
-        </Tag>
+      render: (enabled, record) => (
+        <Switch
+          size='small'
+          checked={enabled}
+          onChange={(checked) => handleUpdateAbility(record, 'enabled', checked)}
+        />
       ),
     },
     {

@@ -332,13 +332,16 @@ func GetAbilityList(modelName, group string, channelId int, keyword string, page
 	return items, total, nil
 }
 
-func UpdateAbilityPriorityWeight(group, modelName string, channelId int, priority *int64, weight *uint) error {
+func UpdateAbilityPriorityWeight(group, modelName string, channelId int, priority *int64, weight *uint, enabled *bool) error {
 	updates := make(map[string]interface{})
 	if priority != nil {
 		updates["priority"] = *priority
 	}
 	if weight != nil {
 		updates["weight"] = *weight
+	}
+	if enabled != nil {
+		updates["enabled"] = *enabled
 	}
 	if len(updates) == 0 {
 		return nil
