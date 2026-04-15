@@ -333,6 +333,24 @@ func GetAbilityList(modelName, group string, channelId int, keyword string, page
 }
 
 func UpdateAbilityPriorityWeight(group, modelName string, channelId int, priority *int64, weight *uint, enabled *bool) error {
+	whereClause := commonGroupCol + " = ? AND model = ? AND channel_id = ?"
+	whereArgs := []interface{}{group, modelName, channelId}
+
+	// enabled 单独处理，使用 Select + Update 确保 false 值不被 GORM 跳过
+	if enabled != nil {
+		result := DB.Model(&Ability{}).
+			Where(whereClause, whereArgs...).
+			Select("enabled").
+			Update("enabled", *enabled)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return errors.New("ability not found")
+		}
+	}
+
+	// priority / weight 用 map 更新
 	updates := make(map[string]interface{})
 	if priority != nil {
 		updates["priority"] = *priority
@@ -340,20 +358,20 @@ func UpdateAbilityPriorityWeight(group, modelName string, channelId int, priorit
 	if weight != nil {
 		updates["weight"] = *weight
 	}
-	if enabled != nil {
-		updates["enabled"] = *enabled
+	if len(updates) > 0 {
+		result := DB.Model(&Ability{}).
+			Where(whereClause, whereArgs...).
+			Updates(updates)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 && enabled == nil {
+			return errors.New("ability not found")
+		}
 	}
-	if len(updates) == 0 {
+
+	if enabled == nil && len(updates) == 0 {
 		return nil
-	}
-	result := DB.Model(&Ability{}).
-		Where(commonGroupCol+" = ? AND model = ? AND channel_id = ?", group, modelName, channelId).
-		Updates(updates)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return errors.New("ability not found")
 	}
 	return nil
 }
