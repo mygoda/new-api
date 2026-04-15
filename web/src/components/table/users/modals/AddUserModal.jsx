@@ -32,6 +32,7 @@ import {
   Form,
   Row,
   Col,
+  Select,
 } from '@douyinfe/semi-ui';
 import { IconSave, IconClose, IconUserAdd } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
@@ -49,6 +50,7 @@ const AddUserModal = (props) => {
     display_name: '',
     password: '',
     remark: '',
+    role: 1,
   });
 
   const submit = async (values) => {
@@ -164,6 +166,23 @@ const AddUserModal = (props) => {
                       rules={[{ required: true, message: t('请输入密码') }]}
                       showClear
                     />
+                  </Col>
+                  <Col span={24}>
+                    <Form.Select
+                      field='role'
+                      label={t('角色')}
+                      style={{ width: '100%' }}
+                    >
+                      <Select.Option value={1}>
+                        {t('普通用户')}
+                      </Select.Option>
+                      <Select.Option value={5}>
+                        {t('代理商')}
+                      </Select.Option>
+                      <Select.Option value={10}>
+                        {t('管理员')}
+                      </Select.Option>
+                    </Form.Select>
                   </Col>
                   <Col span={24}>
                     <Form.Input
