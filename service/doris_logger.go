@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"database/sql"
 	"fmt"
 	"io"
 	"net"
@@ -97,6 +98,125 @@ var (
 	dorisHttpClient *http.Client
 )
 
+// ensureDorisTable creates a Doris table if it does not already exist.
+// Called once at startup for each table the application depends on.
+func ensureDorisTable(tableName, ddl string) {
+	endpoint := resolveDorisEndpoint()
+	if endpoint.host == "" {
+		return
+	}
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=true&loc=UTC&interpolateParams=true",
+		common.DorisUser, common.DorisPassword,
+		endpoint.host, endpoint.queryPort,
+		common.DorisDatabase)
+
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		common.SysError(fmt.Sprintf("doris: ensure table %s: open: %s", tableName, err))
+		return
+	}
+	defer db.Close()
+
+	// Create database first
+	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`", common.DorisDatabase))
+	if err != nil {
+		common.SysError(fmt.Sprintf("doris: ensure database %s: %s", common.DorisDatabase, err))
+	}
+
+	_, err = db.Exec(ddl)
+	if err != nil {
+		common.SysError(fmt.Sprintf("doris: ensure table %s: %s", tableName, err))
+	} else {
+		common.SysLog(fmt.Sprintf("doris: table %s.%s ensured", common.DorisDatabase, tableName))
+	}
+}
+
+const requestLogsDDL = `CREATE TABLE IF NOT EXISTS %s.request_logs (
+    created_at          DATETIME        NOT NULL COMMENT '请求时间 (UTC)',
+    request_id          VARCHAR(128)    NOT NULL COMMENT '请求ID',
+    user_id             INT             NOT NULL COMMENT '用户ID',
+    token_id            INT             NOT NULL COMMENT '令牌ID',
+    token_name          VARCHAR(256)    DEFAULT '' COMMENT '令牌名称',
+    token_key           VARCHAR(512)    DEFAULT '' COMMENT 'API密钥',
+    user_group          VARCHAR(128)    DEFAULT '' COMMENT '用户所在分组',
+    token_group         VARCHAR(128)    DEFAULT '' COMMENT '令牌分组',
+    using_group         VARCHAR(128)    DEFAULT '' COMMENT '实际使用的分组',
+    model_name          VARCHAR(256)    DEFAULT '' COMMENT '请求模型名称',
+    upstream_model      VARCHAR(256)    DEFAULT '' COMMENT '上游实际模型名称',
+    channel_id          INT             DEFAULT 0  COMMENT '渠道ID',
+    channel_type        INT             DEFAULT 0  COMMENT '渠道类型',
+    channel_name        VARCHAR(256)    DEFAULT '' COMMENT '渠道名称',
+    is_stream           TINYINT         DEFAULT 0 COMMENT '是否流式请求',
+    relay_mode          INT             DEFAULT 0  COMMENT '中继模式',
+    request_path        VARCHAR(512)    DEFAULT '' COMMENT '请求路径',
+    client_ip           VARCHAR(64)     DEFAULT '' COMMENT '客户端IP',
+    request_body        STRING          DEFAULT '' COMMENT '请求体',
+    response_content    STRING          DEFAULT '' COMMENT '响应内容',
+    prompt_tokens       INT             DEFAULT 0  COMMENT '输入Token数',
+    completion_tokens   INT             DEFAULT 0  COMMENT '输出Token数',
+    total_tokens        INT             DEFAULT 0  COMMENT '总Token数',
+    cache_tokens        INT             DEFAULT 0  COMMENT '缓存Token数',
+    quota               INT             DEFAULT 0  COMMENT '消耗额度',
+    model_ratio         DOUBLE          DEFAULT 0  COMMENT '模型倍率',
+    group_ratio         DOUBLE          DEFAULT 0  COMMENT '分组倍率',
+    completion_ratio    DOUBLE          DEFAULT 0  COMMENT '补全倍率',
+    model_price         DOUBLE          DEFAULT 0  COMMENT '模型价格',
+    use_time_ms         BIGINT          DEFAULT 0  COMMENT '请求耗时(毫秒)',
+    is_success          TINYINT         DEFAULT 1 COMMENT '是否成功',
+    retry_count         INT             DEFAULT 0  COMMENT '重试次数',
+    status_code         INT             DEFAULT 0  COMMENT 'HTTP状态码',
+    error_type          VARCHAR(128)    DEFAULT '' COMMENT '错误类型',
+    error_message       VARCHAR(1024)   DEFAULT '' COMMENT '错误消息'
+) ENGINE = OLAP
+DUPLICATE KEY(created_at, request_id)
+PARTITION BY RANGE(created_at) ()
+DISTRIBUTED BY HASH(request_id) BUCKETS AUTO
+PROPERTIES (
+    'replication_allocation' = 'tag.location.default: 1',
+    'dynamic_partition.enable' = 'true',
+    'dynamic_partition.time_unit' = 'DAY',
+    'dynamic_partition.start' = '-30',
+    'dynamic_partition.end' = '3',
+    'dynamic_partition.prefix' = 'p',
+    'dynamic_partition.create_history_partition' = 'true'
+)`
+
+const billingRecordsDDL = `CREATE TABLE IF NOT EXISTS %s.billing_records (
+    created_at          DATETIME        NOT NULL COMMENT '计费时间 (UTC)',
+    request_id          VARCHAR(128)    NOT NULL COMMENT '请求ID',
+    user_id             INT             NOT NULL COMMENT '用户ID',
+    token_id            INT             NOT NULL COMMENT '令牌ID',
+    token_name          VARCHAR(256)    DEFAULT '' COMMENT '令牌名称',
+    token_key           VARCHAR(512)    DEFAULT '' COMMENT 'API密钥',
+    user_group          VARCHAR(128)    DEFAULT '' COMMENT '用户分组',
+    using_group         VARCHAR(128)    DEFAULT '' COMMENT '实际使用分组',
+    model_name          VARCHAR(256)    DEFAULT '' COMMENT '请求模型',
+    channel_id          INT             DEFAULT 0  COMMENT '渠道ID',
+    channel_name        VARCHAR(256)    DEFAULT '' COMMENT '渠道名称',
+    prompt_tokens       INT             DEFAULT 0  COMMENT '输入Token',
+    completion_tokens   INT             DEFAULT 0  COMMENT '输出Token',
+    total_tokens        INT             DEFAULT 0  COMMENT '总Token',
+    cache_tokens        INT             DEFAULT 0  COMMENT '缓存Token',
+    quota               INT             DEFAULT 0  COMMENT '消耗额度',
+    model_ratio         DOUBLE          DEFAULT 0  COMMENT '模型倍率',
+    group_ratio         DOUBLE          DEFAULT 0  COMMENT '分组倍率',
+    model_price         DOUBLE          DEFAULT 0  COMMENT '模型价格',
+    is_success          TINYINT         DEFAULT 1  COMMENT '是否成功',
+    use_time_ms         BIGINT          DEFAULT 0  COMMENT '耗时(ms)'
+) ENGINE = OLAP
+DUPLICATE KEY(created_at, request_id)
+PARTITION BY RANGE(created_at) ()
+DISTRIBUTED BY HASH(request_id) BUCKETS AUTO
+PROPERTIES (
+    'replication_allocation' = 'tag.location.default: 1',
+    'dynamic_partition.enable' = 'true',
+    'dynamic_partition.time_unit' = 'DAY',
+    'dynamic_partition.start' = '-90',
+    'dynamic_partition.end' = '3',
+    'dynamic_partition.prefix' = 'p',
+    'dynamic_partition.create_history_partition' = 'true'
+)`
+
 func InitDorisLogger() {
 	if !common.DorisEnabled {
 		return
@@ -109,6 +229,10 @@ func InitDorisLogger() {
 			Timeout:       30 * time.Second,
 			CheckRedirect: dorisRedirectPolicy,
 		}
+
+		ensureDorisTable("request_logs", fmt.Sprintf(requestLogsDDL, common.DorisDatabase))
+		ensureDorisTable("billing_records", fmt.Sprintf(billingRecordsDDL, common.DorisDatabase))
+
 		common.SysLog(fmt.Sprintf("Doris logger initialized: %s:%d/%s.%s (flush every %ds or %d rows)",
 			endpoint.host, endpoint.httpPort, common.DorisDatabase, common.DorisTable,
 			common.DorisFlushInterval, common.DorisFlushBatchSize))
