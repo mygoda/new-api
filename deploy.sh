@@ -57,6 +57,7 @@ cd "$SCRIPT_DIR"
 # ─── 默认值 ───
 IMAGE_NAME="${IMAGE_NAME:-new-api}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')}"
+DOCKERFILE="${DOCKERFILE:-Dockerfile}"
 PORT="${PORT:-3010}"
 DB_TYPE="${DB_TYPE:-mysql}"
 REDIS_URL="${REDIS_URL:-}"
@@ -200,9 +201,10 @@ get_db_dsn() {
 }
 
 do_build() {
-    info "构建 Docker 镜像: ${IMAGE_NAME}:${IMAGE_TAG}"
+    info "构建 Docker 镜像: ${IMAGE_NAME}:${IMAGE_TAG} (Dockerfile: ${DOCKERFILE})"
     docker build \
         --platform "linux/$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')" \
+        -f "${DOCKERFILE}" \
         -t "${IMAGE_NAME}:${IMAGE_TAG}" \
         -t "${IMAGE_NAME}:latest" \
         .
@@ -646,6 +648,7 @@ show_help() {
     echo ""
     echo "环境变量:"
     echo "  PORT=3010          对外端口"
+    echo "  DOCKERFILE=Dockerfile  构建用 Dockerfile (国内: Dockerfile.cn)"
     echo "  DB_TYPE=sqlite     数据库: postgres / mysql / sqlite"
     echo "  DB_DSN=...         自定义数据库 DSN (覆盖 DB_TYPE)"
     echo "  REDIS_URL=...      Redis 连接串"
@@ -670,6 +673,7 @@ show_help() {
     echo "  DB_DSN='postgres://u:p@host/db' ./deploy.sh up   # 自定义外部数据库"
     echo "  DORIS_ENABLED=false ./deploy.sh                  # 禁用 Doris"
     echo "  DORIS_HOST=10.0.0.1 ./deploy.sh                  # 使用外部 Doris"
+    echo "  DOCKERFILE=Dockerfile.cn ./deploy.sh             # 国内服务器构建（使用国内镜像源）"
 }
 
 # ─── 入口 ───
