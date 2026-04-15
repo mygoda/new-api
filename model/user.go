@@ -50,17 +50,21 @@ type User struct {
 	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
 	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	ParentId         int            `json:"parent_id" gorm:"type:int;default:0;column:parent_id;index"`
+	DealerRatio      float64        `json:"dealer_ratio" gorm:"type:double;default:1;column:dealer_ratio"`
+	DealerRemark     string         `json:"dealer_remark,omitempty" gorm:"type:varchar(255);column:dealer_remark"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
 	cache := &UserBase{
-		Id:       user.Id,
-		Group:    user.Group,
-		Quota:    user.Quota,
-		Status:   user.Status,
-		Username: user.Username,
-		Setting:  user.Setting,
-		Email:    user.Email,
+		Id:          user.Id,
+		Group:       user.Group,
+		Quota:       user.Quota,
+		Status:      user.Status,
+		Username:    user.Username,
+		Setting:     user.Setting,
+		Email:       user.Email,
+		DealerRatio: user.DealerRatio,
 	}
 	return cache
 }
@@ -338,6 +342,146 @@ func inviteUser(inviterId int) (err error) {
 	user.AffQuota += common.QuotaForInviter
 	user.AffHistoryQuota += common.QuotaForInviter
 	return DB.Save(user).Error
+}
+
+// ==================== Dealer Functions ====================
+
+func GetDealerUsers(dealerId int, startIdx int, num int) ([]*User, int64, error) {
+	var users []*User
+	var total int64
+	tx := DB.Begin()
+	if tx.Error != nil {
+		return nil, 0, tx.Error
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	query := tx.Model(&User{}).Where("parent_id = ?", dealerId)
+	err := query.Count(&total).Error
+	if err != nil {
+		tx.Rollback()
+		return nil, 0, err
+	}
+	err = query.Order("id desc").Limit(num).Offset(startIdx).Omit("password").Find(&users).Error
+	if err != nil {
+		tx.Rollback()
+		return nil, 0, err
+	}
+	if err = tx.Commit().Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
+func SearchDealerUsers(dealerId int, keyword string, startIdx int, num int) ([]*User, int64, error) {
+	var users []*User
+	var total int64
+	tx := DB.Begin()
+	if tx.Error != nil {
+		return nil, 0, tx.Error
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	query := tx.Model(&User{}).Where("parent_id = ?", dealerId)
+	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
+	keywordInt, err := strconv.Atoi(keyword)
+	if err == nil {
+		query = query.Where("(id = ? OR "+likeCondition+")", keywordInt, "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+	} else {
+		query = query.Where("("+likeCondition+")", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+	}
+
+	err = query.Count(&total).Error
+	if err != nil {
+		tx.Rollback()
+		return nil, 0, err
+	}
+	err = query.Order("id desc").Limit(num).Offset(startIdx).Omit("password").Find(&users).Error
+	if err != nil {
+		tx.Rollback()
+		return nil, 0, err
+	}
+	if err = tx.Commit().Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
+func GetSubUserIds(dealerId int) ([]int, error) {
+	var ids []int
+	err := DB.Model(&User{}).Where("parent_id = ?", dealerId).Pluck("id", &ids).Error
+	return ids, err
+}
+
+func CountSubUsers(dealerId int) int64 {
+	var count int64
+	DB.Model(&User{}).Where("parent_id = ?", dealerId).Count(&count)
+	return count
+}
+
+func GetDealerQuotaStats(dealerId int) (totalQuota int64, totalUsed int64, err error) {
+	type Result struct {
+		TotalQuota int64
+		TotalUsed  int64
+	}
+	var result Result
+	err = DB.Model(&User{}).Where("parent_id = ?", dealerId).
+		Select("COALESCE(SUM(quota), 0) as total_quota, COALESCE(SUM(used_quota), 0) as total_used").
+		Scan(&result).Error
+	return result.TotalQuota, result.TotalUsed, err
+}
+
+func TransferQuota(fromUserId int, toUserId int, amount int) error {
+	if amount <= 0 {
+		return errors.New("转移额度必须大于0")
+	}
+	tx := DB.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	defer tx.Rollback()
+
+	// Lock the source user row
+	var fromUser User
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", fromUserId).First(&fromUser).Error; err != nil {
+		return fmt.Errorf("查询转出用户失败: %w", err)
+	}
+	if fromUser.Quota < amount {
+		return fmt.Errorf("额度不足，当前余额: %s，需要: %s", logger.FormatQuota(fromUser.Quota), logger.FormatQuota(amount))
+	}
+
+	// Deduct from source
+	if err := tx.Model(&User{}).Where("id = ?", fromUserId).Update("quota", gorm.Expr("quota - ?", amount)).Error; err != nil {
+		return fmt.Errorf("扣减转出用户额度失败: %w", err)
+	}
+	// Add to target
+	if err := tx.Model(&User{}).Where("id = ?", toUserId).Update("quota", gorm.Expr("quota + ?", amount)).Error; err != nil {
+		return fmt.Errorf("增加转入用户额度失败: %w", err)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
+
+	// Update cache
+	gopool.Go(func() {
+		updateUserQuotaCache(fromUserId, fromUser.Quota-amount)
+	})
+	gopool.Go(func() {
+		var toUser User
+		if err := DB.Where("id = ?", toUserId).Select("quota").First(&toUser).Error; err == nil {
+			updateUserQuotaCache(toUserId, toUser.Quota)
+		}
+	})
+
+	return nil
 }
 
 func (user *User) TransferAffQuotaToQuota(quota int) error {

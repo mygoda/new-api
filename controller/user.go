@@ -176,6 +176,13 @@ func Register(c *gin.Context) {
 		InviterId:   inviterId,
 		Role:        common.RoleCommonUser, // 明确设置角色为普通用户
 	}
+	// If inviter is a dealer, set parent_id for sub-user ownership
+	if inviterId != 0 {
+		inviter, err := model.GetUserById(inviterId, false)
+		if err == nil && inviter != nil && inviter.Role == common.RoleDealerUser {
+			cleanUser.ParentId = inviterId
+		}
+	}
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = user.Email
 	}
@@ -928,6 +935,23 @@ func ManageUser(c *gin.Context) {
 		}
 		if user.Role == common.RoleCommonUser {
 			common.ApiErrorI18n(c, i18n.MsgUserAlreadyCommon)
+			return
+		}
+		user.Role = common.RoleCommonUser
+	case "promote_dealer":
+		if user.Role >= common.RoleDealerUser {
+			common.ApiErrorMsg(c, "该用户已经是代理商或更高角色")
+			return
+		}
+		user.Role = common.RoleDealerUser
+	case "demote_dealer":
+		if user.Role != common.RoleDealerUser {
+			common.ApiErrorMsg(c, "该用户不是代理商")
+			return
+		}
+		subCount := model.CountSubUsers(user.Id)
+		if subCount > 0 {
+			common.ApiErrorMsg(c, fmt.Sprintf("该代理商下还有 %d 个子用户，请先处理子用户后再降级", subCount))
 			return
 		}
 		user.Role = common.RoleCommonUser

@@ -77,6 +77,9 @@ import {
   CalendarClock,
   ScrollText,
   SlidersHorizontal,
+  Store,
+  Users,
+  Receipt,
 } from 'lucide-react';
 import {
   SiAtlassian,
@@ -153,6 +156,10 @@ export function getLucideIcon(key, selected = false) {
       return <CalendarClock {...commonProps} color={iconColor} />;
     case 'setting':
       return <Settings {...commonProps} color={iconColor} />;
+    case 'dealer_users':
+      return <Users {...commonProps} color={iconColor} />;
+    case 'dealer_billing':
+      return <Receipt {...commonProps} color={iconColor} />;
     default:
       return <CircleUser {...commonProps} color={iconColor} />;
   }

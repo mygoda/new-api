@@ -9,6 +9,7 @@ import (
 
 type BillingFilter struct {
 	UserId    int
+	UserIds   []int // for dealer: query multiple sub-user IDs
 	TokenId   int
 	TokenName string
 	ModelName string
@@ -53,6 +54,13 @@ func buildBillingWhere(filter BillingFilter) (string, []interface{}) {
 	if filter.UserId > 0 {
 		conditions = append(conditions, "user_id = ?")
 		args = append(args, filter.UserId)
+	} else if len(filter.UserIds) > 0 {
+		placeholders := make([]string, len(filter.UserIds))
+		for i, id := range filter.UserIds {
+			placeholders[i] = "?"
+			args = append(args, id)
+		}
+		conditions = append(conditions, "user_id IN ("+strings.Join(placeholders, ",")+")")
 	}
 	if filter.TokenId > 0 {
 		conditions = append(conditions, "token_id = ?")

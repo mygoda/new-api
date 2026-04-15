@@ -73,4 +73,7 @@ const (
 	ContextKeyForceAnthropicAPI ContextKey = "force_anthropic_api"
 
 	ContextKeyResponseContent ContextKey = "doris_response_content"
+
+	/* dealer related keys */
+	ContextKeyDealerRatio ContextKey = "dealer_ratio"
 )

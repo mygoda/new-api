@@ -272,6 +272,32 @@ func SetApiRouter(router *gin.Engine) {
 			}
 		}
 
+		dealerRoute := apiRouter.Group("/dealer")
+		dealerRoute.Use(middleware.DealerAuth())
+		{
+			// Sub-user management
+			dealerRoute.GET("/users", controller.GetDealerUsers)
+			dealerRoute.GET("/users/search", controller.SearchDealerUsers)
+			dealerRoute.POST("/users", controller.CreateDealerUser)
+			dealerRoute.PUT("/users", controller.UpdateDealerUser)
+			dealerRoute.DELETE("/users/:id", controller.DeleteDealerUser)
+			dealerRoute.POST("/users/manage", controller.ManageDealerUser)
+
+			// Quota management
+			dealerRoute.POST("/quota/transfer", controller.TransferQuotaToUser)
+			dealerRoute.GET("/quota/stats", controller.GetDealerQuotaStats)
+
+			// Sub-user token management
+			dealerRoute.GET("/users/:id/tokens", controller.GetDealerUserTokens)
+			dealerRoute.POST("/users/:id/tokens", controller.CreateDealerUserToken)
+			dealerRoute.PUT("/users/:id/tokens", controller.UpdateDealerUserToken)
+			dealerRoute.DELETE("/users/:id/tokens/:token_id", controller.DeleteDealerUserToken)
+
+			// Billing
+			dealerRoute.GET("/billing", controller.GetDealerBillingRecords)
+			dealerRoute.GET("/billing/summary", controller.GetDealerBillingSummary)
+		}
+
 		redemptionRoute := apiRouter.Group("/redemption")
 		redemptionRoute.Use(middleware.AdminAuth())
 		{

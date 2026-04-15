@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -132,6 +133,14 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		QuotaToPreConsume:    preConsumedQuota,
 	}
 
+	// Inject dealer_ratio for sub-users of a dealer
+	if dealerRatioVal, exists := common.GetContextKey(c, constant.ContextKeyDealerRatio); exists {
+		if dr, ok := dealerRatioVal.(float64); ok && dr > 0 && dr != 1.0 {
+			priceData.AddOtherRatio("dealer_ratio", dr)
+			priceData.QuotaToPreConsume = int(float64(priceData.QuotaToPreConsume) * dr)
+		}
+	}
+
 	if common.DebugEnabled {
 		println(fmt.Sprintf("model_price_helper result: %s", priceData.ToSetting()))
 	}
@@ -183,6 +192,15 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 		Quota:          quota,
 		GroupRatioInfo: groupRatioInfo,
 	}
+
+	// Inject dealer_ratio for sub-users of a dealer
+	if dealerRatioVal, exists := common.GetContextKey(c, constant.ContextKeyDealerRatio); exists {
+		if dr, ok := dealerRatioVal.(float64); ok && dr > 0 && dr != 1.0 {
+			priceData.AddOtherRatio("dealer_ratio", dr)
+			priceData.Quota = int(float64(priceData.Quota) * dr)
+		}
+	}
+
 	return priceData, nil
 }
 

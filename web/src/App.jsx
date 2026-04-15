@@ -21,7 +21,7 @@ import React, { lazy, Suspense, useContext, useMemo } from 'react';
 import { Route, Routes, useLocation, useParams } from 'react-router-dom';
 import Loading from './components/common/ui/Loading';
 import User from './pages/User';
-import { AuthRedirect, PrivateRoute, AdminRoute } from './helpers';
+import { AuthRedirect, PrivateRoute, AdminRoute, DealerRoute } from './helpers';
 import RegisterForm from './components/auth/RegisterForm';
 import LoginForm from './components/auth/LoginForm';
 import NotFound from './pages/NotFound';
@@ -53,6 +53,8 @@ import OAuth2Callback from './components/auth/OAuth2Callback';
 import PersonalSetting from './components/settings/PersonalSetting';
 import Setup from './pages/Setup';
 import SetupCheck from './components/layout/SetupCheck';
+import DealerUsers from './pages/Dealer/Users';
+import DealerBilling from './pages/Dealer/Billing';
 
 const Home = lazy(() => import('./pages/Home'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -189,6 +191,22 @@ function App() {
             <AdminRoute>
               <User />
             </AdminRoute>
+          }
+        />
+        <Route
+          path='/console/dealer/users'
+          element={
+            <DealerRoute>
+              <DealerUsers />
+            </DealerRoute>
+          }
+        />
+        <Route
+          path='/console/dealer/billing'
+          element={
+            <DealerRoute>
+              <DealerBilling />
+            </DealerRoute>
           }
         />
         <Route

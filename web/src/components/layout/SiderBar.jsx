@@ -25,7 +25,7 @@ import { ChevronLeft } from 'lucide-react';
 import { useSidebarCollapsed } from '../../hooks/common/useSidebarCollapsed';
 import { useSidebar } from '../../hooks/common/useSidebar';
 import { useMinimumLoadingTime } from '../../hooks/common/useMinimumLoadingTime';
-import { isAdmin, isRoot, showError } from '../../helpers';
+import { isAdmin, isRoot, isDealer, showError } from '../../helpers';
 import SkeletonWrapper from './components/SkeletonWrapper';
 
 import { Nav, Divider, Button } from '@douyinfe/semi-ui';
@@ -53,6 +53,8 @@ const routerMap = {
   billing: '/console/billing',
   playground: '/console/playground',
   personal: '/console/personal',
+  dealer_users: '/console/dealer/users',
+  dealer_billing: '/console/dealer/billing',
 };
 
 const SiderBar = ({ onNavigate = () => {} }) => {
@@ -225,6 +227,22 @@ const SiderBar = ({ onNavigate = () => {} }) => {
 
     return filteredItems;
   }, [isAdmin(), isRoot(), t, isModuleVisible]);
+
+  const dealerItems = useMemo(() => {
+    if (!isDealer()) return [];
+    return [
+      {
+        text: t('子用户管理'),
+        itemKey: 'dealer_users',
+        to: '/console/dealer/users',
+      },
+      {
+        text: t('代理商账单'),
+        itemKey: 'dealer_billing',
+        to: '/console/dealer/billing',
+      },
+    ];
+  }, [isDealer(), t]);
 
   const chatMenuItems = useMemo(() => {
     const items = [
@@ -497,6 +515,19 @@ const SiderBar = ({ onNavigate = () => {} }) => {
                   <div className='sidebar-group-label'>{t('个人中心')}</div>
                 )}
                 {financeItems.map((item) => renderNavItem(item))}
+              </div>
+            </>
+          )}
+
+          {/* 代理商区域 - 只在代理商角色时显示 */}
+          {isDealer() && dealerItems.length > 0 && (
+            <>
+              <Divider className='sidebar-divider' />
+              <div>
+                {!collapsed && (
+                  <div className='sidebar-group-label'>{t('代理商')}</div>
+                )}
+                {dealerItems.map((item) => renderNavItem(item))}
               </div>
             </>
           )}
