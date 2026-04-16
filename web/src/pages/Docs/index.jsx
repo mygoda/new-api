@@ -325,75 +325,72 @@ console.log(response.choices[0].message.content);`}
               <Tag size='small' color='blue' type='light' className='!ml-2'>CLI</Tag>
             </Title>
             <Paragraph className='!mb-3'>
-              {t('Anthropic 官方 AI 编程助手。通过环境变量或配置文件即可将请求转发到本平台。')}
+              {t('Anthropic 官方 AI 编程助手。通过配置文件即可将请求转发到本平台，需要完成以下两步配置。')}
             </Paragraph>
 
-            <Tabs type='line' className='!mb-6'>
-              <TabPane tab={t('环境变量（推荐）')} itemKey='cc-env'>
-                <div className='mt-4'>
-                  <Paragraph type='tertiary' className='!mb-3'>
-                    {t('在终端中执行以下命令，或添加到')} <Text code>~/.bashrc</Text> / <Text code>~/.zshrc</Text> {t('中持久化：')}
-                  </Paragraph>
-                  <CodeBlock onCopy={() => handleCopy(`# ${t('设置 API 中转地址')}
-export ANTHROPIC_BASE_URL=${serverAddress}
-
-# ${t('设置 API 密钥（在令牌管理中创建）')}
-export ANTHROPIC_API_KEY=sk-xxxxxxxxxxxxxxxx
-
-# ${t('启动 Claude Code')}
-claude`)}>
-                    {`# ${t('设置 API 中转地址')}
-export ANTHROPIC_BASE_URL=${serverAddress}
-
-# ${t('设置 API 密钥（在令牌管理中创建）')}
-export ANTHROPIC_API_KEY=sk-xxxxxxxxxxxxxxxx
-
-# ${t('启动 Claude Code')}
-claude`}
-                  </CodeBlock>
-                </div>
-              </TabPane>
-
-              <TabPane tab={t('配置文件')} itemKey='cc-config'>
-                <div className='mt-4'>
-                  <Paragraph type='tertiary' className='!mb-3'>
-                    {t('编辑')} <Text code>~/.claude/settings.json</Text>，{t('添加以下配置：')}
-                  </Paragraph>
-                  <CodeBlock onCopy={() => handleCopy(`{
-  "apiBaseUrl": "${serverAddress}",
-  "apiKey": "sk-xxxxxxxxxxxxxxxx"
+            <div className='!mb-6'>
+              {/* Step 1 */}
+              <Title heading={5} className='!mb-3 !mt-4'>
+                Step 1: {t('配置')} <Text code>settings.json</Text>
+              </Title>
+              <Paragraph type='tertiary' className='!mb-2'>
+                {t('编辑配置文件')} <Text code>~/.claude/settings.json</Text>（Windows: <Text code>%USERPROFILE%\.claude\settings.json</Text>），{t('写入以下内容：')}
+              </Paragraph>
+              <CodeBlock onCopy={() => handleCopy(`{
+  "env": {
+    "ANTHROPIC_BASE_URL": "${serverAddress}",
+    "ANTHROPIC_API_KEY": "sk-xxxxxxxxxxxxxxxx",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "ANTHROPIC_MODEL": "claude-sonnet-4-20250514",
+    "CLAUDE_CODE_MAX_MODEL": "claude-sonnet-4-20250514",
+    "CLAUDE_CODE_BUDGET_MODEL": "claude-sonnet-4-20250514"
+  }
 }`)}>
-                    {`{
-  "apiBaseUrl": "${serverAddress}",
-  "apiKey": "sk-xxxxxxxxxxxxxxxx"
+                {`{
+  "env": {
+    "ANTHROPIC_BASE_URL": "${serverAddress}",
+    "ANTHROPIC_API_KEY": "sk-xxxxxxxxxxxxxxxx",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "ANTHROPIC_MODEL": "claude-sonnet-4-20250514",
+    "CLAUDE_CODE_MAX_MODEL": "claude-sonnet-4-20250514",
+    "CLAUDE_CODE_BUDGET_MODEL": "claude-sonnet-4-20250514"
+  }
 }`}
-                  </CodeBlock>
-                </div>
-              </TabPane>
+              </CodeBlock>
+              <Paragraph type='tertiary' className='!mt-2 !mb-1' size='small'>
+                {t('参数说明：')}
+              </Paragraph>
+              <ul className='list-disc list-inside text-sm text-[var(--semi-color-text-2)] space-y-1 ml-2 mb-4'>
+                <li><Text code>ANTHROPIC_BASE_URL</Text> — {t('API 中转地址，指向本平台')}</li>
+                <li><Text code>ANTHROPIC_API_KEY</Text> — {t('在')}{' '}
+                  <Link to='/console/token' className='!text-[var(--semi-color-primary)]'>{t('令牌管理')}</Link>{' '}
+                  {t('中创建的密钥')}</li>
+                <li><Text code>API_TIMEOUT_MS</Text> — {t('请求超时时间（毫秒），建议设置较大值以支持长时间任务')}</li>
+                <li><Text code>CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</Text> — {t('禁用非必要流量，减少额外请求')}</li>
+                <li><Text code>ANTHROPIC_MODEL</Text> — {t('默认使用的模型，可按需修改为平台支持的其他模型')}</li>
+                <li><Text code>CLAUDE_CODE_MAX_MODEL</Text> / <Text code>CLAUDE_CODE_BUDGET_MODEL</Text> — {t('高性能/经济模式对应的模型')}</li>
+              </ul>
 
-              <TabPane tab={t('一键脚本')} itemKey='cc-script'>
-                <div className='mt-4'>
-                  <Paragraph type='tertiary' className='!mb-3'>
-                    {t('使用以下命令一键写入配置（替换密钥后执行）：')}
-                  </Paragraph>
-                  <CodeBlock onCopy={() => handleCopy(`mkdir -p ~/.claude && cat > ~/.claude/settings.json << 'EOF'
-{
-  "apiBaseUrl": "${serverAddress}",
-  "apiKey": "sk-xxxxxxxxxxxxxxxx"
-}
-EOF
-echo "Claude Code 配置完成"`)}>
-                    {`mkdir -p ~/.claude && cat > ~/.claude/settings.json << 'EOF'
-{
-  "apiBaseUrl": "${serverAddress}",
-  "apiKey": "sk-xxxxxxxxxxxxxxxx"
-}
-EOF
-echo "Claude Code 配置完成"`}
-                  </CodeBlock>
-                </div>
-              </TabPane>
-            </Tabs>
+              {/* Step 2 */}
+              <Title heading={5} className='!mb-3 !mt-6'>
+                Step 2: {t('跳过登录引导')}
+              </Title>
+              <Paragraph type='tertiary' className='!mb-2'>
+                {t('编辑')} <Text code>~/.claude.json</Text>（Windows: <Text code>%USERPROFILE%\.claude.json</Text>），{t('写入以下内容以跳过官方登录流程：')}
+              </Paragraph>
+              <CodeBlock onCopy={() => handleCopy(`{
+  "hasCompletedOnboarding": true
+}`)}>
+                {`{
+  "hasCompletedOnboarding": true
+}`}
+              </CodeBlock>
+              <Paragraph type='tertiary' className='!mt-3'>
+                {t('完成以上两步后，在终端执行')} <Text code>claude</Text> {t('即可启动 Claude Code 并自动连接本平台。')}
+              </Paragraph>
+            </div>
 
             {/* ── Codex (OpenAI) ── */}
             <Title heading={4} className='!mb-4 !mt-10'>
