@@ -95,6 +95,10 @@ func main() {
 
 	// 热更新配置
 	go model.SyncOptions(common.SyncFrequency)
+	// Redis Pub/Sub: 收到其他节点的配置变更通知后立即刷新
+	go common.SubscribeOptionChange(func() {
+		model.LoadOptionsFromDatabase()
+	})
 
 	// 数据看板
 	go model.UpdateQuotaData()

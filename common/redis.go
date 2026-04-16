@@ -325,3 +325,27 @@ func RedisHSetField(key, field string, value interface{}) error {
 	}
 	return nil
 }
+
+const optionChangeChannel = "option_change_notify"
+
+// NotifyOptionChange 通过 Redis Pub/Sub 通知其他节点刷新 OptionMap
+func NotifyOptionChange() {
+	if !RedisEnabled || RDB == nil {
+		return
+	}
+	ctx := context.Background()
+	RDB.Publish(ctx, optionChangeChannel, "sync")
+}
+
+// SubscribeOptionChange 订阅选项变更通知，收到消息后执行回调
+func SubscribeOptionChange(callback func()) {
+	if !RedisEnabled || RDB == nil {
+		return
+	}
+	ctx := context.Background()
+	sub := RDB.Subscribe(ctx, optionChangeChannel)
+	ch := sub.Channel()
+	for range ch {
+		callback()
+	}
+}

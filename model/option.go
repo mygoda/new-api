@@ -181,10 +181,10 @@ func InitOptionMap() {
 	}
 
 	common.OptionMapRWMutex.Unlock()
-	loadOptionsFromDatabase()
+	LoadOptionsFromDatabase()
 }
 
-func loadOptionsFromDatabase() {
+func LoadOptionsFromDatabase() {
 	options, _ := AllOption()
 	for _, option := range options {
 		err := updateOptionMap(option.Key, option.Value)
@@ -198,7 +198,7 @@ func SyncOptions(frequency int) {
 	for {
 		time.Sleep(time.Duration(frequency) * time.Second)
 		common.SysLog("syncing options from database")
-		loadOptionsFromDatabase()
+		LoadOptionsFromDatabase()
 	}
 }
 
@@ -207,15 +207,18 @@ func UpdateOption(key string, value string) error {
 	option := Option{
 		Key: key,
 	}
-	// https://gorm.io/docs/update.html#Save-All-Fields
-	DB.FirstOrCreate(&option, Option{Key: key})
+	if err := DB.FirstOrCreate(&option, Option{Key: key}).Error; err != nil {
+		return err
+	}
 	option.Value = value
-	// Save is a combination function.
-	// If save value does not contain primary key, it will execute Create,
-	// otherwise it will execute Update (with all fields).
-	DB.Save(&option)
+	if err := DB.Save(&option).Error; err != nil {
+		return err
+	}
 	// Update OptionMap
-	return updateOptionMap(key, value)
+	err := updateOptionMap(key, value)
+	// 通知其他节点刷新配置
+	common.NotifyOptionChange()
+	return err
 }
 
 func updateOptionMap(key string, value string) (err error) {
