@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { API, showError, showSuccess } from '../../../../helpers';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 import {
@@ -43,13 +43,30 @@ const AddUserModal = (props) => {
   const { t } = useTranslation();
   const formApiRef = useRef(null);
   const [loading, setLoading] = useState(false);
+  const [groupOptions, setGroupOptions] = useState([]);
   const isMobile = useIsMobile();
+
+  const fetchGroups = async () => {
+    try {
+      let res = await API.get(`/api/group/`);
+      setGroupOptions(res.data.data.map((g) => ({ label: g, value: g })));
+    } catch (e) {
+      showError(e.message);
+    }
+  };
+
+  useEffect(() => {
+    if (props.visible) {
+      fetchGroups();
+    }
+  }, [props.visible]);
 
   const getInitValues = () => ({
     username: '',
     display_name: '',
     password: '',
     remark: '',
+    group: 'default',
     role: 1,
   });
 
@@ -183,6 +200,17 @@ const AddUserModal = (props) => {
                         {t('管理员')}
                       </Select.Option>
                     </Form.Select>
+                  </Col>
+                  <Col span={24}>
+                    <Form.Select
+                      field='group'
+                      label={t('分组')}
+                      placeholder={t('请选择分组')}
+                      optionList={groupOptions}
+                      allowAdditions
+                      search
+                      rules={[{ required: true, message: t('请选择分组') }]}
+                    />
                   </Col>
                   <Col span={24}>
                     <Form.Input
