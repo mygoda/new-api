@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
@@ -13,29 +14,40 @@ func GetPricing(c *gin.Context) {
 	userId, exists := c.Get("id")
 	usableGroup := map[string]string{}
 	groupRatio := map[string]float64{}
-	for s, f := range ratio_setting.GetGroupRatioCopy() {
-		groupRatio[s] = f
-	}
+
 	var group string
+	var userRole int
 	if exists {
 		user, err := model.GetUserCache(userId.(int))
 		if err == nil {
 			group = user.Group
-			for g := range groupRatio {
-				ratio, ok := ratio_setting.GetGroupGroupRatio(group, g)
-				if ok {
-					groupRatio[g] = ratio
-				}
-			}
+		}
+		if role, ok := c.Get("role"); ok {
+			userRole, _ = role.(int)
 		}
 	}
 
-	usableGroup = service.GetUserUsableGroups(group)
-	// check groupRatio contains usableGroup
-	for group := range ratio_setting.GetGroupRatioCopy() {
-		if _, ok := usableGroup[group]; !ok {
-			delete(groupRatio, group)
+	if userRole >= common.RoleAdminUser {
+		// 管理员：显示所有分组
+		for s, f := range ratio_setting.GetGroupRatioCopy() {
+			groupRatio[s] = f
 		}
+		usableGroup = service.GetUserUsableGroups(group)
+	} else if exists && group != "" {
+		// 已登录普通用户：只显示用户可用分组
+		usableGroup = service.GetUserUsableGroups(group)
+		for g := range usableGroup {
+			ratio, ok := ratio_setting.GetGroupGroupRatio(group, g)
+			if ok {
+				groupRatio[g] = ratio
+			} else {
+				groupRatio[g] = ratio_setting.GetGroupRatio(g)
+			}
+		}
+	} else {
+		// 未登录用户：只显示 default 分组
+		usableGroup["default"] = "默认分组"
+		groupRatio["default"] = ratio_setting.GetGroupRatio("default")
 	}
 
 	c.JSON(200, gin.H{
