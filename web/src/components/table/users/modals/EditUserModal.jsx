@@ -87,6 +87,7 @@ const EditUserModal = (props) => {
     quota: 0,
     group: 'default',
     remark: '',
+    created_by: 0,
   });
 
   const fetchGroups = async () => {
@@ -134,6 +135,8 @@ const EditUserModal = (props) => {
     let payload = { ...values };
     if (typeof payload.quota === 'string')
       payload.quota = parseInt(payload.quota) || 0;
+    if (typeof payload.created_by === 'string')
+      payload.created_by = parseInt(payload.created_by) || 0;
     if (userId) {
       payload.id = parseInt(userId);
     }
@@ -322,6 +325,21 @@ const EditUserModal = (props) => {
                             onClick={() => setIsModalOpen(true)}
                           />
                         </Form.Slot>
+                      </Col>
+
+                      <Col span={24}>
+                        <Form.InputNumber
+                          field='created_by'
+                          label={t('创建人 ID')}
+                          placeholder={t('0 表示自助注册')}
+                          min={0}
+                          style={{ width: '100%' }}
+                          extraText={
+                            values.created_by_username
+                              ? `${t('当前创建人')}：${values.created_by_username}`
+                              : t('留空或 0 表示自助注册')
+                          }
+                        />
                       </Col>
                     </Row>
                   </Card>

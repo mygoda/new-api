@@ -174,6 +174,7 @@ func Register(c *gin.Context) {
 		Password:    user.Password,
 		DisplayName: user.Username,
 		InviterId:   inviterId,
+		CreatedBy:   inviterId,
 		Role:        common.RoleCommonUser, // 明确设置角色为普通用户
 	}
 	// If inviter is a dealer, set parent_id for sub-user ownership
@@ -857,6 +858,7 @@ func CreateUser(c *gin.Context) {
 		DisplayName: user.DisplayName,
 		Role:        user.Role, // 保持管理员设置的角色
 		Group:       user.Group,
+		CreatedBy:   c.GetInt("id"),
 	}
 	if cleanUser.Group == "" {
 		cleanUser.Group = "default"

@@ -352,6 +352,27 @@ export const getUsersColumns = ({
       },
     },
     {
+      title: t('创建人'),
+      dataIndex: 'created_by',
+      render: (text, record) => {
+        if (!record.created_by) {
+          return (
+            <Tag color='white' shape='circle' className='!text-xs'>
+              {t('自助注册')}
+            </Tag>
+          );
+        }
+        const label = record.created_by_username
+          ? `${record.created_by_username} (ID: ${record.created_by})`
+          : `ID: ${record.created_by}`;
+        return (
+          <Tag color='light-blue' shape='circle' className='!text-xs'>
+            {label}
+          </Tag>
+        );
+      },
+    },
+    {
       title: t('邀请信息'),
       dataIndex: 'invite',
       render: (text, record, index) => renderInviteInfo(text, record, t),

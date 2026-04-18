@@ -96,6 +96,7 @@ func CreateDealerUser(c *gin.Context) {
 		ParentId:    dealerId,
 		DealerRatio: dealerRatio,
 		DealerRemark: req.DealerRemark,
+		CreatedBy:   dealerId,
 	}
 
 	if err := cleanUser.Insert(0); err != nil {

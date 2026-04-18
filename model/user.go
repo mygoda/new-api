@@ -53,6 +53,9 @@ type User struct {
 	ParentId         int            `json:"parent_id" gorm:"type:int;default:0;column:parent_id;index"`
 	DealerRatio      float64        `json:"dealer_ratio" gorm:"type:double;default:1;column:dealer_ratio"`
 	DealerRemark     string         `json:"dealer_remark,omitempty" gorm:"type:varchar(255);column:dealer_remark"`
+	CreatedBy        int            `json:"created_by" gorm:"type:int;default:0;column:created_by;index"`
+
+	CreatedByUsername string `json:"created_by_username,omitempty" gorm:"-:all"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
@@ -224,7 +227,49 @@ func GetAllUsers(pageInfo *common.PageInfo) (users []*User, total int64, err err
 		return nil, 0, err
 	}
 
+	fillCreatorUsernames(users)
+
 	return users, total, nil
+}
+
+// fillCreatorUsernames 填充每个 user 的 CreatedByUsername 字段。
+// 使用一次批量查询取出所有涉及到的创建人用户名，避免 N+1。
+func fillCreatorUsernames(users []*User) {
+	if len(users) == 0 {
+		return
+	}
+	idSet := make(map[int]struct{})
+	for _, u := range users {
+		if u != nil && u.CreatedBy > 0 {
+			idSet[u.CreatedBy] = struct{}{}
+		}
+	}
+	if len(idSet) == 0 {
+		return
+	}
+	ids := make([]int, 0, len(idSet))
+	for id := range idSet {
+		ids = append(ids, id)
+	}
+	var rows []struct {
+		Id       int
+		Username string
+	}
+	if err := DB.Unscoped().Model(&User{}).Select("id, username").Where("id IN ?", ids).Scan(&rows).Error; err != nil {
+		return
+	}
+	nameMap := make(map[int]string, len(rows))
+	for _, r := range rows {
+		nameMap[r.Id] = r.Username
+	}
+	for _, u := range users {
+		if u == nil {
+			continue
+		}
+		if name, ok := nameMap[u.CreatedBy]; ok {
+			u.CreatedByUsername = name
+		}
+	}
 }
 
 func SearchUsers(keyword string, group string, startIdx int, num int) ([]*User, int64, error) {
@@ -290,6 +335,8 @@ func SearchUsers(keyword string, group string, startIdx int, num int) ([]*User, 
 	if err = tx.Commit().Error; err != nil {
 		return nil, 0, err
 	}
+
+	fillCreatorUsernames(users)
 
 	return users, total, nil
 }
@@ -670,6 +717,7 @@ func (user *User) Edit(updatePassword bool) error {
 		"group":        newUser.Group,
 		"quota":        newUser.Quota,
 		"remark":       newUser.Remark,
+		"created_by":   newUser.CreatedBy,
 	}
 	if updatePassword {
 		updates["password"] = newUser.Password
