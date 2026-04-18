@@ -88,6 +88,7 @@ const EditUserModal = (props) => {
     group: 'default',
     remark: '',
     created_by: 0,
+    dealer_ratio: 1,
   });
 
   const fetchGroups = async () => {
@@ -137,6 +138,10 @@ const EditUserModal = (props) => {
       payload.quota = parseInt(payload.quota) || 0;
     if (typeof payload.created_by === 'string')
       payload.created_by = parseInt(payload.created_by) || 0;
+    if (typeof payload.dealer_ratio === 'string')
+      payload.dealer_ratio = parseFloat(payload.dealer_ratio) || 1;
+    if (payload.dealer_ratio == null || isNaN(payload.dealer_ratio))
+      payload.dealer_ratio = 1;
     if (userId) {
       payload.id = parseInt(userId);
     }
@@ -339,6 +344,21 @@ const EditUserModal = (props) => {
                               ? `${t('当前创建人')}：${values.created_by_username}`
                               : t('留空或 0 表示自助注册')
                           }
+                        />
+                      </Col>
+
+                      <Col span={24}>
+                        <Form.InputNumber
+                          field='dealer_ratio'
+                          label={t('用户倍率')}
+                          placeholder={t('1 表示不调整，按模型和分组倍率结算')}
+                          min={0.01}
+                          step={0.1}
+                          precision={4}
+                          style={{ width: '100%' }}
+                          extraText={t(
+                            '最终计费 = 模型倍率 × 分组倍率 × 用户倍率。设为 1 即保持原计费。',
+                          )}
                         />
                       </Col>
                     </Row>

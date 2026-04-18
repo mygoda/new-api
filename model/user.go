@@ -756,6 +756,7 @@ func (user *User) Edit(updatePassword bool) error {
 		"quota":        newUser.Quota,
 		"remark":       newUser.Remark,
 		"created_by":   newUser.CreatedBy,
+		"dealer_ratio": newUser.DealerRatio,
 	}
 	if updatePassword {
 		updates["password"] = newUser.Password
