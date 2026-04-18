@@ -15,14 +15,15 @@ import (
 
 // UserBase struct remains the same as it represents the cached data structure
 type UserBase struct {
-	Id          int     `json:"id"`
-	Group       string  `json:"group"`
-	Email       string  `json:"email"`
-	Quota       int     `json:"quota"`
-	Status      int     `json:"status"`
-	Username    string  `json:"username"`
-	Setting     string  `json:"setting"`
-	DealerRatio float64 `json:"dealer_ratio"`
+	Id              int    `json:"id"`
+	Group           string `json:"group"`
+	Email           string `json:"email"`
+	Quota           int    `json:"quota"`
+	Status          int    `json:"status"`
+	Username        string `json:"username"`
+	Setting         string `json:"setting"`
+	UserRatio       float64 `json:"user_ratio"`
+	UserModelRatios string  `json:"user_model_ratios"`
 }
 
 func (user *UserBase) WriteContext(c *gin.Context) {
@@ -32,7 +33,8 @@ func (user *UserBase) WriteContext(c *gin.Context) {
 	common.SetContextKey(c, constant.ContextKeyUserEmail, user.Email)
 	common.SetContextKey(c, constant.ContextKeyUserName, user.Username)
 	common.SetContextKey(c, constant.ContextKeyUserSetting, user.GetSetting())
-	common.SetContextKey(c, constant.ContextKeyDealerRatio, user.DealerRatio)
+	common.SetContextKey(c, constant.ContextKeyUserRatio, user.UserRatio)
+	common.SetContextKey(c, constant.ContextKeyUserModelRatios, user.UserModelRatios)
 }
 
 func (user *UserBase) GetSetting() dto.UserSetting {
@@ -102,14 +104,15 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 
 	// Create cache object from user data
 	userCache = &UserBase{
-		Id:          user.Id,
-		Group:       user.Group,
-		Quota:       user.Quota,
-		Status:      user.Status,
-		Username:    user.Username,
-		Setting:     user.Setting,
-		Email:       user.Email,
-		DealerRatio: user.DealerRatio,
+		Id:              user.Id,
+		Group:           user.Group,
+		Quota:           user.Quota,
+		Status:          user.Status,
+		Username:        user.Username,
+		Setting:         user.Setting,
+		Email:           user.Email,
+		UserRatio:       user.UserRatio,
+		UserModelRatios: user.UserModelRatios,
 	}
 
 	return userCache, nil

@@ -56,6 +56,7 @@ import {
   IconPlus,
 } from '@douyinfe/semi-icons';
 import UserBindingManagementModal from './UserBindingManagementModal';
+import ModelRatioEditor from '../../../common/ModelRatioEditor';
 
 const { Text, Title } = Typography;
 
@@ -88,7 +89,8 @@ const EditUserModal = (props) => {
     group: 'default',
     remark: '',
     created_by: 0,
-    dealer_ratio: 1,
+    user_ratio: 0,
+    user_model_ratios: '',
   });
 
   const fetchGroups = async () => {
@@ -138,10 +140,11 @@ const EditUserModal = (props) => {
       payload.quota = parseInt(payload.quota) || 0;
     if (typeof payload.created_by === 'string')
       payload.created_by = parseInt(payload.created_by) || 0;
-    if (typeof payload.dealer_ratio === 'string')
-      payload.dealer_ratio = parseFloat(payload.dealer_ratio) || 1;
-    if (payload.dealer_ratio == null || isNaN(payload.dealer_ratio))
-      payload.dealer_ratio = 1;
+    if (typeof payload.user_ratio === 'string')
+      payload.user_ratio = parseFloat(payload.user_ratio) || 0;
+    if (payload.user_ratio == null || isNaN(payload.user_ratio))
+      payload.user_ratio = 0;
+    if (payload.user_model_ratios == null) payload.user_model_ratios = '';
     if (userId) {
       payload.id = parseInt(userId);
     }
@@ -349,17 +352,36 @@ const EditUserModal = (props) => {
 
                       <Col span={24}>
                         <Form.InputNumber
-                          field='dealer_ratio'
-                          label={t('用户倍率')}
-                          placeholder={t('1 表示不调整，按模型和分组倍率结算')}
-                          min={0.01}
+                          field='user_ratio'
+                          label={t('用户默认倍率')}
+                          placeholder={t('0 = 使用分组倍率；>0 = 替代分组倍率')}
+                          min={0}
                           step={0.1}
                           precision={4}
                           style={{ width: '100%' }}
                           extraText={t(
-                            '最终计费 = 模型倍率 × 分组倍率 × 用户倍率。设为 1 即保持原计费。',
+                            '优先级：模型倍率覆盖 → 用户默认倍率 → 分组倍率。0 表示未设置。',
                           )}
                         />
+                      </Col>
+
+                      <Col span={24}>
+                        <Form.Slot
+                          field='user_model_ratios'
+                          label={t('模型倍率覆盖')}
+                          labelPosition='top'
+                        >
+                          <ModelRatioEditor
+                            value={values.user_model_ratios}
+                            onChange={(val) =>
+                              formApiRef.current?.setValue(
+                                'user_model_ratios',
+                                val,
+                              )
+                            }
+                            modelsEndpoint='/api/channel/models_enabled'
+                          />
+                        </Form.Slot>
                       </Col>
                     </Row>
                   </Card>

@@ -61,12 +61,13 @@ func CreateDealerUser(c *gin.Context) {
 	dealerId := c.GetInt("id")
 
 	var req struct {
-		Username     string  `json:"username"`
-		Password     string  `json:"password"`
-		DisplayName  string  `json:"display_name"`
-		DealerRatio  float64 `json:"dealer_ratio"`
-		DealerRemark string  `json:"dealer_remark"`
-		InitialQuota int     `json:"initial_quota"`
+		Username        string  `json:"username"`
+		Password        string  `json:"password"`
+		DisplayName     string  `json:"display_name"`
+		UserRatio       float64 `json:"user_ratio"`
+		UserModelRatios string  `json:"user_model_ratios"`
+		DealerRemark    string  `json:"dealer_remark"`
+		InitialQuota    int     `json:"initial_quota"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.ApiError(c, err)
@@ -82,21 +83,22 @@ func CreateDealerUser(c *gin.Context) {
 		return
 	}
 
-	dealerRatio := req.DealerRatio
-	if dealerRatio <= 0 {
-		dealerRatio = 1.0
+	if req.UserRatio < 0 {
+		common.ApiErrorMsg(c, "用户倍率不能为负数")
+		return
 	}
 
 	cleanUser := model.User{
-		Username:    req.Username,
-		Password:    req.Password,
-		DisplayName: req.DisplayName,
-		Role:        common.RoleCommonUser,
-		Status:      common.UserStatusEnabled,
-		ParentId:    dealerId,
-		DealerRatio: dealerRatio,
-		DealerRemark: req.DealerRemark,
-		CreatedBy:   dealerId,
+		Username:        req.Username,
+		Password:        req.Password,
+		DisplayName:     req.DisplayName,
+		Role:            common.RoleCommonUser,
+		Status:          common.UserStatusEnabled,
+		ParentId:        dealerId,
+		UserRatio:       req.UserRatio,
+		UserModelRatios: req.UserModelRatios,
+		DealerRemark:    req.DealerRemark,
+		CreatedBy:       dealerId,
 	}
 
 	if err := cleanUser.Insert(0); err != nil {
@@ -126,11 +128,12 @@ func UpdateDealerUser(c *gin.Context) {
 	dealerId := c.GetInt("id")
 
 	var req struct {
-		Id           int      `json:"id"`
-		DisplayName  *string  `json:"display_name,omitempty"`
-		Password     *string  `json:"password,omitempty"`
-		DealerRatio  *float64 `json:"dealer_ratio,omitempty"`
-		DealerRemark *string  `json:"dealer_remark,omitempty"`
+		Id              int      `json:"id"`
+		DisplayName     *string  `json:"display_name,omitempty"`
+		Password        *string  `json:"password,omitempty"`
+		UserRatio       *float64 `json:"user_ratio,omitempty"`
+		UserModelRatios *string  `json:"user_model_ratios,omitempty"`
+		DealerRemark    *string  `json:"dealer_remark,omitempty"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.ApiError(c, err)
@@ -156,12 +159,15 @@ func UpdateDealerUser(c *gin.Context) {
 		}
 		updates["password"] = hash
 	}
-	if req.DealerRatio != nil {
-		if *req.DealerRatio <= 0 {
-			common.ApiErrorMsg(c, "定价倍率必须大于0")
+	if req.UserRatio != nil {
+		if *req.UserRatio < 0 {
+			common.ApiErrorMsg(c, "用户倍率不能为负数")
 			return
 		}
-		updates["dealer_ratio"] = *req.DealerRatio
+		updates["user_ratio"] = *req.UserRatio
+	}
+	if req.UserModelRatios != nil {
+		updates["user_model_ratios"] = *req.UserModelRatios
 	}
 	if req.DealerRemark != nil {
 		updates["dealer_remark"] = *req.DealerRemark

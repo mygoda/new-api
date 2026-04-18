@@ -51,7 +51,8 @@ type User struct {
 	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
 	ParentId         int            `json:"parent_id" gorm:"type:int;default:0;column:parent_id;index"`
-	DealerRatio      float64        `json:"dealer_ratio" gorm:"type:double;default:1;column:dealer_ratio"`
+	UserRatio        float64        `json:"user_ratio" gorm:"type:double;default:0;column:user_ratio"`
+	UserModelRatios  string         `json:"user_model_ratios" gorm:"type:text;column:user_model_ratios"`
 	DealerRemark     string         `json:"dealer_remark,omitempty" gorm:"type:varchar(255);column:dealer_remark"`
 	CreatedBy        int            `json:"created_by" gorm:"type:int;default:0;column:created_by;index"`
 
@@ -60,16 +61,30 @@ type User struct {
 
 func (user *User) ToBaseUser() *UserBase {
 	cache := &UserBase{
-		Id:          user.Id,
-		Group:       user.Group,
-		Quota:       user.Quota,
-		Status:      user.Status,
-		Username:    user.Username,
-		Setting:     user.Setting,
-		Email:       user.Email,
-		DealerRatio: user.DealerRatio,
+		Id:              user.Id,
+		Group:           user.Group,
+		Quota:           user.Quota,
+		Status:          user.Status,
+		Username:        user.Username,
+		Setting:         user.Setting,
+		Email:           user.Email,
+		UserRatio:       user.UserRatio,
+		UserModelRatios: user.UserModelRatios,
 	}
 	return cache
+}
+
+// GetUserModelRatiosMap parses the JSON-encoded per-model ratio overrides.
+// Returns nil when unset or invalid.
+func (user *User) GetUserModelRatiosMap() map[string]float64 {
+	if user.UserModelRatios == "" {
+		return nil
+	}
+	m := map[string]float64{}
+	if err := common.UnmarshalJsonStr(user.UserModelRatios, &m); err != nil {
+		return nil
+	}
+	return m
 }
 
 func (user *User) GetAccessToken() string {
@@ -750,13 +765,14 @@ func (user *User) Edit(updatePassword bool) error {
 
 	newUser := *user
 	updates := map[string]interface{}{
-		"username":     newUser.Username,
-		"display_name": newUser.DisplayName,
-		"group":        newUser.Group,
-		"quota":        newUser.Quota,
-		"remark":       newUser.Remark,
-		"created_by":   newUser.CreatedBy,
-		"dealer_ratio": newUser.DealerRatio,
+		"username":          newUser.Username,
+		"display_name":      newUser.DisplayName,
+		"group":             newUser.Group,
+		"quota":             newUser.Quota,
+		"remark":            newUser.Remark,
+		"created_by":        newUser.CreatedBy,
+		"user_ratio":        newUser.UserRatio,
+		"user_model_ratios": newUser.UserModelRatios,
 	}
 	if updatePassword {
 		updates["password"] = newUser.Password

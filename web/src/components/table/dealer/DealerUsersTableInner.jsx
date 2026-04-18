@@ -42,14 +42,29 @@ const DealerUsersTableInner = (data) => {
         render: (text) => text || '-',
       },
       {
-        title: t('定价倍率'),
-        dataIndex: 'dealer_ratio',
-        width: 100,
-        render: (val) => (
-          <Tag color={val > 1 ? 'amber' : val < 1 ? 'green' : 'blue'} shape='circle'>
-            {val}x
-          </Tag>
-        ),
+        title: t('用户倍率'),
+        dataIndex: 'user_ratio',
+        width: 110,
+        render: (val, record) => {
+          const ratio = Number(val) || 0;
+          const hasOverride =
+            record.user_model_ratios && record.user_model_ratios !== '';
+          if (ratio > 0) {
+            return (
+              <Tag
+                color={ratio > 1 ? 'amber' : ratio < 1 ? 'green' : 'blue'}
+                shape='circle'
+              >
+                {ratio}x{hasOverride ? '+' : ''}
+              </Tag>
+            );
+          }
+          return (
+            <Tag color='grey' shape='circle'>
+              {hasOverride ? t('模型覆盖') : t('跟随分组')}
+            </Tag>
+          );
+        },
       },
       {
         title: t('剩余额度'),

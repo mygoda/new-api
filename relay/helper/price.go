@@ -46,10 +46,34 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.
 	return groupRatioInfo
 }
 
+// resolveEffectiveRatio returns the ratio that should replace group_ratio in the
+// pricing formula. Priority: per-user-model override → per-user default → group_ratio.
+// A value of 0 at any per-user level means "unset", fall through to the next level.
+func resolveEffectiveRatio(c *gin.Context, modelName string, groupRatio float64) float64 {
+	if v, exists := common.GetContextKey(c, constant.ContextKeyUserModelRatios); exists {
+		if s, ok := v.(string); ok && s != "" {
+			m := map[string]float64{}
+			if err := common.UnmarshalJsonStr(s, &m); err == nil {
+				if r, ok := m[modelName]; ok && r > 0 {
+					return r
+				}
+			}
+		}
+	}
+	if v, exists := common.GetContextKey(c, constant.ContextKeyUserRatio); exists {
+		if r, ok := v.(float64); ok && r > 0 {
+			return r
+		}
+	}
+	return groupRatio
+}
+
 func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens int, meta *types.TokenCountMeta) (types.PriceData, error) {
 	modelPrice, usePrice := ratio_setting.GetModelPrice(info.OriginModelName, false)
 
 	groupRatioInfo := HandleGroupRatio(c, info)
+	// Override group_ratio with per-user or per-user-model effective ratio when set.
+	groupRatioInfo.GroupRatio = resolveEffectiveRatio(c, info.OriginModelName, groupRatioInfo.GroupRatio)
 
 	var preConsumedQuota int
 	var modelRatio float64
@@ -133,14 +157,6 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		QuotaToPreConsume:    preConsumedQuota,
 	}
 
-	// Inject dealer_ratio for sub-users of a dealer
-	if dealerRatioVal, exists := common.GetContextKey(c, constant.ContextKeyDealerRatio); exists {
-		if dr, ok := dealerRatioVal.(float64); ok && dr > 0 && dr != 1.0 {
-			priceData.AddOtherRatio("dealer_ratio", dr)
-			priceData.QuotaToPreConsume = int(float64(priceData.QuotaToPreConsume) * dr)
-		}
-	}
-
 	if common.DebugEnabled {
 		println(fmt.Sprintf("model_price_helper result: %s", priceData.ToSetting()))
 	}
@@ -151,6 +167,7 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 // ModelPriceHelperPerCall 按次计费的 PriceHelper (MJ、Task)
 func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types.PriceData, error) {
 	groupRatioInfo := HandleGroupRatio(c, info)
+	groupRatioInfo.GroupRatio = resolveEffectiveRatio(c, info.OriginModelName, groupRatioInfo.GroupRatio)
 
 	modelPrice, success := ratio_setting.GetModelPrice(info.OriginModelName, true)
 	// 如果没有配置价格，检查模型倍率配置
@@ -191,14 +208,6 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 		ModelPrice:     modelPrice,
 		Quota:          quota,
 		GroupRatioInfo: groupRatioInfo,
-	}
-
-	// Inject dealer_ratio for sub-users of a dealer
-	if dealerRatioVal, exists := common.GetContextKey(c, constant.ContextKeyDealerRatio); exists {
-		if dr, ok := dealerRatioVal.(float64); ok && dr > 0 && dr != 1.0 {
-			priceData.AddOtherRatio("dealer_ratio", dr)
-			priceData.Quota = int(float64(priceData.Quota) * dr)
-		}
 	}
 
 	return priceData, nil

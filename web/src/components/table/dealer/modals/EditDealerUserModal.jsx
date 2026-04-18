@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Modal, Form } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
+import ModelRatioEditor from '../../../common/ModelRatioEditor';
 
 const EditDealerUserModal = ({
   visible,
@@ -19,8 +20,10 @@ const EditDealerUserModal = ({
     if (values.display_name !== undefined)
       payload.display_name = values.display_name;
     if (values.password) payload.password = values.password;
-    if (values.dealer_ratio !== undefined)
-      payload.dealer_ratio = values.dealer_ratio;
+    if (values.user_ratio !== undefined && values.user_ratio !== null)
+      payload.user_ratio = Number(values.user_ratio) || 0;
+    if (values.user_model_ratios !== undefined)
+      payload.user_model_ratios = values.user_model_ratios || '';
     if (values.dealer_remark !== undefined)
       payload.dealer_remark = values.dealer_remark;
 
@@ -44,47 +47,66 @@ const EditDealerUserModal = ({
       <Form
         onSubmit={handleSubmit}
         labelPosition='left'
-        labelWidth={100}
+        labelWidth={120}
         initValues={{
           display_name: editingUser.display_name || '',
-          dealer_ratio: editingUser.dealer_ratio || 1,
+          user_ratio:
+            editingUser.user_ratio != null ? editingUser.user_ratio : 0,
+          user_model_ratios: editingUser.user_model_ratios || '',
           dealer_remark: editingUser.dealer_remark || '',
         }}
       >
-        <Form.Input
-          field='display_name'
-          label={t('显示名称')}
-          placeholder={t('可选')}
-        />
-        <Form.Input
-          field='password'
-          label={t('新密码')}
-          mode='password'
-          placeholder={t('留空不修改')}
-        />
-        <Form.InputNumber
-          field='dealer_ratio'
-          label={t('定价倍率')}
-          min={0.01}
-          step={0.1}
-        />
-        <Form.Input
-          field='dealer_remark'
-          label={t('备注')}
-          placeholder={t('可选')}
-        />
-        <div className='flex justify-end gap-2 mt-4'>
-          <button className='semi-button' onClick={handleClose} type='button'>
-            {t('取消')}
-          </button>
-          <button
-            className='semi-button semi-button-primary'
-            type='submit'
-            disabled={submitting}
-          >
-            {submitting ? t('保存中...') : t('保存')}
-          </button>
-        </div>
+        {({ formApi, values }) => (
+          <>
+            <Form.Input
+              field='display_name'
+              label={t('显示名称')}
+              placeholder={t('可选')}
+            />
+            <Form.Input
+              field='password'
+              label={t('新密码')}
+              mode='password'
+              placeholder={t('留空不修改')}
+            />
+            <Form.InputNumber
+              field='user_ratio'
+              label={t('用户默认倍率')}
+              min={0}
+              step={0.1}
+              precision={4}
+              extraText={t('0 = 使用分组倍率；>0 = 替代分组倍率')}
+            />
+            <Form.Slot
+              field='user_model_ratios'
+              label={t('模型倍率覆盖')}
+              labelPosition='top'
+            >
+              <ModelRatioEditor
+                value={values.user_model_ratios}
+                onChange={(val) => formApi.setValue('user_model_ratios', val)}
+                modelsEndpoint='/api/models'
+              />
+            </Form.Slot>
+            <Form.Input
+              field='dealer_remark'
+              label={t('备注')}
+              placeholder={t('可选')}
+            />
+            <div className='flex justify-end gap-2 mt-4'>
+              <button className='semi-button' onClick={handleClose} type='button'>
+                {t('取消')}
+              </button>
+              <button
+                className='semi-button semi-button-primary'
+                type='submit'
+                disabled={submitting}
+              >
+                {submitting ? t('保存中...') : t('保存')}
+              </button>
+            </div>
+          </>
+        )}
       </Form>
     </Modal>
   );

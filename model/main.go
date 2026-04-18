@@ -203,6 +203,9 @@ func InitDB() (err error) {
 		}
 		common.SysLog("database migration started")
 		err = migrateDB()
+		if err == nil {
+			migrateDealerRatioToUserRatio()
+		}
 		return err
 	} else {
 		common.FatalLog(err)
@@ -559,6 +562,18 @@ func migrateSubscriptionPlanPriceAmount() {
 		} else {
 			common.SysLog(fmt.Sprintf("Successfully migrated %s.%s to decimal(10,6)", tableName, columnName))
 		}
+	}
+}
+
+// migrateDealerRatioToUserRatio performs a one-time backfill from the legacy dealer_ratio
+// column to the new user_ratio column. Idempotent: only copies when user_ratio is still
+// zero (unset) and dealer_ratio is a non-default positive value.
+func migrateDealerRatioToUserRatio() {
+	if !DB.Migrator().HasColumn(&User{}, "dealer_ratio") {
+		return
+	}
+	if err := DB.Exec("UPDATE users SET user_ratio = dealer_ratio WHERE user_ratio = 0 AND dealer_ratio > 0 AND dealer_ratio <> 1").Error; err != nil {
+		common.SysLog("migrate dealer_ratio -> user_ratio failed: " + err.Error())
 	}
 }
 

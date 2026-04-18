@@ -74,6 +74,7 @@ const (
 
 	ContextKeyResponseContent ContextKey = "doris_response_content"
 
-	/* dealer related keys */
-	ContextKeyDealerRatio ContextKey = "dealer_ratio"
+	/* per-user pricing overrides */
+	ContextKeyUserRatio       ContextKey = "user_ratio"
+	ContextKeyUserModelRatios ContextKey = "user_model_ratios"
 )
