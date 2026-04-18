@@ -249,6 +249,58 @@ func GetAllUsers(c *gin.Context) {
 	return
 }
 
+// GetSubordinates 返回当前登录用户的下级：
+//   - sub_users：管理员 / 经销商主动创建的子用户
+//   - invitees：通过邀请码带进来的客户
+func GetSubordinates(c *gin.Context) {
+	userId := c.GetInt("id")
+	respondSubordinates(c, userId)
+}
+
+// GetUserSubordinates 管理员查询指定用户的下级。权限与 GetUser 一致：
+// 非 Root 管理员不能查看同级或更高级别的用户。
+func GetUserSubordinates(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	target, err := model.GetUserById(id, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	myRole := c.GetInt("role")
+	if myRole <= target.Role && myRole != common.RoleRootUser {
+		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionSameLevel)
+		return
+	}
+	respondSubordinates(c, id)
+}
+
+func respondSubordinates(c *gin.Context, userId int) {
+	subUsers, err := model.GetSubUsersByCreator(userId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	invitees, err := model.GetInviteesByInviter(userId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"sub_users":       subUsers,
+			"sub_users_total": len(subUsers),
+			"invitees":        invitees,
+			"invitees_total":  len(invitees),
+		},
+	})
+}
+
 func SearchUsers(c *gin.Context) {
 	keyword := c.Query("keyword")
 	group := c.Query("group")

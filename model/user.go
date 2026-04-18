@@ -341,6 +341,44 @@ func SearchUsers(keyword string, group string, startIdx int, num int) ([]*User, 
 	return users, total, nil
 }
 
+// GetSubUsersByCreator 返回由 creatorId 主动创建的下级用户（管理员创建 / 经销商创建）。
+// 判定：created_by = creatorId 且非邀请来源（inviter_id = 0），排除自己。
+func GetSubUsersByCreator(creatorId int) ([]*User, error) {
+	if creatorId <= 0 {
+		return []*User{}, nil
+	}
+	var users []*User
+	err := DB.Unscoped().
+		Omit("password").
+		Where("created_by = ? AND inviter_id = ? AND id <> ?", creatorId, 0, creatorId).
+		Order("id desc").
+		Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	fillCreatorUsernames(users)
+	return users, nil
+}
+
+// GetInviteesByInviter 返回 inviterId 通过邀请码带进来的用户。
+// 判定：inviter_id = inviterId，排除自己。
+func GetInviteesByInviter(inviterId int) ([]*User, error) {
+	if inviterId <= 0 {
+		return []*User{}, nil
+	}
+	var users []*User
+	err := DB.Unscoped().
+		Omit("password").
+		Where("inviter_id = ? AND id <> ?", inviterId, inviterId).
+		Order("id desc").
+		Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	fillCreatorUsernames(users)
+	return users, nil
+}
+
 func GetUserById(id int, selectAll bool) (*User, error) {
 	if id == 0 {
 		return nil, errors.New("id 为空！")
