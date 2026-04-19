@@ -166,6 +166,25 @@ func GetStatus(c *gin.Context) {
 	return
 }
 
+func GetSiteInfo(c *gin.Context) {
+	common.OptionMapRWMutex.RLock()
+	defer common.OptionMapRWMutex.RUnlock()
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"system_name":    common.SystemName,
+			"logo":           common.Logo,
+			"footer_html":    common.Footer,
+			"version":        common.Version,
+			"server_address": system_setting.ServerAddress,
+			"top_up_link":    common.TopUpLink,
+			"docs_link":      operation_setting.GetGeneralSetting().DocsLink,
+		},
+	})
+}
+
 func GetNotice(c *gin.Context) {
 	common.OptionMapRWMutex.RLock()
 	defer common.OptionMapRWMutex.RUnlock()
