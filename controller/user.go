@@ -903,14 +903,20 @@ func CreateUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserCannotCreateHigherLevel)
 		return
 	}
+	if user.UserRatio < 0 {
+		common.ApiErrorMsg(c, "用户倍率不能为负数")
+		return
+	}
 	// Even for admin users, we cannot fully trust them!
 	cleanUser := model.User{
-		Username:    user.Username,
-		Password:    user.Password,
-		DisplayName: user.DisplayName,
-		Role:        user.Role, // 保持管理员设置的角色
-		Group:       user.Group,
-		CreatedBy:   c.GetInt("id"),
+		Username:        user.Username,
+		Password:        user.Password,
+		DisplayName:     user.DisplayName,
+		Role:            user.Role, // 保持管理员设置的角色
+		Group:           user.Group,
+		CreatedBy:       c.GetInt("id"),
+		UserRatio:       user.UserRatio,
+		UserModelRatios: user.UserModelRatios,
 	}
 	if cleanUser.Group == "" {
 		cleanUser.Group = "default"
