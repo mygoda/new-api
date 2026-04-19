@@ -919,6 +919,9 @@ func CreateUser(c *gin.Context) {
 		UserModelRatios: user.UserModelRatios,
 	}
 	if cleanUser.Group == "" {
+		cleanUser.Group = c.GetString("user_group")
+	}
+	if cleanUser.Group == "" {
 		cleanUser.Group = "default"
 	}
 	if err := cleanUser.Insert(0); err != nil {
