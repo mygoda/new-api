@@ -899,6 +899,13 @@ func CreateUser(c *gin.Context) {
 		user.DisplayName = user.Username
 	}
 	myRole := c.GetInt("role")
+	if user.Role == 0 {
+		user.Role = common.RoleCommonUser
+	}
+	if !common.IsValidateRole(user.Role) || user.Role == common.RoleGuestUser {
+		common.ApiErrorMsg(c, "无效的用户角色")
+		return
+	}
 	if user.Role >= myRole {
 		common.ApiErrorI18n(c, i18n.MsgUserCannotCreateHigherLevel)
 		return
