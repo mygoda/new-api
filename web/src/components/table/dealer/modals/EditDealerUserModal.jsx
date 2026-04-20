@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, Form } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import ModelRatioEditor from '../../../common/ModelRatioEditor';
@@ -11,6 +11,13 @@ const EditDealerUserModal = ({
 }) => {
   const { t } = useTranslation();
   const [submitting, setSubmitting] = useState(false);
+  const [userModelRatios, setUserModelRatios] = useState('');
+
+  useEffect(() => {
+    if (editingUser) {
+      setUserModelRatios(editingUser.user_model_ratios || '');
+    }
+  }, [editingUser]);
 
   const handleSubmit = async (values) => {
     if (!editingUser) return;
@@ -22,8 +29,7 @@ const EditDealerUserModal = ({
     if (values.password) payload.password = values.password;
     if (values.user_ratio !== undefined && values.user_ratio !== null)
       payload.user_ratio = Number(values.user_ratio) || 0;
-    if (values.user_model_ratios !== undefined)
-      payload.user_model_ratios = values.user_model_ratios || '';
+    payload.user_model_ratios = userModelRatios || '';
     if (values.dealer_remark !== undefined)
       payload.dealer_remark = values.dealer_remark;
 
@@ -78,13 +84,15 @@ const EditDealerUserModal = ({
               extraText={t('0 = 使用分组倍率；>0 = 替代分组倍率')}
             />
             <Form.Slot
-              field='user_model_ratios'
               label={t('模型倍率覆盖')}
               labelPosition='top'
             >
               <ModelRatioEditor
-                value={values.user_model_ratios}
-                onChange={(val) => formApi.setValue('user_model_ratios', val)}
+                value={userModelRatios}
+                onChange={(val) => {
+                  setUserModelRatios(val);
+                  formApi.setValue('user_model_ratios', val);
+                }}
                 modelsEndpoint='/api/models'
               />
             </Form.Slot>

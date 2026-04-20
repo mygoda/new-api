@@ -70,6 +70,7 @@ const EditUserModal = (props) => {
   const isMobile = useIsMobile();
   const [groupOptions, setGroupOptions] = useState([]);
   const [bindingModalVisible, setBindingModalVisible] = useState(false);
+  const [userModelRatios, setUserModelRatios] = useState('');
   const formApiRef = useRef(null);
 
   const isEdit = Boolean(userId);
@@ -112,6 +113,7 @@ const EditUserModal = (props) => {
     if (success) {
       data.password = '';
       formApiRef.current?.setValues({ ...getInitValues(), ...data });
+      setUserModelRatios(data.user_model_ratios || '');
     } else {
       showError(message);
     }
@@ -144,7 +146,7 @@ const EditUserModal = (props) => {
       payload.user_ratio = parseFloat(payload.user_ratio) || 0;
     if (payload.user_ratio == null || isNaN(payload.user_ratio))
       payload.user_ratio = 0;
-    if (payload.user_model_ratios == null) payload.user_model_ratios = '';
+    payload.user_model_ratios = userModelRatios || '';
     if (userId) {
       payload.id = parseInt(userId);
     }
@@ -367,18 +369,18 @@ const EditUserModal = (props) => {
 
                       <Col span={24}>
                         <Form.Slot
-                          field='user_model_ratios'
                           label={t('模型倍率覆盖')}
                           labelPosition='top'
                         >
                           <ModelRatioEditor
-                            value={values.user_model_ratios}
-                            onChange={(val) =>
+                            value={userModelRatios}
+                            onChange={(val) => {
+                              setUserModelRatios(val);
                               formApiRef.current?.setValue(
                                 'user_model_ratios',
                                 val,
-                              )
-                            }
+                              );
+                            }}
                             modelsEndpoint='/api/channel/models_enabled'
                           />
                         </Form.Slot>
