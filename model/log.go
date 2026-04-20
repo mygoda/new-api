@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -625,23 +626,47 @@ func GetChannelStats(startTimestamp int64, endTimestamp int64) ([]ChannelStats, 
 	}
 
 	// PostgreSQL 直接用 SQL 计算分位数，MySQL/SQLite 通过 Go 后处理计算
-	if !common.UsingPostgreSQL {
-		for i := range consumeStats {
-			var latencyVals []float64
-			latencyQuery := LOG_DB.Table("logs").
-				Select("use_time").
-				Where("type = ? AND channel_id = ? AND use_time > 0", LogTypeConsume, consumeStats[i].ChannelId)
-			if startTimestamp != 0 {
-				latencyQuery = latencyQuery.Where("created_at >= ?", startTimestamp)
+	// 优化：单次查询拉取所有 (channel_id, use_time) 按 channel_id 排序，Go 端分桶复用 percentileCalculate
+	if !common.UsingPostgreSQL && len(consumeStats) > 0 {
+		type latRow struct {
+			ChannelId int     `gorm:"column:channel_id"`
+			UseTime   float64 `gorm:"column:use_time"`
+		}
+		var rows []latRow
+		latQuery := LOG_DB.Table("logs").
+			Select("channel_id, use_time").
+			Where("type = ? AND channel_id > 0 AND use_time > 0", LogTypeConsume)
+		if startTimestamp != 0 {
+			latQuery = latQuery.Where("created_at >= ?", startTimestamp)
+		}
+		if endTimestamp != 0 {
+			latQuery = latQuery.Where("created_at <= ?", endTimestamp)
+		}
+		if err := latQuery.Order("channel_id, use_time").Find(&rows).Error; err == nil {
+			statIdx := make(map[int]*ChannelStats, len(consumeStats))
+			for i := range consumeStats {
+				statIdx[consumeStats[i].ChannelId] = &consumeStats[i]
 			}
-			if endTimestamp != 0 {
-				latencyQuery = latencyQuery.Where("created_at <= ?", endTimestamp)
+			curId := -1
+			var buf []float64
+			flush := func() {
+				if curId >= 0 && len(buf) > 0 {
+					if s := statIdx[curId]; s != nil {
+						s.LatencyP50 = percentileCalculate(buf, 0.5)
+						s.LatencyP90 = percentileCalculate(buf, 0.9)
+						s.LatencyP95 = percentileCalculate(buf, 0.95)
+					}
+				}
 			}
-			if err := latencyQuery.Order("use_time").Find(&latencyVals).Error; err == nil && len(latencyVals) > 0 {
-				consumeStats[i].LatencyP50 = percentileCalculate(latencyVals, 0.5)
-				consumeStats[i].LatencyP90 = percentileCalculate(latencyVals, 0.9)
-				consumeStats[i].LatencyP95 = percentileCalculate(latencyVals, 0.95)
+			for _, r := range rows {
+				if r.ChannelId != curId {
+					flush()
+					curId = r.ChannelId
+					buf = buf[:0]
+				}
+				buf = append(buf, r.UseTime)
 			}
+			flush()
 		}
 	}
 
@@ -967,23 +992,55 @@ func GetModelChannelCrossStats(modelName string, startTimestamp int64, endTimest
 	}
 
 	// 非 PostgreSQL: 后处理计算分位数
-	if !common.UsingPostgreSQL {
-		for i := range consumeStats {
-			var latencyVals []float64
-			latencyQuery := LOG_DB.Table("logs").
-				Select("use_time").
-				Where("type = ? AND channel_id = ? AND model_name = ? AND use_time > 0", LogTypeConsume, consumeStats[i].ChannelId, consumeStats[i].ModelName)
-			if startTimestamp != 0 {
-				latencyQuery = latencyQuery.Where("created_at >= ?", startTimestamp)
+	// 优化：单次查询拉取所有 (model_name, channel_id, use_time) 有序，Go 端按 (model_name, channel_id) 分桶
+	if !common.UsingPostgreSQL && len(consumeStats) > 0 {
+		type latRow struct {
+			ModelName string  `gorm:"column:model_name"`
+			ChannelId int     `gorm:"column:channel_id"`
+			UseTime   float64 `gorm:"column:use_time"`
+		}
+		var rows []latRow
+		latQuery := LOG_DB.Table("logs").
+			Select("model_name, channel_id, use_time").
+			Where("type = ? AND channel_id > 0 AND use_time > 0", LogTypeConsume)
+		if modelName != "" {
+			latQuery = latQuery.Where("model_name = ?", modelName)
+		}
+		if startTimestamp != 0 {
+			latQuery = latQuery.Where("created_at >= ?", startTimestamp)
+		}
+		if endTimestamp != 0 {
+			latQuery = latQuery.Where("created_at <= ?", endTimestamp)
+		}
+		if err := latQuery.Order("model_name, channel_id, use_time").Find(&rows).Error; err == nil {
+			statIdx := make(map[string]*ModelChannelCrossStats, len(consumeStats))
+			for i := range consumeStats {
+				k := consumeStats[i].ModelName + "\x00" + strconv.Itoa(consumeStats[i].ChannelId)
+				statIdx[k] = &consumeStats[i]
 			}
-			if endTimestamp != 0 {
-				latencyQuery = latencyQuery.Where("created_at <= ?", endTimestamp)
+			var curKey string
+			keyInit := false
+			var buf []float64
+			flush := func() {
+				if keyInit && len(buf) > 0 {
+					if s := statIdx[curKey]; s != nil {
+						s.LatencyP50 = percentileCalculate(buf, 0.5)
+						s.LatencyP90 = percentileCalculate(buf, 0.9)
+						s.LatencyP95 = percentileCalculate(buf, 0.95)
+					}
+				}
 			}
-			if err := latencyQuery.Order("use_time").Find(&latencyVals).Error; err == nil && len(latencyVals) > 0 {
-				consumeStats[i].LatencyP50 = percentileCalculate(latencyVals, 0.5)
-				consumeStats[i].LatencyP90 = percentileCalculate(latencyVals, 0.9)
-				consumeStats[i].LatencyP95 = percentileCalculate(latencyVals, 0.95)
+			for _, r := range rows {
+				k := r.ModelName + "\x00" + strconv.Itoa(r.ChannelId)
+				if !keyInit || k != curKey {
+					flush()
+					curKey = k
+					keyInit = true
+					buf = buf[:0]
+				}
+				buf = append(buf, r.UseTime)
 			}
+			flush()
 		}
 	}
 
