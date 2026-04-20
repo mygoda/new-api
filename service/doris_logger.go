@@ -230,7 +230,7 @@ func ensureDorisRequestLogsColumns() {
 		if exists > 0 {
 			continue
 		}
-		stmt := fmt.Sprintf("ALTER TABLE `%s`.`request_logs` ADD COLUMN `%s` %s",
+		stmt := fmt.Sprintf("ALTER TABLE `%s`.`request_logs` ADD `%s` %s",
 			common.DorisDatabase, col.name, col.def)
 		if _, err := db.Exec(stmt); err != nil {
 			common.SysLog(fmt.Sprintf("doris: add column request_logs.%s failed: %s", col.name, err))
