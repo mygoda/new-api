@@ -212,9 +212,9 @@ func ensureDorisRequestLogsColumns() {
 		name string
 		def  string
 	}{
-		{"cache_creation_tokens", "INT DEFAULT 0 COMMENT '缓存写入Token总数(创建)'"},
-		{"cache_creation_tokens_5m", "INT DEFAULT 0 COMMENT 'Claude 5m TTL 缓存写入Token'"},
-		{"cache_creation_tokens_1h", "INT DEFAULT 0 COMMENT 'Claude 1h TTL 缓存写入Token'"},
+		{"cache_creation_tokens", `INT DEFAULT "0" COMMENT '缓存写入Token总数(创建)'`},
+		{"cache_creation_tokens_5m", `INT DEFAULT "0" COMMENT 'Claude 5m TTL 缓存写入Token'`},
+		{"cache_creation_tokens_1h", `INT DEFAULT "0" COMMENT 'Claude 1h TTL 缓存写入Token'`},
 	}
 	for _, col := range columns {
 		var exists int
@@ -230,7 +230,7 @@ func ensureDorisRequestLogsColumns() {
 		if exists > 0 {
 			continue
 		}
-		stmt := fmt.Sprintf("ALTER TABLE `%s`.`request_logs` ADD `%s` %s",
+		stmt := fmt.Sprintf("ALTER TABLE `%s`.`request_logs` ADD COLUMN `%s` %s",
 			common.DorisDatabase, col.name, col.def)
 		if _, err := db.Exec(stmt); err != nil {
 			common.SysLog(fmt.Sprintf("doris: add column request_logs.%s failed: %s", col.name, err))
