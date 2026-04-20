@@ -221,6 +221,14 @@ generate_compose() {
     env_lines+="      - ERROR_LOG_ENABLED=true\n"
     env_lines+="      - BATCH_UPDATE_ENABLED=true\n"
 
+    # 放宽非关键路径限流，登录/注册/支付等 CriticalRateLimit 保持默认
+    env_lines+="      - GLOBAL_API_RATE_LIMIT=${GLOBAL_API_RATE_LIMIT:-10000}\n"
+    env_lines+="      - GLOBAL_API_RATE_LIMIT_DURATION=${GLOBAL_API_RATE_LIMIT_DURATION:-60}\n"
+    env_lines+="      - GLOBAL_WEB_RATE_LIMIT=${GLOBAL_WEB_RATE_LIMIT:-10000}\n"
+    env_lines+="      - GLOBAL_WEB_RATE_LIMIT_DURATION=${GLOBAL_WEB_RATE_LIMIT_DURATION:-60}\n"
+    env_lines+="      - SEARCH_RATE_LIMIT=${SEARCH_RATE_LIMIT:-200}\n"
+    env_lines+="      - SEARCH_RATE_LIMIT_DURATION=${SEARCH_RATE_LIMIT_DURATION:-60}\n"
+
     if [ -n "$db_dsn" ]; then
         env_lines+="      - SQL_DSN=${db_dsn}\n"
     fi
