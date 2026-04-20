@@ -64,6 +64,9 @@ func EmitDorisLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto
 		log.CompletionTokens = usage.CompletionTokens
 		log.TotalTokens = usage.TotalTokens
 		log.CacheTokens = usage.PromptTokensDetails.CachedTokens
+		log.CacheCreationTokens = usage.PromptTokensDetails.CachedCreationTokens
+		log.CacheCreationTokens5m = usage.ClaudeCacheCreation5mTokens
+		log.CacheCreationTokens1h = usage.ClaudeCacheCreation1hTokens
 	}
 
 	log.Quota = quota

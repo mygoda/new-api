@@ -334,6 +334,8 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/doris/self", middleware.UserAuth(), controller.GetDorisLogsSelf)
 		logRoute.GET("/doris/detail", middleware.AdminAuth(), controller.GetDorisLogDetail)
 		logRoute.GET("/doris/detail/self", middleware.UserAuth(), controller.GetDorisLogDetailSelf)
+		logRoute.GET("/doris/cache_stats", middleware.AdminAuth(), controller.GetDorisCacheStats)
+		logRoute.GET("/doris/cache_stats/self", middleware.UserAuth(), controller.GetDorisCacheStatsSelf)
 
 		billingRoute := apiRouter.Group("/billing")
 		{

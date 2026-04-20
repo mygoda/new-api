@@ -53,41 +53,44 @@ func dorisRedirectPolicy(req *http.Request, via []*http.Request) error {
 
 // DorisRequestLog represents a detailed API request log row for Doris.
 type DorisRequestLog struct {
-	RequestId        string  `json:"request_id"`
-	UserId           int     `json:"user_id"`
-	TokenId          int     `json:"token_id"`
-	TokenName        string  `json:"token_name"`
-	TokenKey         string  `json:"token_key"`
-	UserGroup        string  `json:"user_group"`
-	TokenGroup       string  `json:"token_group"`
-	UsingGroup       string  `json:"using_group"`
-	ModelName        string  `json:"model_name"`
-	UpstreamModel    string  `json:"upstream_model"`
-	ChannelId        int     `json:"channel_id"`
-	ChannelType      int     `json:"channel_type"`
-	ChannelName      string  `json:"channel_name"`
-	IsStream         bool    `json:"is_stream"`
-	RelayMode        int     `json:"relay_mode"`
-	RequestPath      string  `json:"request_path"`
-	ClientIp         string  `json:"client_ip"`
-	RequestBody      string  `json:"request_body"`
-	ResponseContent  string  `json:"response_content"`
-	PromptTokens     int     `json:"prompt_tokens"`
-	CompletionTokens int     `json:"completion_tokens"`
-	TotalTokens      int     `json:"total_tokens"`
-	CacheTokens      int     `json:"cache_tokens"`
-	Quota            int     `json:"quota"`
-	ModelRatio       float64 `json:"model_ratio"`
-	GroupRatio       float64 `json:"group_ratio"`
-	CompletionRatio  float64 `json:"completion_ratio"`
-	ModelPrice       float64 `json:"model_price"`
-	UseTimeMs        int64   `json:"use_time_ms"`
-	IsSuccess        bool    `json:"is_success"`
-	RetryCount       int     `json:"retry_count"`
-	StatusCode       int     `json:"status_code"`
-	ErrorType        string  `json:"error_type,omitempty"`
-	ErrorMessage     string  `json:"error_message,omitempty"`
-	CreatedAt        string  `json:"created_at"`
+	RequestId             string  `json:"request_id"`
+	UserId                int     `json:"user_id"`
+	TokenId               int     `json:"token_id"`
+	TokenName             string  `json:"token_name"`
+	TokenKey              string  `json:"token_key"`
+	UserGroup             string  `json:"user_group"`
+	TokenGroup            string  `json:"token_group"`
+	UsingGroup            string  `json:"using_group"`
+	ModelName             string  `json:"model_name"`
+	UpstreamModel         string  `json:"upstream_model"`
+	ChannelId             int     `json:"channel_id"`
+	ChannelType           int     `json:"channel_type"`
+	ChannelName           string  `json:"channel_name"`
+	IsStream              bool    `json:"is_stream"`
+	RelayMode             int     `json:"relay_mode"`
+	RequestPath           string  `json:"request_path"`
+	ClientIp              string  `json:"client_ip"`
+	RequestBody           string  `json:"request_body"`
+	ResponseContent       string  `json:"response_content"`
+	PromptTokens          int     `json:"prompt_tokens"`
+	CompletionTokens      int     `json:"completion_tokens"`
+	TotalTokens           int     `json:"total_tokens"`
+	CacheTokens           int     `json:"cache_tokens"`
+	CacheCreationTokens   int     `json:"cache_creation_tokens"`
+	CacheCreationTokens5m int     `json:"cache_creation_tokens_5m"`
+	CacheCreationTokens1h int     `json:"cache_creation_tokens_1h"`
+	Quota                 int     `json:"quota"`
+	ModelRatio            float64 `json:"model_ratio"`
+	GroupRatio            float64 `json:"group_ratio"`
+	CompletionRatio       float64 `json:"completion_ratio"`
+	ModelPrice            float64 `json:"model_price"`
+	UseTimeMs             int64   `json:"use_time_ms"`
+	IsSuccess             bool    `json:"is_success"`
+	RetryCount            int     `json:"retry_count"`
+	StatusCode            int     `json:"status_code"`
+	ErrorType             string  `json:"error_type,omitempty"`
+	ErrorMessage          string  `json:"error_message,omitempty"`
+	CreatedAt             string  `json:"created_at"`
 }
 
 var (
@@ -186,6 +189,57 @@ func ensureDorisInvertedIndexes() {
 	}
 }
 
+// ensureDorisRequestLogsColumns retrofits older deployments with columns added later.
+// Idempotent: checks information_schema.columns first, errors on ADD COLUMN are logged
+// but do not block startup.
+func ensureDorisRequestLogsColumns() {
+	endpoint := resolveDorisEndpoint()
+	if endpoint.host == "" {
+		return
+	}
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=true&loc=UTC&interpolateParams=true",
+		common.DorisUser, common.DorisPassword,
+		endpoint.host, endpoint.queryPort,
+		common.DorisDatabase)
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		common.SysError(fmt.Sprintf("doris: ensure request_logs columns: open: %s", err))
+		return
+	}
+	defer db.Close()
+
+	columns := []struct {
+		name string
+		def  string
+	}{
+		{"cache_creation_tokens", "INT DEFAULT 0 COMMENT '缓存写入Token总数(创建)'"},
+		{"cache_creation_tokens_5m", "INT DEFAULT 0 COMMENT 'Claude 5m TTL 缓存写入Token'"},
+		{"cache_creation_tokens_1h", "INT DEFAULT 0 COMMENT 'Claude 1h TTL 缓存写入Token'"},
+	}
+	for _, col := range columns {
+		var exists int
+		row := db.QueryRow(
+			`SELECT COUNT(*) FROM information_schema.columns
+			 WHERE table_schema = ? AND table_name = ? AND column_name = ?`,
+			common.DorisDatabase, "request_logs", col.name,
+		)
+		if err := row.Scan(&exists); err != nil {
+			common.SysLog(fmt.Sprintf("doris: check column request_logs.%s skipped: %s", col.name, err))
+			continue
+		}
+		if exists > 0 {
+			continue
+		}
+		stmt := fmt.Sprintf("ALTER TABLE `%s`.`request_logs` ADD COLUMN `%s` %s",
+			common.DorisDatabase, col.name, col.def)
+		if _, err := db.Exec(stmt); err != nil {
+			common.SysLog(fmt.Sprintf("doris: add column request_logs.%s failed: %s", col.name, err))
+			continue
+		}
+		common.SysLog(fmt.Sprintf("doris: column request_logs.%s added", col.name))
+	}
+}
+
 const requestLogsDDL = `CREATE TABLE IF NOT EXISTS %s.request_logs (
     created_at          DATETIME        NOT NULL COMMENT '请求时间 (UTC)',
     request_id          VARCHAR(128)    NOT NULL COMMENT '请求ID',
@@ -210,7 +264,10 @@ const requestLogsDDL = `CREATE TABLE IF NOT EXISTS %s.request_logs (
     prompt_tokens       INT             DEFAULT 0  COMMENT '输入Token数',
     completion_tokens   INT             DEFAULT 0  COMMENT '输出Token数',
     total_tokens        INT             DEFAULT 0  COMMENT '总Token数',
-    cache_tokens        INT             DEFAULT 0  COMMENT '缓存Token数',
+    cache_tokens        INT             DEFAULT 0  COMMENT '缓存读取Token数(命中)',
+    cache_creation_tokens    INT        DEFAULT 0  COMMENT '缓存写入Token总数(创建)',
+    cache_creation_tokens_5m INT        DEFAULT 0  COMMENT 'Claude 5m TTL 缓存写入Token',
+    cache_creation_tokens_1h INT        DEFAULT 0  COMMENT 'Claude 1h TTL 缓存写入Token',
     quota               INT             DEFAULT 0  COMMENT '消耗额度',
     model_ratio         DOUBLE          DEFAULT 0  COMMENT '模型倍率',
     group_ratio         DOUBLE          DEFAULT 0  COMMENT '分组倍率',
@@ -287,6 +344,7 @@ func InitDorisLogger() {
 
 		ensureDorisTable("request_logs", fmt.Sprintf(requestLogsDDL, common.DorisDatabase))
 		ensureDorisTable("billing_records", fmt.Sprintf(billingRecordsDDL, common.DorisDatabase))
+		ensureDorisRequestLogsColumns()
 		ensureDorisInvertedIndexes()
 
 		common.SysLog(fmt.Sprintf("Doris logger initialized: %s:%d/%s.%s (flush every %ds or %d rows)",

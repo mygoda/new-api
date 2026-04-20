@@ -65,7 +65,10 @@ CREATE TABLE IF NOT EXISTS \`${DORIS_DATABASE}\`.\`${DORIS_TABLE}\` (
     prompt_tokens       INT             DEFAULT 0  COMMENT '输入Token数',
     completion_tokens   INT             DEFAULT 0  COMMENT '输出Token数',
     total_tokens        INT             DEFAULT 0  COMMENT '总Token数',
-    cache_tokens        INT             DEFAULT 0  COMMENT '缓存Token数',
+    cache_tokens        INT             DEFAULT 0  COMMENT '缓存读取Token数(命中)',
+    cache_creation_tokens    INT        DEFAULT 0  COMMENT '缓存写入Token总数(创建)',
+    cache_creation_tokens_5m INT        DEFAULT 0  COMMENT 'Claude 5m TTL 缓存写入Token',
+    cache_creation_tokens_1h INT        DEFAULT 0  COMMENT 'Claude 1h TTL 缓存写入Token',
     quota               INT             DEFAULT 0  COMMENT '消耗额度',
     model_ratio         DOUBLE          DEFAULT 0  COMMENT '模型倍率',
     group_ratio         DOUBLE          DEFAULT 0  COMMENT '分组倍率',
@@ -107,9 +110,12 @@ add_column_if_missing() {
   fi
 }
 
-add_column_if_missing "token_key"         "VARCHAR(512)  DEFAULT '' COMMENT 'API 密钥'"
-add_column_if_missing "request_body"      "STRING        DEFAULT '' COMMENT '请求体'"
-add_column_if_missing "response_content"  "STRING        DEFAULT '' COMMENT '响应内容'"
+add_column_if_missing "token_key"                "VARCHAR(512)  DEFAULT '' COMMENT 'API 密钥'"
+add_column_if_missing "request_body"             "STRING        DEFAULT '' COMMENT '请求体'"
+add_column_if_missing "response_content"         "STRING        DEFAULT '' COMMENT '响应内容'"
+add_column_if_missing "cache_creation_tokens"    "INT           DEFAULT 0  COMMENT '缓存写入Token总数(创建)'"
+add_column_if_missing "cache_creation_tokens_5m" "INT           DEFAULT 0  COMMENT 'Claude 5m TTL 缓存写入Token'"
+add_column_if_missing "cache_creation_tokens_1h" "INT           DEFAULT 0  COMMENT 'Claude 1h TTL 缓存写入Token'"
 
 # 4. Create billing_records table
 BILLING_TABLE="billing_records"

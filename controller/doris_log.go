@@ -177,3 +177,109 @@ func GetDorisLogsSelf(c *gin.Context) {
 	pageInfo.SetItems(result.Items)
 	common.ApiSuccess(c, pageInfo)
 }
+
+// GetDorisCacheStats aggregates cache usage across all users (admin).
+// Query params:
+//   - group_by: user (default) | model | day | token | channel
+//   - user_id / token_id / channel / model_name / group / is_success
+//   - start_timestamp / end_timestamp (unix seconds)
+func GetDorisCacheStats(c *gin.Context) {
+	if !common.DorisEnabled || !setting.DorisLogEnabled {
+		common.ApiErrorMsg(c, "Doris 日志功能未启用")
+		return
+	}
+
+	pageInfo := common.GetPageQuery(c)
+	filter := service.DorisCacheStatsFilter{
+		GroupBy:   c.Query("group_by"),
+		ModelName: c.Query("model_name"),
+		UserGroup: c.Query("group"),
+	}
+	if v, err := strconv.Atoi(c.Query("user_id")); err == nil && v > 0 {
+		filter.UserId = v
+	}
+	if v, err := strconv.Atoi(c.Query("token_id")); err == nil && v > 0 {
+		filter.TokenId = v
+	}
+	if v, err := strconv.Atoi(c.Query("channel")); err == nil && v > 0 {
+		filter.ChannelId = v
+	}
+	if v := c.Query("is_success"); v == "true" {
+		b := true
+		filter.IsSuccess = &b
+	} else if v == "false" {
+		b := false
+		filter.IsSuccess = &b
+	}
+	if v, err := strconv.ParseInt(c.Query("start_timestamp"), 10, 64); err == nil && v > 0 {
+		filter.StartTime = time.Unix(v, 0).UTC().Format("2006-01-02 15:04:05")
+	}
+	if v, err := strconv.ParseInt(c.Query("end_timestamp"), 10, 64); err == nil && v > 0 {
+		filter.EndTime = time.Unix(v, 0).UTC().Format("2006-01-02 15:04:05")
+	}
+
+	result, err := service.QueryDorisCacheStats(filter, pageInfo.GetPage(), pageInfo.GetPageSize())
+	if err != nil {
+		common.ApiErrorMsg(c, "查询缓存统计失败: "+err.Error())
+		return
+	}
+
+	pageInfo.SetTotal(result.Total)
+	pageInfo.SetItems(result.Items)
+	common.ApiSuccess(c, pageInfo)
+}
+
+// GetDorisCacheStatsSelf returns aggregated cache usage for the current user only.
+// Forces user_id = current user. Default group_by is "day" instead of "user".
+// Strips channel_id / channel_name from responses.
+func GetDorisCacheStatsSelf(c *gin.Context) {
+	if !common.DorisEnabled || !setting.DorisLogEnabled {
+		common.ApiErrorMsg(c, "Doris 日志功能未启用")
+		return
+	}
+
+	pageInfo := common.GetPageQuery(c)
+	userId := c.GetInt("id")
+	groupBy := c.DefaultQuery("group_by", "day")
+	if groupBy == "user" {
+		// "user" makes no sense in self scope; fall back to day.
+		groupBy = "day"
+	}
+
+	filter := service.DorisCacheStatsFilter{
+		UserId:    userId,
+		GroupBy:   groupBy,
+		ModelName: c.Query("model_name"),
+	}
+	if v, err := strconv.Atoi(c.Query("token_id")); err == nil && v > 0 {
+		filter.TokenId = v
+	}
+	if v := c.Query("is_success"); v == "true" {
+		b := true
+		filter.IsSuccess = &b
+	} else if v == "false" {
+		b := false
+		filter.IsSuccess = &b
+	}
+	if v, err := strconv.ParseInt(c.Query("start_timestamp"), 10, 64); err == nil && v > 0 {
+		filter.StartTime = time.Unix(v, 0).UTC().Format("2006-01-02 15:04:05")
+	}
+	if v, err := strconv.ParseInt(c.Query("end_timestamp"), 10, 64); err == nil && v > 0 {
+		filter.EndTime = time.Unix(v, 0).UTC().Format("2006-01-02 15:04:05")
+	}
+
+	result, err := service.QueryDorisCacheStats(filter, pageInfo.GetPage(), pageInfo.GetPageSize())
+	if err != nil {
+		common.ApiErrorMsg(c, "查询缓存统计失败: "+err.Error())
+		return
+	}
+
+	for i := range result.Items {
+		result.Items[i].ChannelId = 0
+		result.Items[i].ChannelName = ""
+	}
+
+	pageInfo.SetTotal(result.Total)
+	pageInfo.SetItems(result.Items)
+	common.ApiSuccess(c, pageInfo)
+}

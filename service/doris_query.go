@@ -69,6 +69,9 @@ const dorisListColumns = "request_id, user_id, token_id, token_name, IFNULL(toke
 	"model_name, upstream_model, channel_id, channel_type, channel_name, " +
 	"is_stream, relay_mode, request_path, client_ip, " +
 	"prompt_tokens, completion_tokens, total_tokens, cache_tokens, " +
+	"IFNULL(cache_creation_tokens, 0) AS cache_creation_tokens, " +
+	"IFNULL(cache_creation_tokens_5m, 0) AS cache_creation_tokens_5m, " +
+	"IFNULL(cache_creation_tokens_1h, 0) AS cache_creation_tokens_1h, " +
 	"quota, model_ratio, group_ratio, completion_ratio, model_price, " +
 	"use_time_ms, is_success, retry_count, status_code, " +
 	"IFNULL(error_type, '') AS error_type, IFNULL(error_message, '') AS error_message, " +
@@ -81,6 +84,9 @@ const dorisDetailColumns = "request_id, user_id, token_id, token_name, IFNULL(to
 	"is_stream, relay_mode, request_path, client_ip, " +
 	"IFNULL(request_body, '') AS request_body, IFNULL(response_content, '') AS response_content, " +
 	"prompt_tokens, completion_tokens, total_tokens, cache_tokens, " +
+	"IFNULL(cache_creation_tokens, 0) AS cache_creation_tokens, " +
+	"IFNULL(cache_creation_tokens_5m, 0) AS cache_creation_tokens_5m, " +
+	"IFNULL(cache_creation_tokens_1h, 0) AS cache_creation_tokens_1h, " +
 	"quota, model_ratio, group_ratio, completion_ratio, model_price, " +
 	"use_time_ms, is_success, retry_count, status_code, " +
 	"IFNULL(error_type, '') AS error_type, IFNULL(error_message, '') AS error_message, " +
@@ -199,6 +205,7 @@ func QueryDorisLogs(filter DorisLogFilter, page, pageSize int) (*DorisLogQueryRe
 			&log.ChannelId, &log.ChannelType, &log.ChannelName,
 			&log.IsStream, &log.RelayMode, &log.RequestPath, &log.ClientIp,
 			&log.PromptTokens, &log.CompletionTokens, &log.TotalTokens, &log.CacheTokens,
+			&log.CacheCreationTokens, &log.CacheCreationTokens5m, &log.CacheCreationTokens1h,
 			&log.Quota, &log.ModelRatio, &log.GroupRatio, &log.CompletionRatio, &log.ModelPrice,
 			&log.UseTimeMs, &log.IsSuccess, &log.RetryCount, &log.StatusCode,
 			&log.ErrorType, &log.ErrorMessage,
@@ -250,6 +257,7 @@ func QueryDorisLogDetail(requestId string) (*DorisRequestLog, error) {
 		&log.IsStream, &log.RelayMode, &log.RequestPath, &log.ClientIp,
 		&log.RequestBody, &log.ResponseContent,
 		&log.PromptTokens, &log.CompletionTokens, &log.TotalTokens, &log.CacheTokens,
+		&log.CacheCreationTokens, &log.CacheCreationTokens5m, &log.CacheCreationTokens1h,
 		&log.Quota, &log.ModelRatio, &log.GroupRatio, &log.CompletionRatio, &log.ModelPrice,
 		&log.UseTimeMs, &log.IsSuccess, &log.RetryCount, &log.StatusCode,
 		&log.ErrorType, &log.ErrorMessage,
