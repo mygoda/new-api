@@ -131,6 +131,61 @@ func ensureDorisTable(tableName, ddl string) {
 	}
 }
 
+// ensureDorisInvertedIndexes creates inverted indexes on high-cardinality filter columns
+// (user_id / token_id). Idempotent: checks information_schema.statistics first, and
+// ALTER failures are logged but do not block startup. Requires Doris >= 2.0.
+// Note: for existing data partitions, run `BUILD INDEX <idx> ON <table>` on the Doris FE
+// after first deploy to backfill the index.
+func ensureDorisInvertedIndexes() {
+	endpoint := resolveDorisEndpoint()
+	if endpoint.host == "" {
+		return
+	}
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=true&loc=UTC&interpolateParams=true",
+		common.DorisUser, common.DorisPassword,
+		endpoint.host, endpoint.queryPort,
+		common.DorisDatabase)
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		common.SysError(fmt.Sprintf("doris: ensure inverted indexes: open: %s", err))
+		return
+	}
+	defer db.Close()
+
+	checks := []struct {
+		table string
+		idx   string
+		col   string
+	}{
+		{"billing_records", "idx_billing_user_id", "user_id"},
+		{"billing_records", "idx_billing_token_id", "token_id"},
+		{"request_logs", "idx_logs_user_id", "user_id"},
+		{"request_logs", "idx_logs_token_id", "token_id"},
+	}
+	for _, c := range checks {
+		var exists int
+		row := db.QueryRow(
+			`SELECT COUNT(*) FROM information_schema.statistics
+			 WHERE table_schema = ? AND table_name = ? AND index_name = ?`,
+			common.DorisDatabase, c.table, c.idx,
+		)
+		if err := row.Scan(&exists); err != nil {
+			common.SysLog(fmt.Sprintf("doris: check inverted index %s.%s skipped: %s", c.table, c.idx, err))
+			continue
+		}
+		if exists > 0 {
+			continue
+		}
+		stmt := fmt.Sprintf("ALTER TABLE `%s`.`%s` ADD INDEX `%s` (`%s`) USING INVERTED",
+			common.DorisDatabase, c.table, c.idx, c.col)
+		if _, err := db.Exec(stmt); err != nil {
+			common.SysLog(fmt.Sprintf("doris: add inverted index %s on %s failed (requires Doris 2.0+): %s", c.idx, c.table, err))
+			continue
+		}
+		common.SysLog(fmt.Sprintf("doris: inverted index %s on %s.%s created", c.idx, common.DorisDatabase, c.table))
+	}
+}
+
 const requestLogsDDL = `CREATE TABLE IF NOT EXISTS %s.request_logs (
     created_at          DATETIME        NOT NULL COMMENT '请求时间 (UTC)',
     request_id          VARCHAR(128)    NOT NULL COMMENT '请求ID',
@@ -232,6 +287,7 @@ func InitDorisLogger() {
 
 		ensureDorisTable("request_logs", fmt.Sprintf(requestLogsDDL, common.DorisDatabase))
 		ensureDorisTable("billing_records", fmt.Sprintf(billingRecordsDDL, common.DorisDatabase))
+		ensureDorisInvertedIndexes()
 
 		common.SysLog(fmt.Sprintf("Doris logger initialized: %s:%d/%s.%s (flush every %ds or %d rows)",
 			endpoint.host, endpoint.httpPort, common.DorisDatabase, common.DorisTable,
