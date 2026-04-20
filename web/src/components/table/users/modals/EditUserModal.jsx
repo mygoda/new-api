@@ -140,8 +140,8 @@ const EditUserModal = (props) => {
     let payload = { ...values };
     if (typeof payload.quota === 'string')
       payload.quota = parseInt(payload.quota) || 0;
-    if (typeof payload.created_by === 'string')
-      payload.created_by = parseInt(payload.created_by) || 0;
+    delete payload.created_by;
+    delete payload.created_by_username;
     if (typeof payload.user_ratio === 'string')
       payload.user_ratio = parseFloat(payload.user_ratio) || 0;
     if (payload.user_ratio == null || isNaN(payload.user_ratio))
@@ -338,18 +338,15 @@ const EditUserModal = (props) => {
                       </Col>
 
                       <Col span={24}>
-                        <Form.InputNumber
-                          field='created_by'
-                          label={t('创建人 ID')}
-                          placeholder={t('0 表示自助注册')}
-                          min={0}
-                          style={{ width: '100%' }}
-                          extraText={
-                            values.created_by_username
-                              ? `${t('当前创建人')}：${values.created_by_username}`
-                              : t('留空或 0 表示自助注册')
-                          }
-                        />
+                        <Form.Slot label={t('创建人')}>
+                          <span>
+                            {values.created_by_username
+                              ? `${values.created_by_username}${values.created_by ? ` (ID: ${values.created_by})` : ''}`
+                              : values.created_by
+                                ? `ID: ${values.created_by}`
+                                : t('自助注册')}
+                          </span>
+                        </Form.Slot>
                       </Col>
 
                       <Col span={24}>

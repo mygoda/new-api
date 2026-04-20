@@ -770,7 +770,6 @@ func (user *User) Edit(updatePassword bool) error {
 		"group":             newUser.Group,
 		"quota":             newUser.Quota,
 		"remark":            newUser.Remark,
-		"created_by":        newUser.CreatedBy,
 		"user_ratio":        newUser.UserRatio,
 		"user_model_ratios": newUser.UserModelRatios,
 	}
