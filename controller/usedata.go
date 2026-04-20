@@ -6,6 +6,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,7 +15,7 @@ func GetAllQuotaDates(c *gin.Context) {
 	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
 	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
 	username := c.Query("username")
-	dates, err := model.GetAllQuotaDates(startTimestamp, endTimestamp, username)
+	dates, err := service.CachedGetAllQuotaDates(startTimestamp, endTimestamp, username)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -55,7 +56,7 @@ func GetUserQuotaDates(c *gin.Context) {
 func GetChannelDashboardStats(c *gin.Context) {
 	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
 	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
-	stats, err := model.GetChannelStats(startTimestamp, endTimestamp)
+	stats, err := service.CachedGetChannelStats(startTimestamp, endTimestamp)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -78,7 +79,7 @@ func GetModelPerformanceDashboardStats(c *gin.Context) {
 		})
 		return
 	}
-	stats, err := model.GetModelPerformanceStats(userId, startTimestamp, endTimestamp)
+	stats, err := service.CachedGetModelPerformanceStats(userId, startTimestamp, endTimestamp)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -94,7 +95,7 @@ func GetModelChannelCrossDashboardStats(c *gin.Context) {
 	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
 	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
 	modelName := c.Query("model_name")
-	stats, err := model.GetModelChannelCrossStats(modelName, startTimestamp, endTimestamp)
+	stats, err := service.CachedGetModelChannelCrossStats(modelName, startTimestamp, endTimestamp)
 	if err != nil {
 		common.ApiError(c, err)
 		return
