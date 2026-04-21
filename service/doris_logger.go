@@ -182,6 +182,11 @@ func ensureDorisInvertedIndexes() {
 		stmt := fmt.Sprintf("ALTER TABLE `%s`.`%s` ADD INDEX `%s` (`%s`) USING INVERTED",
 			common.DorisDatabase, c.table, c.idx, c.col)
 		if _, err := db.Exec(stmt); err != nil {
+			// Doris 的 information_schema.statistics 视图在部分版本里不列 inverted index，
+			// 会走到这里但实际索引已存在。把 "already exist" 当作幂等成功，静默跳过。
+			if strings.Contains(err.Error(), "already exist") {
+				continue
+			}
 			common.SysLog(fmt.Sprintf("doris: add inverted index %s on %s failed (requires Doris 2.0+): %s", c.idx, c.table, err))
 			continue
 		}
@@ -230,11 +235,17 @@ func ensureDorisRequestLogsColumns() {
 		if exists > 0 {
 			continue
 		}
-		stmt := fmt.Sprintf("ALTER TABLE `%s`.`request_logs` ADD COLUMN `%s` %s",
+		// Try standard "ADD COLUMN" first; some Doris versions reject the
+		// COLUMN keyword with a ParseException. Fall back to "ADD" on parse errors.
+		withColumn := fmt.Sprintf("ALTER TABLE `%s`.`request_logs` ADD COLUMN `%s` %s",
 			common.DorisDatabase, col.name, col.def)
-		if _, err := db.Exec(stmt); err != nil {
-			common.SysLog(fmt.Sprintf("doris: add column request_logs.%s failed: %s", col.name, err))
-			continue
+		if _, err := db.Exec(withColumn); err != nil {
+			withoutColumn := fmt.Sprintf("ALTER TABLE `%s`.`request_logs` ADD `%s` %s",
+				common.DorisDatabase, col.name, col.def)
+			if _, err2 := db.Exec(withoutColumn); err2 != nil {
+				common.SysLog(fmt.Sprintf("doris: add column request_logs.%s failed: %s (fallback: %s)", col.name, err, err2))
+				continue
+			}
 		}
 		common.SysLog(fmt.Sprintf("doris: column request_logs.%s added", col.name))
 	}

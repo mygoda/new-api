@@ -102,12 +102,25 @@ add_column_if_missing() {
   local col="$1"
   local def="$2"
   # DESC will show the column if it exists; we grep for it
-  if ! run_sql "DESC \`${DORIS_DATABASE}\`.\`${DORIS_TABLE}\`;" | grep -qw "$col"; then
-    echo "    Adding column '${col}' ..."
-    run_sql "ALTER TABLE \`${DORIS_DATABASE}\`.\`${DORIS_TABLE}\` ADD COLUMN \`${col}\` ${def};" || true
-  else
+  if run_sql "DESC \`${DORIS_DATABASE}\`.\`${DORIS_TABLE}\`;" | grep -qw "$col"; then
     echo "    Column '${col}' already exists, skipping."
+    return 0
   fi
+
+  echo "    Adding column '${col}' ..."
+  # Try the standard "ADD COLUMN" form first. Some Doris versions reject
+  # the COLUMN keyword with a ParseException; fall back to "ADD" in that case.
+  local out
+  out=$(run_sql "ALTER TABLE \`${DORIS_DATABASE}\`.\`${DORIS_TABLE}\` ADD COLUMN \`${col}\` ${def};" || true)
+  if echo "$out" | grep -qiE 'error|exception'; then
+    out=$(run_sql "ALTER TABLE \`${DORIS_DATABASE}\`.\`${DORIS_TABLE}\` ADD \`${col}\` ${def};" || true)
+  fi
+  if echo "$out" | grep -qiE 'error|exception'; then
+    echo "    Failed to add column '${col}':"
+    echo "$out" | sed 's/^/      /'
+    return 1
+  fi
+  echo "    Added column '${col}'."
 }
 
 add_column_if_missing "token_key"                "VARCHAR(512)  DEFAULT '' COMMENT 'API 密钥'"
