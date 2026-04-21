@@ -259,6 +259,51 @@ export const useDashboardCharts = (
     },
   });
 
+  // 缓存命中率趋势折线图
+  const [spec_cache_hit, setSpecCacheHit] = useState({
+    type: 'line',
+    data: [
+      {
+        id: 'cacheHitData',
+        values: [],
+      },
+    ],
+    xField: 'date',
+    yField: 'hit_rate_pct',
+    legends: { visible: false },
+    title: {
+      visible: true,
+      text: t('缓存命中率趋势'),
+      subtext: '',
+    },
+    axes: [
+      { orient: 'left', type: 'linear', min: 0, max: 100,
+        label: { formatMethod: (v) => `${v}%` } },
+      { orient: 'bottom', type: 'band' },
+    ],
+    point: { visible: true },
+    tooltip: {
+      mark: {
+        content: [
+          {
+            key: () => t('命中率'),
+            value: (datum) =>
+              `${(datum.hit_rate_pct ?? 0).toFixed(2)}%`,
+          },
+          {
+            key: () => t('缓存读取Token'),
+            value: (datum) => (datum.cache_tokens ?? 0).toLocaleString(),
+          },
+          {
+            key: () => t('缓存写入Token'),
+            value: (datum) =>
+              (datum.cache_creation_tokens ?? 0).toLocaleString(),
+          },
+        ],
+      },
+    },
+  });
+
   // ========== 数据处理函数 ==========
   const generateModelColors = useCallback((uniqueModels, modelColors) => {
     const newModelColors = {};
@@ -433,15 +478,38 @@ export const useDashboardCharts = (
     });
   }, []);
 
+  const updateCacheHitChart = useCallback((trend) => {
+    const rows = (trend || []).map((r) => {
+      const cache = r.cache_tokens || 0;
+      const creation = r.cache_creation_tokens || 0;
+      const prompt = r.prompt_tokens || 0;
+      const total = cache + creation + prompt;
+      const rate = total > 0 ? cache / total : 0;
+      return {
+        date: r.date || '',
+        hit_rate_pct: +(rate * 100).toFixed(2),
+        cache_tokens: cache,
+        cache_creation_tokens: creation,
+        prompt_tokens: prompt,
+      };
+    });
+    setSpecCacheHit((prev) => ({
+      ...prev,
+      data: [{ id: 'cacheHitData', values: rows }],
+    }));
+  }, []);
+
   return {
     // 图表规格
     spec_pie,
     spec_line,
     spec_model_line,
     spec_rank_bar,
+    spec_cache_hit,
 
     // 函数
     updateChartData,
+    updateCacheHitChart,
     generateModelColors,
   };
 };

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 
@@ -182,6 +183,7 @@ func GetDorisLogsSelf(c *gin.Context) {
 // Query params:
 //   - group_by: user (default) | model | day | token | channel
 //   - user_id / token_id / channel / model_name / group / is_success
+//   - username (resolved to user_id, lets admin reuse the dashboard's username filter)
 //   - start_timestamp / end_timestamp (unix seconds)
 func GetDorisCacheStats(c *gin.Context) {
 	if !common.DorisEnabled || !setting.DorisLogEnabled {
@@ -197,6 +199,11 @@ func GetDorisCacheStats(c *gin.Context) {
 	}
 	if v, err := strconv.Atoi(c.Query("user_id")); err == nil && v > 0 {
 		filter.UserId = v
+	} else if uname := c.Query("username"); uname != "" {
+		var u model.User
+		if err := model.DB.Select("id").Where("username = ?", uname).First(&u).Error; err == nil && u.Id > 0 {
+			filter.UserId = u.Id
+		}
 	}
 	if v, err := strconv.Atoi(c.Query("token_id")); err == nil && v > 0 {
 		filter.TokenId = v

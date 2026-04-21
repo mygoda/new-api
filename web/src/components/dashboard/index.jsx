@@ -85,6 +85,8 @@ const Dashboard = () => {
     dashboardData.performanceMetrics,
     dashboardData.navigate,
     dashboardData.t,
+    dashboardData.cacheStats,
+    dashboardData.dorisEnabled,
   );
 
   // ========== 渠道/模型分析 ==========
@@ -103,6 +105,7 @@ const Dashboard = () => {
       }
     });
     await dashboardData.loadUptimeData();
+    await dashboardData.loadCacheStats();
   };
 
   const handleRefresh = async () => {
@@ -115,6 +118,11 @@ const Dashboard = () => {
   const handleSearchConfirm = async () => {
     await dashboardData.handleSearchConfirm(dashboardCharts.updateChartData);
   };
+
+  // Keep cache-hit chart in sync with cacheTrend state
+  useEffect(() => {
+    dashboardCharts.updateCacheHitChart(dashboardData.cacheTrend || []);
+  }, [dashboardData.cacheTrend, dashboardCharts.updateCacheHitChart]);
 
   // ========== 数据准备 ==========
   const apiInfoData = statusState?.status?.api_info || [];
@@ -202,6 +210,8 @@ const Dashboard = () => {
             spec_model_line={dashboardCharts.spec_model_line}
             spec_pie={dashboardCharts.spec_pie}
             spec_rank_bar={dashboardCharts.spec_rank_bar}
+            spec_cache_hit={dashboardCharts.spec_cache_hit}
+            dorisEnabled={dashboardData.dorisEnabled}
             CARD_PROPS={CARD_PROPS}
             CHART_CONFIG={CHART_CONFIG}
             FLEX_CENTER_GAP2={FLEX_CENTER_GAP2}

@@ -55,6 +55,32 @@ const StepCard = ({ step, title, children }) => (
   </div>
 );
 
+const methodColor = {
+  GET: 'green',
+  POST: 'blue',
+  PUT: 'orange',
+  DELETE: 'red',
+  WS: 'purple',
+};
+
+const EndpointRow = ({ method, path, desc, onCopy }) => (
+  <div className='flex items-start gap-3 py-2 border-b border-semi-color-border last:border-0'>
+    <Tag color={methodColor[method] || 'grey'} size='small' className='!min-w-[48px] !text-center !font-mono'>
+      {method}
+    </Tag>
+    <div className='flex-1 min-w-0'>
+      <Text
+        code
+        className='!text-[13px] break-all cursor-pointer'
+        onClick={() => onCopy?.(path)}
+      >
+        {path}
+      </Text>
+      <div className='text-xs text-semi-color-text-2 mt-1'>{desc}</div>
+    </div>
+  </div>
+);
+
 const ToolCard = ({ icon, title, description, tags }) => (
   <Card className='!mb-3 hover:shadow-md transition-shadow' bodyStyle={{ padding: '16px 20px' }}>
     <div className='flex items-start gap-3'>
@@ -94,6 +120,7 @@ const Docs = () => {
   const anchorLinks = [
     { href: '#quick-start', title: t('快速开始') },
     { href: '#api-examples', title: t('API 调用示例') },
+    { href: '#api-reference', title: t('API 参考') },
     { href: '#tools', title: t('支持的工具') },
     { href: '#models', title: t('模型列表') },
     { href: '#faq', title: t('常见问题') },
@@ -304,6 +331,234 @@ console.log(response.choices[0].message.content);`}
                 </div>
               </TabPane>
             </Tabs>
+          </section>
+
+          {/* ─── API 参考 ─── */}
+          <section id='api-reference' className='mb-12 scroll-mt-20'>
+            <Title heading={3} className='!mb-6 flex items-center gap-2'>
+              <IconKey size='small' />
+              {t('API 参考')}
+            </Title>
+
+            <Paragraph type='tertiary' className='!mb-4'>
+              {t('本平台支持多种主流 API 格式。所有接口前缀统一为')}{' '}
+              <Text
+                code
+                onClick={() => handleCopy(serverAddress)}
+                style={{ cursor: 'pointer' }}
+              >
+                {serverAddress}
+              </Text>
+              {t('。生产环境请使用 HTTPS 以保护令牌。')}
+            </Paragraph>
+
+            <Paragraph type='tertiary' className='!mb-6'>
+              {t('鉴权方式：在请求头中添加')}{' '}
+              <Text code>Authorization: Bearer YOUR_API_KEY</Text>
+              {t('，YOUR_API_KEY 为')}{' '}
+              <Link
+                to='/console/token'
+                className='!text-[var(--semi-color-primary)]'
+              >
+                {t('令牌管理')}
+              </Link>
+              {t('中创建的以 sk- 开头的令牌。')}
+            </Paragraph>
+
+            <Tabs type='line' className='!mb-4'>
+              <TabPane tab={t('聊天')} itemKey='ref-chat'>
+                <Card className='!mt-3'>
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/chat/completions'
+                    desc={t('OpenAI 格式对话补全，支持流式、工具调用、视觉输入。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/responses'
+                    desc={t('OpenAI Responses 新格式，支持有状态对话、内置工具、推理参数。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/messages'
+                    desc={t('Anthropic Claude 原生格式，可直接对接 Claude SDK / Claude Code。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='POST'
+                    path='/v1beta/models/{model}:generateContent'
+                    desc={t('Google Gemini 原生格式（非流式），路径包含模型名。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='POST'
+                    path='/v1beta/models/{model}:streamGenerateContent'
+                    desc={t('Google Gemini 原生格式（流式 SSE）。')}
+                    onCopy={handleCopy}
+                  />
+                </Card>
+              </TabPane>
+
+              <TabPane tab={t('嵌入')} itemKey='ref-embeddings'>
+                <Card className='!mt-3'>
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/embeddings'
+                    desc={t('OpenAI 格式文本向量嵌入，可用于语义检索、RAG 等场景。')}
+                    onCopy={handleCopy}
+                  />
+                </Card>
+              </TabPane>
+
+              <TabPane tab={t('图像')} itemKey='ref-image'>
+                <Card className='!mt-3'>
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/images/generations'
+                    desc={t('OpenAI 格式文生图（DALL-E / gpt-image 等）。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/images/edits'
+                    desc={t('OpenAI 格式图像编辑（局部修改 / 扩图）。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/images/variations'
+                    desc={t('OpenAI 格式图像变体生成。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='POST'
+                    path='/mj/submit/imagine'
+                    desc={t('Midjourney Proxy 创建 imagine 绘图任务。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='POST'
+                    path='/mj/submit/change'
+                    desc={t('Midjourney Proxy 执行 U1-U4 / V1-V4 / Reroll 等后续动作。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='GET'
+                    path='/mj/task/{id}/fetch'
+                    desc={t('查询 Midjourney 任务状态与结果图。')}
+                    onCopy={handleCopy}
+                  />
+                </Card>
+              </TabPane>
+
+              <TabPane tab={t('音频')} itemKey='ref-audio'>
+                <Card className='!mt-3'>
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/audio/speech'
+                    desc={t('文本转语音 (TTS)，返回音频流。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/audio/transcriptions'
+                    desc={t('语音转文字，支持多语言自动识别。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/audio/translations'
+                    desc={t('将任意语种语音翻译为英文文本。')}
+                    onCopy={handleCopy}
+                  />
+                </Card>
+              </TabPane>
+
+              <TabPane tab={t('重排')} itemKey='ref-rerank'>
+                <Card className='!mt-3'>
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/rerank'
+                    desc={t('文档相关性重排序，兼容 Jina / Cohere / Xinference 等服务商格式。')}
+                    onCopy={handleCopy}
+                  />
+                </Card>
+              </TabPane>
+
+              <TabPane tab={t('实时')} itemKey='ref-realtime'>
+                <Card className='!mt-3'>
+                  <EndpointRow
+                    method='WS'
+                    path='/v1/realtime'
+                    desc={t('OpenAI Realtime WebSocket，支持低延迟双向语音对话。')}
+                    onCopy={handleCopy}
+                  />
+                </Card>
+              </TabPane>
+
+              <TabPane tab={t('音乐')} itemKey='ref-music'>
+                <Card className='!mt-3'>
+                  <EndpointRow
+                    method='POST'
+                    path='/suno/submit/music'
+                    desc={t('Suno API 生成歌曲，支持描述模式 / 自定义歌词模式。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='POST'
+                    path='/suno/submit/lyrics'
+                    desc={t('Suno API 生成歌词。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='GET'
+                    path='/suno/fetch/{id}'
+                    desc={t('查询 Suno 任务状态与生成结果。')}
+                    onCopy={handleCopy}
+                  />
+                </Card>
+              </TabPane>
+
+              <TabPane tab={t('视频')} itemKey='ref-video'>
+                <Card className='!mt-3'>
+                  <EndpointRow
+                    method='POST'
+                    path='/v1/video/generations'
+                    desc={t('创建文生视频 / 图生视频任务（兼容 Sora / Kling / 即梦 等格式）。')}
+                    onCopy={handleCopy}
+                  />
+                  <EndpointRow
+                    method='GET'
+                    path='/v1/video/generations/{id}'
+                    desc={t('查询视频任务状态与下载地址。')}
+                    onCopy={handleCopy}
+                  />
+                </Card>
+              </TabPane>
+            </Tabs>
+
+            <Paragraph type='tertiary' size='small' className='!mt-4'>
+              {t('以上为常用端点摘要。完整的请求参数、响应结构与在线调试请参考官方接口文档：')}
+              <a
+                href='https://docs.newapi.ai/api/'
+                target='_blank'
+                rel='noreferrer'
+                className='!text-[var(--semi-color-primary)] !ml-1'
+              >
+                docs.newapi.ai/api
+              </a>
+              {' · '}
+              <a
+                href='https://apifox.newapi.ai/'
+                target='_blank'
+                rel='noreferrer'
+                className='!text-[var(--semi-color-primary)]'
+              >
+                apifox.newapi.ai
+              </a>
+            </Paragraph>
           </section>
 
           {/* ─── 支持的工具 ─── */}

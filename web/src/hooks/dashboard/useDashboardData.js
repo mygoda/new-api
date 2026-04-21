@@ -76,6 +76,18 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     tpm: [],
   });
 
+  // ========== 缓存命中数据（依赖 Doris） ==========
+  const [cacheStats, setCacheStats] = useState({
+    cacheTokens: 0,
+    cacheCreationTokens: 0,
+    cacheCreation5m: 0,
+    cacheCreation1h: 0,
+    promptTokens: 0,
+    totalInput: 0,
+    hitRate: 0,
+  });
+  const [cacheTrend, setCacheTrend] = useState([]);
+
   // ========== Uptime 数据 ==========
   const [uptimeData, setUptimeData] = useState([]);
   const [uptimeLoading, setUptimeLoading] = useState(false);
@@ -91,6 +103,7 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     statusState?.status?.announcements_enabled ?? true;
   const faqEnabled = statusState?.status?.faq_enabled ?? true;
   const uptimeEnabled = statusState?.status?.uptime_kuma_enabled ?? true;
+  const dorisEnabled = statusState?.status?.doris_enabled ?? false;
 
   const hasApiInfoPanel = apiInfoEnabled;
   const hasInfoPanels = announcementsEnabled || faqEnabled || uptimeEnabled;
@@ -213,6 +226,64 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     }
   }, [activeUptimeTab]);
 
+  const loadCacheStats = useCallback(async () => {
+    if (!dorisEnabled) {
+      setCacheStats({
+        cacheTokens: 0, cacheCreationTokens: 0,
+        cacheCreation5m: 0, cacheCreation1h: 0,
+        promptTokens: 0, totalInput: 0, hitRate: 0,
+      });
+      setCacheTrend([]);
+      return;
+    }
+    try {
+      const { start_timestamp, end_timestamp, username } = inputs;
+      const localStart = Date.parse(start_timestamp) / 1000;
+      const localEnd = Date.parse(end_timestamp) / 1000;
+      const base = isAdminUser ? '/api/log/doris/cache_stats' : '/api/log/doris/cache_stats/self';
+      const params = new URLSearchParams({
+        group_by: 'day',
+        start_timestamp: String(localStart),
+        end_timestamp: String(localEnd),
+        page_size: '500',
+      });
+      if (isAdminUser && username) params.set('username', username);
+
+      const res = await API.get(`${base}?${params.toString()}`);
+      const { success, data } = res.data || {};
+      if (!success) {
+        setCacheStats({
+          cacheTokens: 0, cacheCreationTokens: 0,
+          cacheCreation5m: 0, cacheCreation1h: 0,
+          promptTokens: 0, totalInput: 0, hitRate: 0,
+        });
+        setCacheTrend([]);
+        return;
+      }
+      const items = (data?.items || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      setCacheTrend(items);
+
+      const totals = items.reduce(
+        (acc, r) => ({
+          cacheTokens: acc.cacheTokens + (r.cache_tokens || 0),
+          cacheCreationTokens: acc.cacheCreationTokens + (r.cache_creation_tokens || 0),
+          cacheCreation5m: acc.cacheCreation5m + (r.cache_creation_tokens_5m || 0),
+          cacheCreation1h: acc.cacheCreation1h + (r.cache_creation_tokens_1h || 0),
+          promptTokens: acc.promptTokens + (r.prompt_tokens || 0),
+        }),
+        { cacheTokens: 0, cacheCreationTokens: 0, cacheCreation5m: 0, cacheCreation1h: 0, promptTokens: 0 },
+      );
+      const totalInput = totals.promptTokens + totals.cacheTokens + totals.cacheCreationTokens;
+      setCacheStats({
+        ...totals,
+        totalInput,
+        hitRate: totalInput > 0 ? totals.cacheTokens / totalInput : 0,
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  }, [dorisEnabled, inputs, isAdminUser]);
+
   const getUserData = useCallback(async () => {
     let res = await API.get(`/api/user/self`);
     const { success, message, data } = res.data;
@@ -226,8 +297,9 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
   const refresh = useCallback(async () => {
     const data = await loadQuotaData();
     await loadUptimeData();
+    await loadCacheStats();
     return data;
-  }, [loadQuotaData, loadUptimeData]);
+  }, [loadQuotaData, loadUptimeData, loadCacheStats]);
 
   const handleSearchConfirm = useCallback(
     async (updateChartDataCallback) => {
@@ -288,6 +360,11 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     trendData,
     setTrendData,
 
+    // 缓存命中数据
+    cacheStats,
+    cacheTrend,
+    dorisEnabled,
+
     // Uptime 数据
     uptimeData,
     uptimeLoading,
@@ -312,6 +389,7 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     handleCloseModal,
     loadQuotaData,
     loadUptimeData,
+    loadCacheStats,
     getUserData,
     refresh,
     handleSearchConfirm,

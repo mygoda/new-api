@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import { useMemo } from 'react';
-import { Wallet, Activity, Zap, Gauge } from 'lucide-react';
+import { Wallet, Activity, Zap, Gauge, Database } from 'lucide-react';
 import {
   IconMoneyExchangeStroked,
   IconHistogram,
@@ -28,6 +28,9 @@ import {
   IconStopwatchStroked,
   IconTypograph,
   IconSend,
+  IconSaveStroked,
+  IconCloudStroked,
+  IconPercentage,
 } from '@douyinfe/semi-icons';
 import { renderQuota } from '../../helpers';
 import { createSectionTitle } from '../../helpers/dashboard';
@@ -41,9 +44,12 @@ export const useDashboardStats = (
   performanceMetrics,
   navigate,
   t,
+  cacheStats,
+  dorisEnabled,
 ) => {
   const groupedStatsData = useMemo(
-    () => [
+    () => {
+      const groups = [
       {
         title: createSectionTitle(Wallet, t('账户数据')),
         color: 'bg-blue-50',
@@ -132,7 +138,51 @@ export const useDashboardStats = (
           },
         ],
       },
-    ],
+      ];
+
+      const hasCacheData =
+        dorisEnabled &&
+        cacheStats &&
+        ((cacheStats.cacheTokens || 0) +
+          (cacheStats.cacheCreationTokens || 0) +
+          (cacheStats.promptTokens || 0) >
+          0);
+      if (hasCacheData) {
+        const hitRatePct = ((cacheStats.hitRate || 0) * 100).toFixed(2) + '%';
+        groups.push({
+          title: createSectionTitle(Database, t('缓存命中')),
+          color: 'bg-teal-50',
+          items: [
+            {
+              title: t('缓存读取Token'),
+              value: (cacheStats.cacheTokens || 0).toLocaleString(),
+              icon: <IconSaveStroked />,
+              avatarColor: 'teal',
+              trendData: [],
+              trendColor: '#14b8a6',
+            },
+            {
+              title: t('缓存写入Token'),
+              value: (cacheStats.cacheCreationTokens || 0).toLocaleString(),
+              icon: <IconCloudStroked />,
+              avatarColor: 'cyan',
+              trendData: [],
+              trendColor: '#06b6d4',
+            },
+            {
+              title: t('缓存命中率'),
+              value: hitRatePct,
+              icon: <IconPercentage />,
+              avatarColor: 'green',
+              trendData: [],
+              trendColor: '#10b981',
+            },
+          ],
+        });
+      }
+
+      return groups;
+    },
     [
       userState?.user?.quota,
       userState?.user?.used_quota,
@@ -144,6 +194,8 @@ export const useDashboardStats = (
       performanceMetrics,
       navigate,
       t,
+      cacheStats,
+      dorisEnabled,
     ],
   );
 
