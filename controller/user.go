@@ -614,6 +614,29 @@ func GetUserModels(c *gin.Context) {
 		}
 	}
 
+	// 可选：按标签过滤（tag 取自 models.tags，CSV 形式；匹配规则含名称前缀/后缀/包含）
+	if tag := strings.TrimSpace(c.Query("tag")); tag != "" {
+		allow := make(map[string]struct{})
+		for _, p := range model.GetPricing() {
+			if p.Tags == "" {
+				continue
+			}
+			for _, t := range strings.Split(p.Tags, ",") {
+				if strings.EqualFold(strings.TrimSpace(t), tag) {
+					allow[p.ModelName] = struct{}{}
+					break
+				}
+			}
+		}
+		filtered := models[:0]
+		for _, name := range models {
+			if _, ok := allow[name]; ok {
+				filtered = append(filtered, name)
+			}
+		}
+		models = filtered
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
