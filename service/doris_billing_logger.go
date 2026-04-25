@@ -39,6 +39,9 @@ type BillingRecord struct {
 	ModelRatio       float64 `json:"model_ratio"`
 	GroupRatio       float64 `json:"group_ratio"`
 	ModelPrice       float64 `json:"model_price"`
+	TierIndex        int     `json:"tier_index"`
+	TierThreshold    int     `json:"tier_threshold"`
+	TierTotal        int     `json:"tier_total"`
 	IsSuccess        bool    `json:"is_success"`
 	UseTimeMs        int64   `json:"use_time_ms"`
 	CreatedAt        string  `json:"created_at"`

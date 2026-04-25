@@ -123,6 +123,10 @@ export default function ModelPricingEditor({
     handleOptionalFieldToggle,
     handleNumericFieldChange,
     handleBillingModeChange,
+    handleTieredToggle,
+    handleAddTier,
+    handleDeleteTier,
+    handleTierFieldChange,
     handleSubmit,
     addModel,
     deleteModel,
@@ -653,6 +657,155 @@ export default function ModelPricingEditor({
                         }
                       />
                     </Card>
+
+                    {selectedModel.tieredEnabled ? (
+                      <Card
+                        bodyStyle={{ padding: 16 }}
+                        style={{
+                          marginBottom: 16,
+                          background: 'var(--semi-color-fill-0)',
+                        }}
+                      >
+                        <div className='mb-3 flex items-center justify-between'>
+                          <div>
+                            <div className='font-medium'>{t('阶梯计费')}</div>
+                            <div className='text-xs text-gray-500 mt-1'>
+                              {t(
+                                '按 prompt 输入 token 数切换不同档位的输入/输出单价。启用后将覆盖上方基础价格。',
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            type='tertiary'
+                            theme='borderless'
+                            onClick={() => handleTieredToggle(false)}
+                          >
+                            {t('取消阶梯计费')}
+                          </Button>
+                        </div>
+                        <div className='space-y-3'>
+                          {selectedModel.tiers.map((tier, idx) => (
+                            <Card
+                              key={idx}
+                              bodyStyle={{ padding: 12 }}
+                              style={{
+                                background: 'var(--semi-color-bg-2)',
+                              }}
+                            >
+                              <div className='flex items-center justify-between mb-2'>
+                                <Text strong>
+                                  {idx === 0
+                                    ? t('首档（默认）')
+                                    : t('阶梯 {{idx}}', { idx: idx + 1 })}
+                                </Text>
+                                {idx > 0 ? (
+                                  <Button
+                                    icon={<IconDelete />}
+                                    size='small'
+                                    type='danger'
+                                    theme='borderless'
+                                    onClick={() => handleDeleteTier(idx)}
+                                  />
+                                ) : null}
+                              </div>
+                              <div
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: isMobile
+                                    ? '1fr'
+                                    : 'repeat(2, 1fr)',
+                                  gap: 12,
+                                }}
+                              >
+                                <PriceInput
+                                  label={t('阈值（prompt tokens）')}
+                                  value={tier.threshold}
+                                  placeholder={
+                                    idx === 0
+                                      ? '0'
+                                      : t('如 200000 表示 >200K 时生效')
+                                  }
+                                  suffix='tokens'
+                                  disabled={idx === 0}
+                                  onChange={(value) =>
+                                    handleTierFieldChange(idx, 'threshold', value)
+                                  }
+                                />
+                                <PriceInput
+                                  label={t('输入价格')}
+                                  value={tier.inputPrice}
+                                  placeholder={t('输入 $/1M tokens')}
+                                  onChange={(value) =>
+                                    handleTierFieldChange(idx, 'inputPrice', value)
+                                  }
+                                />
+                                <PriceInput
+                                  label={t('输出价格')}
+                                  value={tier.completionPrice}
+                                  placeholder={t('输入 $/1M tokens')}
+                                  onChange={(value) =>
+                                    handleTierFieldChange(
+                                      idx,
+                                      'completionPrice',
+                                      value,
+                                    )
+                                  }
+                                />
+                                <PriceInput
+                                  label={t('缓存读取价格（可选）')}
+                                  value={tier.cachePrice}
+                                  placeholder={t('留空则沿用基础缓存价')}
+                                  onChange={(value) =>
+                                    handleTierFieldChange(
+                                      idx,
+                                      'cachePrice',
+                                      value,
+                                    )
+                                  }
+                                />
+                                <PriceInput
+                                  label={t('缓存创建价格（可选）')}
+                                  value={tier.createCachePrice}
+                                  placeholder={t('留空则沿用基础缓存写入价')}
+                                  onChange={(value) =>
+                                    handleTierFieldChange(
+                                      idx,
+                                      'createCachePrice',
+                                      value,
+                                    )
+                                  }
+                                />
+                              </div>
+                            </Card>
+                          ))}
+                          <Button
+                            icon={<IconPlus />}
+                            block
+                            onClick={handleAddTier}
+                          >
+                            {t('新增阶梯')}
+                          </Button>
+                        </div>
+                      </Card>
+                    ) : (
+                      <div className='mb-4'>
+                        <Button
+                          icon={<IconPlus />}
+                          theme='light'
+                          type='tertiary'
+                          onClick={() => handleTieredToggle(true)}
+                        >
+                          {t('设置阶梯价格')}
+                        </Button>
+                        <Text
+                          className='ml-3'
+                          type='tertiary'
+                          size='small'
+                        >
+                          {t('按 prompt 输入 token 数切换不同档位的单价（可选）')}
+                        </Text>
+                      </div>
+                    )}
                   </>
                 )}
 

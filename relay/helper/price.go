@@ -15,7 +15,9 @@ import (
 )
 
 // https://docs.claude.com/en/docs/build-with-claude/prompt-caching#1-hour-cache-duration
-const claudeCacheCreation1hMultiplier = 6 / 3.75
+// ClaudeCacheCreation1hMultiplier 是 Claude 1h cache write 价格相对 5min cache write 的倍数。
+const ClaudeCacheCreation1hMultiplier = 6 / 3.75
+const claudeCacheCreation1hMultiplier = ClaudeCacheCreation1hMultiplier
 
 // HandleGroupRatio checks for "auto_group" in the context and updates the group ratio and relayInfo.UsingGroup if present
 func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.GroupRatioInfo {
@@ -86,6 +88,10 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 	var audioRatio float64
 	var audioCompletionRatio float64
 	var freeModel bool
+	var tieredEnabled bool
+	var tierIndex int
+	var tierThreshold int
+	var tierTotal int
 	if !usePrice {
 		preConsumedTokens := common.Max(promptTokens, common.PreConsumedQuota)
 		if meta.MaxTokens != 0 {
@@ -112,6 +118,30 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		imageRatio, _ = ratio_setting.GetImageRatio(info.OriginModelName)
 		audioRatio = ratio_setting.GetAudioRatio(info.OriginModelName)
 		audioCompletionRatio = ratio_setting.GetAudioCompletionRatio(info.OriginModelName)
+
+		// 阶梯计费：若模型配置了 tiers，根据预扣阶段的 promptTokens 选档，
+		// 覆盖 modelRatio/completionRatio 以及（若该档显式给出）cacheRatio/cacheCreationRatio。
+		// 注意：promptTokens 此处可能是估算值，结算阶段会按真实 usage 重新选档。
+		if tiers, ok := ratio_setting.GetModelRatioTiers(info.OriginModelName); ok && len(tiers) > 0 {
+			idx, t := ratio_setting.SelectTierByPromptTokens(tiers, promptTokens)
+			if idx >= 0 {
+				modelRatio = t.ModelRatio
+				completionRatio = t.CompletionRatio
+				if t.CacheRatio > 0 {
+					cacheRatio = t.CacheRatio
+				}
+				if t.CreateCacheRatio > 0 {
+					cacheCreationRatio = t.CreateCacheRatio
+					cacheCreationRatio5m = cacheCreationRatio
+					cacheCreationRatio1h = cacheCreationRatio * claudeCacheCreation1hMultiplier
+				}
+				tieredEnabled = true
+				tierIndex = idx
+				tierThreshold = t.Threshold
+				tierTotal = len(tiers)
+			}
+		}
+
 		ratio := modelRatio * groupRatioInfo.GroupRatio
 		preConsumedQuota = int(float64(preConsumedTokens) * ratio)
 	} else {
@@ -155,6 +185,10 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		CacheCreation5mRatio: cacheCreationRatio5m,
 		CacheCreation1hRatio: cacheCreationRatio1h,
 		QuotaToPreConsume:    preConsumedQuota,
+		TieredEnabled:        tieredEnabled,
+		TierIndex:            tierIndex,
+		TierThreshold:        tierThreshold,
+		TierTotal:            tierTotal,
 	}
 
 	if common.DebugEnabled {

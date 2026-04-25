@@ -65,18 +65,27 @@ func GetPricing(c *gin.Context) {
 // PublicModelInfo 公开模型展示信息
 // 价格单位：美元 / 1M tokens（按倍率计费时）；按次计费时使用 price_per_request（美元/次）
 type PublicModelInfo struct {
-	ModelName       string   `json:"model_name"`
-	Description     string   `json:"description,omitempty"`
-	Icon            string   `json:"icon,omitempty"`
-	Tags            string   `json:"tags,omitempty"`
-	ContextLength   string   `json:"context_length,omitempty"`
-	QuotaType       int      `json:"quota_type"` // 0 = 按量计费, 1 = 按次计费
-	InputPrice      float64  `json:"input_price,omitempty"`
-	OutputPrice     float64  `json:"output_price,omitempty"`
-	CachedPrice     *float64 `json:"cached_price,omitempty"`
-	PricePerRequest float64  `json:"price_per_request,omitempty"`
-	Currency        string   `json:"currency"`
-	Unit            string   `json:"unit"`
+	ModelName       string             `json:"model_name"`
+	Description     string             `json:"description,omitempty"`
+	Icon            string             `json:"icon,omitempty"`
+	Tags            string             `json:"tags,omitempty"`
+	ContextLength   string             `json:"context_length,omitempty"`
+	QuotaType       int                `json:"quota_type"` // 0 = 按量计费, 1 = 按次计费
+	InputPrice      float64            `json:"input_price,omitempty"`
+	OutputPrice     float64            `json:"output_price,omitempty"`
+	CachedPrice     *float64           `json:"cached_price,omitempty"`
+	Tiers           []PublicTierPrice  `json:"tiers,omitempty"`
+	PricePerRequest float64            `json:"price_per_request,omitempty"`
+	Currency        string             `json:"currency"`
+	Unit            string             `json:"unit"`
+}
+
+// PublicTierPrice 单档阶梯计费的展示信息
+type PublicTierPrice struct {
+	Threshold   int      `json:"threshold"`
+	InputPrice  float64  `json:"input_price"`
+	OutputPrice float64  `json:"output_price"`
+	CachedPrice *float64 `json:"cached_price,omitempty"`
 }
 
 // GetPublicModels 公开的模型列表接口，无需登录即可访问
@@ -111,6 +120,21 @@ func GetPublicModels(c *gin.Context) {
 			if p.CacheRatio != nil {
 				cached := p.ModelRatio * (*p.CacheRatio) * perMillion
 				info.CachedPrice = &cached
+			}
+			if len(p.ModelRatioTiers) > 0 {
+				info.Tiers = make([]PublicTierPrice, 0, len(p.ModelRatioTiers))
+				for _, t := range p.ModelRatioTiers {
+					tier := PublicTierPrice{
+						Threshold:   t.Threshold,
+						InputPrice:  t.ModelRatio * perMillion,
+						OutputPrice: t.ModelRatio * t.CompletionRatio * perMillion,
+					}
+					if t.CacheRatio > 0 {
+						cached := t.ModelRatio * t.CacheRatio * perMillion
+						tier.CachedPrice = &cached
+					}
+					info.Tiers = append(info.Tiers, tier)
+				}
 			}
 		}
 		list = append(list, info)

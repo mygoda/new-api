@@ -677,6 +677,14 @@ export const calculateModelPrice = ({
         imageRatio: formatRatio(record.image_ratio),
         audioInputRatio: formatRatio(record.audio_ratio),
         audioOutputRatio: formatRatio(record.audio_completion_ratio),
+        tiers: Array.isArray(record.model_ratio_tiers)
+          ? record.model_ratio_tiers.map((tier) => ({
+              threshold: Number(tier.threshold ?? 0),
+              inputRatio: formatRatio(tier.model_ratio),
+              completionRatio: formatRatio(tier.completion_ratio),
+              cacheRatio: formatRatio(tier.cache_ratio),
+            }))
+          : null,
         isPerToken: true,
         isTokensDisplay: true,
         usedGroup,
@@ -713,6 +721,22 @@ export const calculateModelPrice = ({
       ? formatTokenPrice(inputRatioPriceUSD * Number(record.audio_ratio))
       : null;
 
+    const tieredPriceItems = Array.isArray(record.model_ratio_tiers)
+      ? record.model_ratio_tiers.map((tier) => {
+          const tierBaseUSD = Number(tier.model_ratio) * 2 * usedGroupRatio;
+          return {
+            threshold: Number(tier.threshold ?? 0),
+            inputPrice: formatTokenPrice(tierBaseUSD),
+            completionPrice: formatTokenPrice(
+              tierBaseUSD * Number(tier.completion_ratio ?? 0),
+            ),
+            cachePrice: hasRatioValue(tier.cache_ratio)
+              ? formatTokenPrice(tierBaseUSD * Number(tier.cache_ratio))
+              : null,
+          };
+        })
+      : null;
+
     return {
       inputPrice,
       completionPrice: formatTokenPrice(
@@ -736,6 +760,7 @@ export const calculateModelPrice = ({
                 Number(record.audio_completion_ratio),
             )
           : null,
+      tiers: tieredPriceItems,
       unitLabel,
       isPerToken: true,
       isTokensDisplay: false,
@@ -768,6 +793,58 @@ export const calculateModelPrice = ({
   };
 };
 
+const formatTokenThreshold = (threshold) => {
+  if (!Number.isFinite(threshold) || threshold <= 0) return '0';
+  if (threshold >= 1000000) {
+    const m = threshold / 1000000;
+    return `${m % 1 === 0 ? m.toFixed(0) : m.toFixed(2)}M`;
+  }
+  if (threshold >= 1000) {
+    const k = threshold / 1000;
+    return `${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}K`;
+  }
+  return String(threshold);
+};
+
+const tierRangeLabel = (tiers, idx) => {
+  const cur = tiers[idx];
+  const next = tiers[idx + 1];
+  if (idx === 0 && tiers.length === 1) return '';
+  if (next) {
+    return `≤${formatTokenThreshold(next.threshold)}`;
+  }
+  return `>${formatTokenThreshold(cur.threshold)}`;
+};
+
+const buildTieredPriceItems = (tiers, unitSuffix, t) =>
+  tiers.map((tier, idx) => {
+    const range = tierRangeLabel(tiers, idx);
+    const cachePart = tier.cachePrice
+      ? ` / ${t('缓存')} ${tier.cachePrice}`
+      : '';
+    return {
+      key: `tier-${idx}`,
+      label: range || t('档 {{idx}}', { idx: idx + 1 }),
+      value: `${t('输入')} ${tier.inputPrice} / ${t('输出')} ${tier.completionPrice}${cachePart}`,
+      suffix: unitSuffix,
+    };
+  });
+
+const buildTieredRatioItems = (tiers, t) =>
+  tiers.map((tier, idx) => {
+    const range = tierRangeLabel(tiers, idx);
+    const cachePart =
+      tier.cacheRatio !== null && tier.cacheRatio !== undefined
+        ? ` / ${t('缓存')} ${tier.cacheRatio}x`
+        : '';
+    return {
+      key: `tier-ratio-${idx}`,
+      label: range || t('档 {{idx}}', { idx: idx + 1 }),
+      value: `${t('输入')} ${tier.inputRatio}x / ${t('补全')} ${tier.completionRatio}x${cachePart}`,
+      suffix: '',
+    };
+  });
+
 export const getModelPriceItems = (
   priceData,
   t,
@@ -775,6 +852,9 @@ export const getModelPriceItems = (
 ) => {
   if (priceData.isPerToken) {
     if (quotaDisplayType === 'TOKENS' || priceData.isTokensDisplay) {
+      if (Array.isArray(priceData.tiers) && priceData.tiers.length > 0) {
+        return buildTieredRatioItems(priceData.tiers, t);
+      }
       return [
         {
           key: 'input-ratio',
@@ -825,6 +905,11 @@ export const getModelPriceItems = (
     }
 
     const unitSuffix = ` / 1${priceData.unitLabel} Tokens`;
+
+    if (Array.isArray(priceData.tiers) && priceData.tiers.length > 0) {
+      return buildTieredPriceItems(priceData.tiers, unitSuffix, t);
+    }
+
     return [
       {
         key: 'input',

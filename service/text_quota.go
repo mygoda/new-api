@@ -11,7 +11,9 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayhelper "github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -112,6 +114,42 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 	summary.CacheCreationTokens1h = usage.ClaudeCacheCreation1hTokens
 	summary.ImageTokens = usage.PromptTokensDetails.ImageTokens
 	summary.AudioTokens = usage.PromptTokensDetails.AudioTokens
+
+	// 阶梯计费：用真实的原始 prompt_tokens（含缓存命中）重新选档，
+	// 覆盖预扣阶段的 ratio。必须放在 OpenRouter cache 减扣之前，避免缓存
+	// 命中导致档位误降；与 Gemini/Claude 上游"按总输入决定档位"的口径一致。
+	if relayInfo != nil && !relayInfo.PriceData.UsePrice {
+		if tiers, ok := ratio_setting.GetModelRatioTiers(relayInfo.OriginModelName); ok && len(tiers) > 0 {
+			idx, t := ratio_setting.SelectTierByPromptTokens(tiers, usage.PromptTokens)
+			if idx >= 0 {
+				summary.ModelRatio = t.ModelRatio
+				summary.CompletionRatio = t.CompletionRatio
+				if t.CacheRatio > 0 {
+					summary.CacheRatio = t.CacheRatio
+				}
+				if t.CreateCacheRatio > 0 {
+					summary.CacheCreationRatio = t.CreateCacheRatio
+					summary.CacheCreationRatio5m = t.CreateCacheRatio
+					summary.CacheCreationRatio1h = t.CreateCacheRatio * relayhelper.ClaudeCacheCreation1hMultiplier
+				}
+				relayInfo.PriceData.ModelRatio = t.ModelRatio
+				relayInfo.PriceData.CompletionRatio = t.CompletionRatio
+				if t.CacheRatio > 0 {
+					relayInfo.PriceData.CacheRatio = t.CacheRatio
+				}
+				if t.CreateCacheRatio > 0 {
+					relayInfo.PriceData.CacheCreationRatio = t.CreateCacheRatio
+					relayInfo.PriceData.CacheCreation5mRatio = t.CreateCacheRatio
+					relayInfo.PriceData.CacheCreation1hRatio = t.CreateCacheRatio * relayhelper.ClaudeCacheCreation1hMultiplier
+				}
+				relayInfo.PriceData.TieredEnabled = true
+				relayInfo.PriceData.TierIndex = idx
+				relayInfo.PriceData.TierThreshold = t.Threshold
+				relayInfo.PriceData.TierTotal = len(tiers)
+			}
+		}
+	}
+
 	legacyClaudeDerived := isLegacyClaudeDerivedOpenAIUsage(relayInfo, usage)
 	isOpenRouterClaudeBilling := relayInfo.ChannelMeta != nil &&
 		relayInfo.ChannelType == constant.ChannelTypeOpenRouter &&
@@ -408,6 +446,12 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		// to cache_creation_tokens.
 		other["cache_write_tokens"] = cacheWriteTokens
 	}
+	if relayInfo.PriceData.TieredEnabled {
+		other["tiered_pricing"] = true
+		other["tier_index"] = relayInfo.PriceData.TierIndex
+		other["tier_threshold"] = relayInfo.PriceData.TierThreshold
+		other["tier_total"] = relayInfo.PriceData.TierTotal
+	}
 	if relayInfo.GetFinalRequestRelayFormat() != types.RelayFormatClaude && usage != nil && usage.UsageSource != "" && usage.InputTokens > 0 {
 		// input_tokens_total: explicit normalized total input used by the usage log UI.
 		// Only write this field when upstream/current conversion has already provided a
@@ -463,6 +507,9 @@ func emitDorisTextLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 		GroupRatio:            summary.GroupRatio,
 		CompletionRatio:       summary.CompletionRatio,
 		ModelPrice:            summary.ModelPrice,
+		TierIndex:             relayInfo.PriceData.TierIndex,
+		TierThreshold:         relayInfo.PriceData.TierThreshold,
+		TierTotal:             relayInfo.PriceData.TierTotal,
 		UseTimeMs:             summary.UseTimeSeconds * 1000,
 		IsSuccess:             true,
 		StatusCode:            ctx.Writer.Status(),
@@ -502,6 +549,9 @@ func emitDorisTextLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 		ModelRatio:       summary.ModelRatio,
 		GroupRatio:       summary.GroupRatio,
 		ModelPrice:       summary.ModelPrice,
+		TierIndex:        relayInfo.PriceData.TierIndex,
+		TierThreshold:    relayInfo.PriceData.TierThreshold,
+		TierTotal:        relayInfo.PriceData.TierTotal,
 		IsSuccess:        true,
 		UseTimeMs:        summary.UseTimeSeconds * 1000,
 		CreatedAt:        dorisLog.CreatedAt,
