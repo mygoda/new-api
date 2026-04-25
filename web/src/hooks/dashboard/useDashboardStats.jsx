@@ -29,7 +29,6 @@ import {
   IconTypograph,
   IconSend,
   IconSaveStroked,
-  IconCloudStroked,
   IconPercentage,
 } from '@douyinfe/semi-icons';
 import { renderQuota } from '../../helpers';
@@ -149,25 +148,19 @@ export const useDashboardStats = (
           0);
       if (hasCacheData) {
         const hitRatePct = ((cacheStats.hitRate || 0) * 100).toFixed(2) + '%';
+        const read = (cacheStats.cacheTokens || 0).toLocaleString();
+        const write = (cacheStats.cacheCreationTokens || 0).toLocaleString();
         groups.push({
           title: createSectionTitle(Database, t('缓存命中')),
           color: 'bg-teal-50',
           items: [
             {
-              title: t('缓存读取Token'),
-              value: (cacheStats.cacheTokens || 0).toLocaleString(),
+              title: t('缓存 Token 读 / 写'),
+              value: `${read} / ${write}`,
               icon: <IconSaveStroked />,
               avatarColor: 'teal',
               trendData: [],
               trendColor: '#14b8a6',
-            },
-            {
-              title: t('缓存写入Token'),
-              value: (cacheStats.cacheCreationTokens || 0).toLocaleString(),
-              icon: <IconCloudStroked />,
-              avatarColor: 'cyan',
-              trendData: [],
-              trendColor: '#06b6d4',
             },
             {
               title: t('缓存命中率'),
