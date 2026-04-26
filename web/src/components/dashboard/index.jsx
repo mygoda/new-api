@@ -163,8 +163,9 @@ const Dashboard = () => {
       channelAnalysis.loadModelChannelCrossStats(channelAnalysis.crossStatsModelFilter);
     } else {
       channelAnalysis.loadModelPerformanceStats();
-      channelAnalysis.loadTokenUsageStats();
     }
+    // 「按令牌」面板对所有用户均按当前登录用户口径展示
+    channelAnalysis.loadTokenUsageStats();
   }, [
     channelAnalysis.loadChannelStats,
     channelAnalysis.loadModelPerformanceStats,
@@ -302,7 +303,7 @@ const Dashboard = () => {
       )}
 
       {/* 渠道/模型分析面板 */}
-      {(dashboardData.isAdminUser || channelAnalysis.modelPerformanceStats.length > 0) && (
+      {(dashboardData.isAdminUser || channelAnalysis.modelPerformanceStats.length > 0 || channelAnalysis.tokenUsageStats.length > 0) && (
         <div className='mb-4'>
           <ChannelAnalysisPanel
             channelStats={channelAnalysis.channelStats}
@@ -320,6 +321,7 @@ const Dashboard = () => {
             errorRateChartSpec={channelAnalysis.errorRateChartSpec}
             healthScoreChartSpec={channelAnalysis.healthScoreChartSpec}
             qpsChartSpec={channelAnalysis.qpsChartSpec}
+            tokenModelTreemapSpec={channelAnalysis.tokenModelTreemapSpec}
             isAdminUser={dashboardData.isAdminUser}
             activeTab={activeChannelTab}
             setActiveTab={setActiveChannelTab}

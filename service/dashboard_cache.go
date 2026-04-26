@@ -19,7 +19,7 @@ const (
 	dashboardModelPerfNamespace   = "new-api:dashboard:model_perf:v1"
 	dashboardModelCrossNamespace  = "new-api:dashboard:model_cross:v1"
 	dashboardQuotaDatesNamespace  = "new-api:dashboard:quota_dates:v1"
-	dashboardTokenUsageNamespace  = "new-api:dashboard:token_usage:v1"
+	dashboardTokenUsageNamespace  = "new-api:dashboard:token_usage:v2"
 )
 
 var (

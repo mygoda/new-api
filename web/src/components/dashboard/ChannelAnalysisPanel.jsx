@@ -49,6 +49,7 @@ const ChannelAnalysisPanel = ({
   errorRateChartSpec,
   healthScoreChartSpec,
   qpsChartSpec,
+  tokenModelTreemapSpec,
   isAdminUser,
   activeTab,
   setActiveTab,
@@ -455,6 +456,12 @@ const ChannelAnalysisPanel = ({
       render: (val) => (val || 0).toLocaleString(),
     },
     {
+      title: t('占比'),
+      dataIndex: 'token_pct',
+      sorter: (a, b) => (a.token_pct || 0) - (b.token_pct || 0),
+      render: (val) => `${(val || 0).toFixed(2)}%`,
+    },
+    {
       title: t('消耗额度'),
       dataIndex: 'total_quota',
       sorter: (a, b) => (a.total_quota || 0) - (b.total_quota || 0),
@@ -473,6 +480,72 @@ const ChannelAnalysisPanel = ({
       render: (val) => `${((val || 0) * 100).toFixed(1)}%`,
     },
   ];
+
+  // 计算每个令牌的 tokens 占比，并准备展开行的子表格
+  const tokenRows = useMemo(() => {
+    const list = tokenUsageStats || [];
+    const totalTokens = list.reduce((sum, item) => sum + (item.total_tokens || 0), 0);
+    return list.map((item) => ({
+      ...item,
+      token_pct: totalTokens > 0 ? ((item.total_tokens || 0) / totalTokens) * 100 : 0,
+    }));
+  }, [tokenUsageStats]);
+
+  const renderTokenModelExpanded = useCallback((record) => {
+    const models = (record?.models || []).slice().sort((a, b) => (b.total_tokens || 0) - (a.total_tokens || 0));
+    const tokenTotal = record?.total_tokens || 0;
+    if (models.length === 0) {
+      return (
+        <div className='p-3'>
+          <Empty title={t('该令牌下暂无模型消耗数据')} style={{ padding: 16 }} />
+        </div>
+      );
+    }
+    const subColumns = [
+      {
+        title: t('模型名称'),
+        dataIndex: 'model_name',
+        render: (text) => <Tag size='small' color='blue'>{text || t('未知模型')}</Tag>,
+      },
+      {
+        title: t('调用次数'),
+        dataIndex: 'total_requests',
+        sorter: (a, b) => (a.total_requests || 0) - (b.total_requests || 0),
+        render: (val) => (val || 0).toLocaleString(),
+      },
+      {
+        title: t('消耗 tokens'),
+        dataIndex: 'total_tokens',
+        sorter: (a, b) => (a.total_tokens || 0) - (b.total_tokens || 0),
+        render: (val) => (val || 0).toLocaleString(),
+      },
+      {
+        title: t('占比'),
+        dataIndex: 'model_pct',
+        render: (_v, row) => {
+          const pct = tokenTotal > 0 ? ((row.total_tokens || 0) / tokenTotal) * 100 : 0;
+          return `${pct.toFixed(2)}%`;
+        },
+      },
+      {
+        title: t('消耗额度'),
+        dataIndex: 'total_quota',
+        sorter: (a, b) => (a.total_quota || 0) - (b.total_quota || 0),
+        render: (val) => renderQuota(val || 0, 2),
+      },
+    ];
+    return (
+      <div className='p-2 bg-gray-50'>
+        <Table
+          columns={subColumns}
+          dataSource={models}
+          rowKey={(row) => `${row.token_id}_${row.model_name}`}
+          pagination={false}
+          size='small'
+        />
+      </div>
+    );
+  }, [t]);
 
   // Extract unique model names for the cross-stats filter
   const crossStatsModelOptions = useMemo(() => {
@@ -501,9 +574,7 @@ const ChannelAnalysisPanel = ({
             onChange={setActiveTab}
           >
             <TabPane tab={<span>{tableTabTitle}</span>} itemKey='1' />
-            {!isAdminUser && (
-              <TabPane tab={<span>{t('按令牌')}</span>} itemKey='token' />
-            )}
+            <TabPane tab={<span>{t('按令牌')}</span>} itemKey='token' />
             <TabPane tab={<span>{t('延迟对比')}</span>} itemKey='2' />
             <TabPane tab={<span>{t('延迟分位数')}</span>} itemKey='6' />
             <TabPane tab={<span>{t('错误率对比')}</span>} itemKey='3' />
@@ -536,16 +607,25 @@ const ChannelAnalysisPanel = ({
           )}
         </div>
       )}
-      {!isAdminUser && activeTab === 'token' && (
+      {activeTab === 'token' && (
         <div className='p-2'>
-          {(tokenUsageStats || []).length > 0 ? (
+          <div className='h-96 mb-3'>
+            {tokenModelTreemapSpec && tokenModelTreemapSpec.data?.[0]?.values?.length > 0 ? (
+              <VChart spec={tokenModelTreemapSpec} option={CHART_CONFIG} />
+            ) : (
+              <Empty title={t('无令牌数据')} style={{ padding: 40 }} />
+            )}
+          </div>
+          {tokenRows.length > 0 ? (
             <Table
               columns={tokenColumns}
-              dataSource={tokenUsageStats}
+              dataSource={tokenRows}
               rowKey='token_id'
-              pagination={tokenUsageStats.length > 10 ? { pageSize: 10 } : false}
+              pagination={tokenRows.length > 10 ? { pageSize: 10 } : false}
               size='small'
               loading={loading}
+              expandedRowRender={renderTokenModelExpanded}
+              expandRowByClick
             />
           ) : (
             <Empty title={t('无令牌数据')} style={{ padding: 40 }} />

@@ -1145,14 +1145,24 @@ func GetModelChannelCrossStats(modelName string, startTimestamp int64, endTimest
 
 // TokenUsageStats represents per-token usage aggregation for the dashboard.
 type TokenUsageStats struct {
-	TokenId             int     `json:"token_id"`
-	TokenName           string  `json:"token_name"`
-	TotalRequests       int64   `json:"total_requests"`
-	TotalQuota          int64   `json:"total_quota"`
-	TotalTokens         int64   `json:"total_tokens"`
-	StreamRequestCount  int64   `json:"stream_request_count"`
-	AvgTokensPerRequest float64 `json:"avg_tokens_per_request" gorm:"-"`
-	StreamRatio         float64 `json:"stream_ratio" gorm:"-"`
+	TokenId             int               `json:"token_id"`
+	TokenName           string            `json:"token_name"`
+	TotalRequests       int64             `json:"total_requests"`
+	TotalQuota          int64             `json:"total_quota"`
+	TotalTokens         int64             `json:"total_tokens"`
+	StreamRequestCount  int64             `json:"stream_request_count"`
+	AvgTokensPerRequest float64           `json:"avg_tokens_per_request" gorm:"-"`
+	StreamRatio         float64           `json:"stream_ratio" gorm:"-"`
+	Models              []TokenModelUsage `json:"models" gorm:"-"`
+}
+
+// TokenModelUsage represents per-(token, model) usage breakdown under a token.
+type TokenModelUsage struct {
+	TokenId       int    `json:"token_id"`
+	ModelName     string `json:"model_name"`
+	TotalRequests int64  `json:"total_requests"`
+	TotalQuota    int64  `json:"total_quota"`
+	TotalTokens   int64  `json:"total_tokens"`
 }
 
 func GetTokenUsageStats(userId int, startTimestamp int64, endTimestamp int64) ([]TokenUsageStats, error) {
@@ -1181,6 +1191,32 @@ func GetTokenUsageStats(userId int, startTimestamp int64, endTimestamp int64) ([
 			stats[i].AvgTokensPerRequest = float64(stats[i].TotalTokens) / float64(stats[i].TotalRequests)
 			stats[i].StreamRatio = float64(stats[i].StreamRequestCount) / float64(stats[i].TotalRequests)
 		}
+	}
+
+	if len(stats) == 0 {
+		return stats, nil
+	}
+
+	var modelUsages []TokenModelUsage
+	modelQuery := LOG_DB.Table("logs").
+		Select("token_id, model_name, COUNT(*) as total_requests, COALESCE(SUM(quota),0) as total_quota, COALESCE(SUM(COALESCE(prompt_tokens,0) + COALESCE(completion_tokens,0)),0) as total_tokens").
+		Where("type = ? AND user_id = ? AND token_id > 0", LogTypeConsume, userId)
+	if startTimestamp != 0 {
+		modelQuery = modelQuery.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		modelQuery = modelQuery.Where("created_at <= ?", endTimestamp)
+	}
+	if err := modelQuery.Group("token_id, model_name").Find(&modelUsages).Error; err != nil {
+		return nil, err
+	}
+
+	usagesByToken := make(map[int][]TokenModelUsage, len(stats))
+	for _, mu := range modelUsages {
+		usagesByToken[mu.TokenId] = append(usagesByToken[mu.TokenId], mu)
+	}
+	for i := range stats {
+		stats[i].Models = usagesByToken[stats[i].TokenId]
 	}
 
 	return stats, nil
