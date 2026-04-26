@@ -658,31 +658,30 @@ export default function ModelPricingEditor({
                       />
                     </Card>
 
-                    {selectedModel.tieredEnabled ? (
-                      <Card
-                        bodyStyle={{ padding: 16 }}
-                        style={{
-                          marginBottom: 16,
-                          background: 'var(--semi-color-fill-0)',
-                        }}
-                      >
-                        <div className='mb-3 flex items-center justify-between'>
-                          <div>
-                            <div className='font-medium'>{t('阶梯计费')}</div>
-                            <div className='text-xs text-gray-500 mt-1'>
-                              {t(
-                                '按 prompt 输入 token 数切换不同档位的输入/输出单价。启用后将覆盖上方基础价格。',
-                              )}
-                            </div>
+                    <Card
+                      bodyStyle={{ padding: 16 }}
+                      style={{
+                        marginBottom: 16,
+                        background: 'var(--semi-color-fill-0)',
+                      }}
+                    >
+                      <div className='mb-3 flex items-center justify-between gap-3'>
+                        <div>
+                          <div className='font-medium'>{t('阶梯计费')}</div>
+                          <div className='text-xs text-gray-500 mt-1'>
+                            {t(
+                              '按 prompt 输入 token 数切换不同档位的输入/输出单价。启用后将覆盖上方基础价格。',
+                            )}
                           </div>
-                          <Button
-                            type='tertiary'
-                            theme='borderless'
-                            onClick={() => handleTieredToggle(false)}
-                          >
-                            {t('取消阶梯计费')}
-                          </Button>
                         </div>
+                        <Switch
+                          size='small'
+                          checked={!!selectedModel.tieredEnabled}
+                          onChange={(checked) => handleTieredToggle(checked)}
+                          aria-label={t('阶梯计费')}
+                        />
+                      </div>
+                      {selectedModel.tieredEnabled ? (
                         <div className='space-y-3'>
                           {selectedModel.tiers.map((tier, idx) => (
                             <Card
@@ -786,26 +785,8 @@ export default function ModelPricingEditor({
                             {t('新增阶梯')}
                           </Button>
                         </div>
-                      </Card>
-                    ) : (
-                      <div className='mb-4'>
-                        <Button
-                          icon={<IconPlus />}
-                          theme='light'
-                          type='tertiary'
-                          onClick={() => handleTieredToggle(true)}
-                        >
-                          {t('设置阶梯价格')}
-                        </Button>
-                        <Text
-                          className='ml-3'
-                          type='tertiary'
-                          size='small'
-                        >
-                          {t('按 prompt 输入 token 数切换不同档位的单价（可选）')}
-                        </Text>
-                      </div>
-                    )}
+                      ) : null}
+                    </Card>
                   </>
                 )}
 

@@ -11,11 +11,13 @@ import {
   Spin,
   Banner,
 } from '@douyinfe/semi-ui';
+import { IconDelete, IconPlus } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { API, showError, showSuccess } from '../../../../helpers';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 import { PriceInput } from '../../../../pages/Setting/Ratio/components/ModelPricingEditor';
 import {
+  EMPTY_TIER,
   buildModelState,
   serializeModel,
   parseOptionJSON,
@@ -23,6 +25,7 @@ import {
   buildOptionalFieldToggles,
   getModelWarnings,
   buildPreviewRows,
+  validateTiers,
 } from '../../../../pages/Setting/Ratio/hooks/useModelPricingEditorState';
 
 const { Text } = Typography;
@@ -38,6 +41,7 @@ const PRICING_OPTION_KEYS = [
   'ImageRatio',
   'AudioRatio',
   'AudioCompletionRatio',
+  'ModelRatioTiered',
 ];
 
 const toNumberOrNull = (value) => {
@@ -107,6 +111,7 @@ const buildSourceMaps = (options) => ({
   ImageRatio: parseOptionJSON(options.ImageRatio),
   AudioRatio: parseOptionJSON(options.AudioRatio),
   AudioCompletionRatio: parseOptionJSON(options.AudioCompletionRatio),
+  ModelRatioTiered: parseOptionJSON(options.ModelRatioTiered),
 });
 
 export default function ConfigurePriceModal({
@@ -210,8 +215,79 @@ export default function ConfigurePriceModal({
     [],
   );
 
+  const handleTieredToggle = useCallback((checked) => {
+    setModelState((prev) => {
+      if (!prev) return prev;
+      if (checked) {
+        const initialTier = {
+          ...EMPTY_TIER,
+          threshold: '0',
+          inputPrice: hasValue(prev.inputPrice) ? prev.inputPrice : '',
+          completionPrice: hasValue(prev.completionPrice)
+            ? prev.completionPrice
+            : '',
+        };
+        return {
+          ...prev,
+          tieredEnabled: true,
+          tiers:
+            Array.isArray(prev.tiers) && prev.tiers.length > 0
+              ? prev.tiers
+              : [initialTier],
+        };
+      }
+      return { ...prev, tieredEnabled: false };
+    });
+  }, []);
+
+  const handleAddTier = useCallback(() => {
+    setModelState((prev) => {
+      if (!prev) return prev;
+      const tiers = Array.isArray(prev.tiers) ? prev.tiers : [];
+      const last = tiers[tiers.length - 1];
+      const lastThresholdNum = Number(last?.threshold);
+      const lastThreshold = Number.isFinite(lastThresholdNum)
+        ? lastThresholdNum
+        : 0;
+      const suggested = lastThreshold === 0 ? 200000 : lastThreshold * 2;
+      const newTier = {
+        ...EMPTY_TIER,
+        threshold: String(suggested),
+        inputPrice: last?.inputPrice ?? '',
+        completionPrice: last?.completionPrice ?? '',
+      };
+      return { ...prev, tiers: [...tiers, newTier] };
+    });
+  }, []);
+
+  const handleDeleteTier = useCallback((index) => {
+    if (index === 0) return;
+    setModelState((prev) => {
+      if (!prev) return prev;
+      const tiers = Array.isArray(prev.tiers) ? prev.tiers : [];
+      return { ...prev, tiers: tiers.filter((_, i) => i !== index) };
+    });
+  }, []);
+
+  const handleTierFieldChange = useCallback((index, field, value) => {
+    if (!NUMERIC_INPUT_REGEX.test(value)) return;
+    setModelState((prev) => {
+      if (!prev) return prev;
+      const tiers = Array.isArray(prev.tiers) ? prev.tiers : [];
+      return {
+        ...prev,
+        tiers: tiers.map((tier, i) =>
+          i === index ? { ...tier, [field]: value } : tier,
+        ),
+      };
+    });
+  }, []);
+
   const warnings = useMemo(
-    () => getModelWarnings(modelState, t),
+    () => [
+      ...getModelWarnings(modelState, t),
+      ...validateTiers(modelState, t),
+    ],
     [modelState, t],
   );
 
@@ -573,6 +649,126 @@ export default function ConfigurePriceModal({
                         : ''
                   }
                 />
+              </Card>
+
+              <Card
+                bodyStyle={{ padding: 16 }}
+                style={{
+                  marginBottom: 16,
+                  background: 'var(--semi-color-fill-0)',
+                }}
+              >
+                <div className='mb-3 flex items-center justify-between gap-3'>
+                  <div>
+                    <div className='font-medium'>{t('阶梯计费')}</div>
+                    <div className='text-xs text-gray-500 mt-1'>
+                      {t(
+                        '按 prompt 输入 token 数切换不同档位的输入/输出单价。启用后将覆盖上方基础价格。',
+                      )}
+                    </div>
+                  </div>
+                  <Switch
+                    size='small'
+                    checked={!!modelState.tieredEnabled}
+                    onChange={(checked) => handleTieredToggle(checked)}
+                    aria-label={t('阶梯计费')}
+                  />
+                </div>
+                {modelState.tieredEnabled ? (
+                  <div className='space-y-3'>
+                    {(modelState.tiers || []).map((tier, idx) => (
+                      <Card
+                        key={idx}
+                        bodyStyle={{ padding: 12 }}
+                        style={{ background: 'var(--semi-color-bg-2)' }}
+                      >
+                        <div className='flex items-center justify-between mb-2'>
+                          <Text strong>
+                            {idx === 0
+                              ? t('首档（默认）')
+                              : t('阶梯 {{idx}}', { idx: idx + 1 })}
+                          </Text>
+                          {idx > 0 ? (
+                            <Button
+                              icon={<IconDelete />}
+                              size='small'
+                              type='danger'
+                              theme='borderless'
+                              onClick={() => handleDeleteTier(idx)}
+                            />
+                          ) : null}
+                        </div>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: isMobile
+                              ? '1fr'
+                              : 'repeat(2, 1fr)',
+                            gap: 12,
+                          }}
+                        >
+                          <PriceInput
+                            label={t('阈值（prompt tokens）')}
+                            value={tier.threshold}
+                            placeholder={
+                              idx === 0
+                                ? '0'
+                                : t('如 200000 表示 >200K 时生效')
+                            }
+                            suffix='tokens'
+                            disabled={idx === 0}
+                            onChange={(value) =>
+                              handleTierFieldChange(idx, 'threshold', value)
+                            }
+                          />
+                          <PriceInput
+                            label={t('输入价格')}
+                            value={tier.inputPrice}
+                            placeholder={t('输入 $/1M tokens')}
+                            onChange={(value) =>
+                              handleTierFieldChange(idx, 'inputPrice', value)
+                            }
+                          />
+                          <PriceInput
+                            label={t('输出价格')}
+                            value={tier.completionPrice}
+                            placeholder={t('输入 $/1M tokens')}
+                            onChange={(value) =>
+                              handleTierFieldChange(
+                                idx,
+                                'completionPrice',
+                                value,
+                              )
+                            }
+                          />
+                          <PriceInput
+                            label={t('缓存读取价格（可选）')}
+                            value={tier.cachePrice}
+                            placeholder={t('留空则沿用基础缓存价')}
+                            onChange={(value) =>
+                              handleTierFieldChange(idx, 'cachePrice', value)
+                            }
+                          />
+                          <PriceInput
+                            label={t('缓存创建价格（可选）')}
+                            value={tier.createCachePrice}
+                            placeholder={t('留空则沿用基础缓存写入价')}
+                            onChange={(value) =>
+                              handleTierFieldChange(
+                                idx,
+                                'createCachePrice',
+                                value,
+                              )
+                            }
+                          />
+                        </div>
+                      </Card>
+                    ))}
+                    <Button icon={<IconPlus />} block onClick={handleAddTier}>
+                      {t('新增阶梯')}
+                    </Button>
+                  </div>
+                ) : null}
               </Card>
             </>
           )}
