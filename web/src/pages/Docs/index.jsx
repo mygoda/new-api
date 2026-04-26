@@ -128,6 +128,365 @@ const Docs = () => {
     { href: '#faq', title: t('常见问题') },
   ];
 
+  // 构造 API 参考章节使用的 endpoint + 示例数据
+  const apiSections = [
+    {
+      key: 'ref-chat',
+      label: t('聊天'),
+      endpoints: [
+        {
+          method: 'POST',
+          path: '/v1/chat/completions',
+          desc: t('OpenAI 格式对话补全，支持流式、工具调用、视觉输入。'),
+          body: `{
+  "model": "gpt-4o",
+  "messages": [
+    { "role": "system", "content": "You are a helpful assistant." },
+    { "role": "user", "content": "Hello!" }
+  ],
+  "stream": false,
+  "temperature": 0.7
+}`,
+        },
+        {
+          method: 'POST',
+          path: '/v1/responses',
+          desc: t('OpenAI Responses 新格式，支持有状态对话、内置工具、推理参数。'),
+          body: `{
+  "model": "gpt-4o",
+  "input": "Tell me a haiku about programming.",
+  "stream": false
+}`,
+        },
+        {
+          method: 'POST',
+          path: '/v1/messages',
+          desc: t('Anthropic Claude 原生格式，可直接对接 Claude SDK / Claude Code。'),
+          body: `{
+  "model": "claude-sonnet-4-20250514",
+  "max_tokens": 1024,
+  "messages": [
+    { "role": "user", "content": "Hello, Claude" }
+  ]
+}`,
+        },
+        {
+          method: 'POST',
+          path: '/v1beta/models/{model}:generateContent',
+          urlPath: '/v1beta/models/gemini-2.0-flash:generateContent',
+          desc: t('Google Gemini 原生格式（非流式），路径中 {model} 需替换为具体模型名。'),
+          body: `{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [{ "text": "Hello, Gemini!" }]
+    }
+  ],
+  "generationConfig": {
+    "temperature": 0.7,
+    "maxOutputTokens": 1024
+  }
+}`,
+        },
+        {
+          method: 'POST',
+          path: '/v1beta/models/{model}:streamGenerateContent',
+          urlPath: '/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse',
+          desc: t('Google Gemini 原生格式（流式 SSE）。请求体与非流式一致，URL 加上 ?alt=sse 即可。'),
+          body: `{
+  "contents": [
+    { "role": "user", "parts": [{ "text": "Hello, Gemini!" }] }
+  ]
+}`,
+        },
+      ],
+    },
+    {
+      key: 'ref-embeddings',
+      label: t('嵌入'),
+      endpoints: [
+        {
+          method: 'POST',
+          path: '/v1/embeddings',
+          desc: t('OpenAI 格式文本向量嵌入，可用于语义检索、RAG 等场景。input 支持字符串或字符串数组。'),
+          body: `{
+  "model": "text-embedding-3-small",
+  "input": "The food was delicious and the service was excellent."
+}`,
+        },
+      ],
+    },
+    {
+      key: 'ref-image',
+      label: t('图像'),
+      endpoints: [
+        {
+          method: 'POST',
+          path: '/v1/images/generations',
+          desc: t('OpenAI 格式文生图（DALL-E / gpt-image 等）。'),
+          body: `{
+  "model": "dall-e-3",
+  "prompt": "A cute cat wearing sunglasses, photorealistic",
+  "n": 1,
+  "size": "1024x1024",
+  "response_format": "url"
+}`,
+        },
+        {
+          method: 'POST',
+          path: '/v1/images/edits',
+          desc: t('OpenAI 格式图像编辑，请求为 multipart/form-data。'),
+          formData: [
+            'image=@/path/to/source.png',
+            'mask=@/path/to/mask.png',
+            'prompt=Replace the sky with northern lights',
+            'model=dall-e-2',
+            'n=1',
+            'size=1024x1024',
+          ],
+        },
+        {
+          method: 'POST',
+          path: '/v1/images/variations',
+          desc: t('OpenAI 格式图像变体生成，请求为 multipart/form-data。'),
+          formData: [
+            'image=@/path/to/source.png',
+            'model=dall-e-2',
+            'n=1',
+            'size=1024x1024',
+          ],
+        },
+        {
+          method: 'POST',
+          path: '/mj/submit/imagine',
+          desc: t('Midjourney Proxy 创建 imagine 绘图任务，botType 可选 MID_JOURNEY / NIJI_JOURNEY。'),
+          body: `{
+  "prompt": "Cat with hat, cinematic lighting --ar 16:9 --v 6",
+  "botType": "MID_JOURNEY",
+  "notifyHook": "",
+  "state": ""
+}`,
+        },
+        {
+          method: 'POST',
+          path: '/mj/submit/change',
+          desc: t('Midjourney Proxy 执行 U/V/Reroll 等后续动作，taskId 与 customId 由 imagine 任务返回。'),
+          body: `{
+  "taskId": "1742700000000000",
+  "action": "UPSCALE",
+  "index": 1,
+  "customId": "MJ::JOB::upsample::1::xxxxxxxx",
+  "notifyHook": ""
+}`,
+        },
+        {
+          method: 'GET',
+          path: '/mj/task/{id}/fetch',
+          urlPath: '/mj/task/1742700000000000/fetch',
+          desc: t('查询 Midjourney 任务状态与结果图，无请求体。'),
+        },
+      ],
+    },
+    {
+      key: 'ref-audio',
+      label: t('音频'),
+      endpoints: [
+        {
+          method: 'POST',
+          path: '/v1/audio/speech',
+          desc: t('文本转语音 (TTS)，返回音频流（MP3 / WAV / Opus 等）。'),
+          body: `{
+  "model": "tts-1",
+  "input": "Hello, this is a text to speech test.",
+  "voice": "alloy",
+  "response_format": "mp3"
+}`,
+          curlExtra: '--output speech.mp3',
+        },
+        {
+          method: 'POST',
+          path: '/v1/audio/transcriptions',
+          desc: t('语音转文字，请求为 multipart/form-data，支持多语言自动识别。'),
+          formData: [
+            'file=@/path/to/audio.mp3',
+            'model=whisper-1',
+            'response_format=json',
+          ],
+        },
+        {
+          method: 'POST',
+          path: '/v1/audio/translations',
+          desc: t('将任意语种语音翻译为英文文本，请求为 multipart/form-data。'),
+          formData: ['file=@/path/to/audio.mp3', 'model=whisper-1'],
+        },
+      ],
+    },
+    {
+      key: 'ref-rerank',
+      label: t('重排'),
+      endpoints: [
+        {
+          method: 'POST',
+          path: '/v1/rerank',
+          desc: t('文档相关性重排序，兼容 Jina / Cohere / Xinference 等服务商格式。'),
+          body: `{
+  "model": "jina-reranker-v2-base-multilingual",
+  "query": "What is the capital of France?",
+  "documents": [
+    "Paris is the capital of France.",
+    "Tokyo is the capital of Japan.",
+    "London is in the United Kingdom."
+  ],
+  "top_n": 2,
+  "return_documents": true
+}`,
+        },
+      ],
+    },
+    {
+      key: 'ref-realtime',
+      label: t('实时'),
+      endpoints: [
+        {
+          method: 'WS',
+          path: '/v1/realtime',
+          urlPath: '/v1/realtime?model=gpt-4o-realtime-preview',
+          desc: t('OpenAI Realtime WebSocket，支持低延迟双向语音对话。建立连接后通过 JSON 消息交互。'),
+          customExample: `# ${t('使用 wscat 连接（需要 npm i -g wscat）')}
+wscat -c "${(serverAddress || '').replace(/^https?:/, 'wss:').replace(/^http:/, 'ws:')}/v1/realtime?model=gpt-4o-realtime-preview" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "OpenAI-Beta: realtime=v1"`,
+        },
+      ],
+    },
+    {
+      key: 'ref-music',
+      label: t('音乐'),
+      endpoints: [
+        {
+          method: 'POST',
+          path: '/suno/submit/music',
+          desc: t('Suno API 生成歌曲。描述模式只填 gpt_description_prompt；自定义模式填 prompt 作为歌词、title、tags。'),
+          body: `{
+  "gpt_description_prompt": "A relaxing piano lullaby for sleep",
+  "make_instrumental": true,
+  "mv": "chirp-v3-5",
+  "tags": "",
+  "title": "",
+  "prompt": ""
+}`,
+        },
+        {
+          method: 'POST',
+          path: '/suno/submit/lyrics',
+          desc: t('Suno API 生成歌词。'),
+          body: `{
+  "prompt": "A song about morning coffee"
+}`,
+        },
+        {
+          method: 'GET',
+          path: '/suno/fetch/{id}',
+          urlPath: '/suno/fetch/abcd1234efgh',
+          desc: t('查询 Suno 任务状态与生成结果（含 audio_url / video_url / 歌词）。无请求体。'),
+        },
+      ],
+    },
+    {
+      key: 'ref-video',
+      label: t('视频'),
+      endpoints: [
+        {
+          method: 'POST',
+          path: '/v1/video/generations',
+          desc: t('创建文生视频 / 图生视频任务（兼容 Kling / Sora / 即梦 等格式）。image 字段为可选输入图（URL 或 Base64）。'),
+          body: `{
+  "model": "kling-v1",
+  "prompt": "Astronaut walking on the moon, cinematic shot",
+  "duration": 5.0,
+  "width": 1024,
+  "height": 1024,
+  "fps": 30,
+  "n": 1,
+  "response_format": "url"
+}`,
+        },
+        {
+          method: 'GET',
+          path: '/v1/video/generations/{id}',
+          urlPath: '/v1/video/generations/abcd1234efgh',
+          desc: t('查询视频任务状态与下载地址。无请求体。'),
+        },
+      ],
+    },
+  ];
+
+  const renderApiPanel = (ep) => {
+    const fullUrl = `${serverAddress}${ep.urlPath || ep.path}`;
+    let curl;
+    if (ep.customExample) {
+      curl = ep.customExample;
+    } else if (ep.formData && ep.formData.length > 0) {
+      curl = `curl -X ${ep.method} "${fullUrl}" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+${ep.formData.map((f) => `  -F "${f}"`).join(' \\\n')}`;
+    } else if (ep.body) {
+      curl = `curl -X ${ep.method} "${fullUrl}" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '${ep.body}'${ep.curlExtra ? ` \\\n  ${ep.curlExtra}` : ''}`;
+    } else {
+      curl = `curl -X ${ep.method} "${fullUrl}" \\
+  -H "Authorization: Bearer YOUR_API_KEY"`;
+    }
+
+    return (
+      <Collapse.Panel
+        key={ep.path}
+        itemKey={ep.path}
+        header={
+          <div className='flex items-start gap-3 w-full'>
+            <Tag
+              color={methodColor[ep.method] || 'grey'}
+              size='small'
+              className='!min-w-[48px] !text-center !font-mono'
+            >
+              {ep.method}
+            </Tag>
+            <div className='flex-1 min-w-0'>
+              <Text code className='!text-[13px] break-all'>
+                {ep.path}
+              </Text>
+              <div className='text-xs text-semi-color-text-2 mt-1'>{ep.desc}</div>
+            </div>
+          </div>
+        }
+      >
+        <div className='space-y-3'>
+          {ep.body && (
+            <div>
+              <div className='text-xs font-semibold mb-1 text-[var(--semi-color-text-2)]'>
+                {t('请求体示例')}
+              </div>
+              <CodeBlock onCopy={() => handleCopy(ep.body)}>{ep.body}</CodeBlock>
+            </div>
+          )}
+          {ep.formData && ep.formData.length > 0 && (
+            <Paragraph type='tertiary' size='small'>
+              {t('请求为 multipart/form-data，无 JSON 请求体；详见下方 cURL 示例。')}
+            </Paragraph>
+          )}
+          <div>
+            <div className='text-xs font-semibold mb-1 text-[var(--semi-color-text-2)]'>
+              cURL
+            </div>
+            <CodeBlock onCopy={() => handleCopy(curl)}>{curl}</CodeBlock>
+          </div>
+        </div>
+      </Collapse.Panel>
+    );
+  };
+
   return (
     <div className='mt-[60px] px-4 md:px-8 pb-16'>
       <div className='max-w-7xl mx-auto flex gap-8'>
@@ -381,177 +740,17 @@ console.log(response.choices[0].message.content);`}
             </Paragraph>
 
             <Tabs type='line' className='!mb-4'>
-              <TabPane tab={t('聊天')} itemKey='ref-chat'>
-                <Card className='!mt-3'>
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/chat/completions'
-                    desc={t('OpenAI 格式对话补全，支持流式、工具调用、视觉输入。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/responses'
-                    desc={t('OpenAI Responses 新格式，支持有状态对话、内置工具、推理参数。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/messages'
-                    desc={t('Anthropic Claude 原生格式，可直接对接 Claude SDK / Claude Code。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='POST'
-                    path='/v1beta/models/{model}:generateContent'
-                    desc={t('Google Gemini 原生格式（非流式），路径包含模型名。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='POST'
-                    path='/v1beta/models/{model}:streamGenerateContent'
-                    desc={t('Google Gemini 原生格式（流式 SSE）。')}
-                    onCopy={handleCopy}
-                  />
-                </Card>
-              </TabPane>
-
-              <TabPane tab={t('嵌入')} itemKey='ref-embeddings'>
-                <Card className='!mt-3'>
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/embeddings'
-                    desc={t('OpenAI 格式文本向量嵌入，可用于语义检索、RAG 等场景。')}
-                    onCopy={handleCopy}
-                  />
-                </Card>
-              </TabPane>
-
-              <TabPane tab={t('图像')} itemKey='ref-image'>
-                <Card className='!mt-3'>
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/images/generations'
-                    desc={t('OpenAI 格式文生图（DALL-E / gpt-image 等）。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/images/edits'
-                    desc={t('OpenAI 格式图像编辑（局部修改 / 扩图）。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/images/variations'
-                    desc={t('OpenAI 格式图像变体生成。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='POST'
-                    path='/mj/submit/imagine'
-                    desc={t('Midjourney Proxy 创建 imagine 绘图任务。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='POST'
-                    path='/mj/submit/change'
-                    desc={t('Midjourney Proxy 执行 U1-U4 / V1-V4 / Reroll 等后续动作。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='GET'
-                    path='/mj/task/{id}/fetch'
-                    desc={t('查询 Midjourney 任务状态与结果图。')}
-                    onCopy={handleCopy}
-                  />
-                </Card>
-              </TabPane>
-
-              <TabPane tab={t('音频')} itemKey='ref-audio'>
-                <Card className='!mt-3'>
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/audio/speech'
-                    desc={t('文本转语音 (TTS)，返回音频流。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/audio/transcriptions'
-                    desc={t('语音转文字，支持多语言自动识别。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/audio/translations'
-                    desc={t('将任意语种语音翻译为英文文本。')}
-                    onCopy={handleCopy}
-                  />
-                </Card>
-              </TabPane>
-
-              <TabPane tab={t('重排')} itemKey='ref-rerank'>
-                <Card className='!mt-3'>
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/rerank'
-                    desc={t('文档相关性重排序，兼容 Jina / Cohere / Xinference 等服务商格式。')}
-                    onCopy={handleCopy}
-                  />
-                </Card>
-              </TabPane>
-
-              <TabPane tab={t('实时')} itemKey='ref-realtime'>
-                <Card className='!mt-3'>
-                  <EndpointRow
-                    method='WS'
-                    path='/v1/realtime'
-                    desc={t('OpenAI Realtime WebSocket，支持低延迟双向语音对话。')}
-                    onCopy={handleCopy}
-                  />
-                </Card>
-              </TabPane>
-
-              <TabPane tab={t('音乐')} itemKey='ref-music'>
-                <Card className='!mt-3'>
-                  <EndpointRow
-                    method='POST'
-                    path='/suno/submit/music'
-                    desc={t('Suno API 生成歌曲，支持描述模式 / 自定义歌词模式。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='POST'
-                    path='/suno/submit/lyrics'
-                    desc={t('Suno API 生成歌词。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='GET'
-                    path='/suno/fetch/{id}'
-                    desc={t('查询 Suno 任务状态与生成结果。')}
-                    onCopy={handleCopy}
-                  />
-                </Card>
-              </TabPane>
-
-              <TabPane tab={t('视频')} itemKey='ref-video'>
-                <Card className='!mt-3'>
-                  <EndpointRow
-                    method='POST'
-                    path='/v1/video/generations'
-                    desc={t('创建文生视频 / 图生视频任务（兼容 Sora / Kling / 即梦 等格式）。')}
-                    onCopy={handleCopy}
-                  />
-                  <EndpointRow
-                    method='GET'
-                    path='/v1/video/generations/{id}'
-                    desc={t('查询视频任务状态与下载地址。')}
-                    onCopy={handleCopy}
-                  />
-                </Card>
-              </TabPane>
+              {apiSections.map((section) => (
+                <TabPane
+                  key={section.key}
+                  tab={section.label}
+                  itemKey={section.key}
+                >
+                  <Collapse className='!mt-3' keepDOM={false}>
+                    {section.endpoints.map((ep) => renderApiPanel(ep))}
+                  </Collapse>
+                </TabPane>
+              ))}
             </Tabs>
 
             <Paragraph type='tertiary' size='small' className='!mt-4'>
