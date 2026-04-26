@@ -1143,6 +1143,49 @@ func GetModelChannelCrossStats(modelName string, startTimestamp int64, endTimest
 	return consumeStats, nil
 }
 
+// TokenUsageStats represents per-token usage aggregation for the dashboard.
+type TokenUsageStats struct {
+	TokenId             int     `json:"token_id"`
+	TokenName           string  `json:"token_name"`
+	TotalRequests       int64   `json:"total_requests"`
+	TotalQuota          int64   `json:"total_quota"`
+	TotalTokens         int64   `json:"total_tokens"`
+	StreamRequestCount  int64   `json:"stream_request_count"`
+	AvgTokensPerRequest float64 `json:"avg_tokens_per_request" gorm:"-"`
+	StreamRatio         float64 `json:"stream_ratio" gorm:"-"`
+}
+
+func GetTokenUsageStats(userId int, startTimestamp int64, endTimestamp int64) ([]TokenUsageStats, error) {
+	streamSum := streamRequestSumExpr()
+	selectExpr := fmt.Sprintf(
+		"token_id, token_name, COUNT(*) as total_requests, COALESCE(SUM(quota),0) as total_quota, COALESCE(SUM(COALESCE(prompt_tokens,0) + COALESCE(completion_tokens,0)),0) as total_tokens, %s",
+		streamSum,
+	)
+
+	var stats []TokenUsageStats
+	query := LOG_DB.Table("logs").
+		Select(selectExpr).
+		Where("type = ? AND user_id = ? AND token_id > 0", LogTypeConsume, userId)
+	if startTimestamp != 0 {
+		query = query.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		query = query.Where("created_at <= ?", endTimestamp)
+	}
+	if err := query.Group("token_id, token_name").Find(&stats).Error; err != nil {
+		return nil, err
+	}
+
+	for i := range stats {
+		if stats[i].TotalRequests > 0 {
+			stats[i].AvgTokensPerRequest = float64(stats[i].TotalTokens) / float64(stats[i].TotalRequests)
+			stats[i].StreamRatio = float64(stats[i].StreamRequestCount) / float64(stats[i].TotalRequests)
+		}
+	}
+
+	return stats, nil
+}
+
 func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {
 	var total int64 = 0
 

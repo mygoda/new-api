@@ -19,6 +19,7 @@ const (
 	dashboardModelPerfNamespace   = "new-api:dashboard:model_perf:v1"
 	dashboardModelCrossNamespace  = "new-api:dashboard:model_cross:v1"
 	dashboardQuotaDatesNamespace  = "new-api:dashboard:quota_dates:v1"
+	dashboardTokenUsageNamespace  = "new-api:dashboard:token_usage:v1"
 )
 
 var (
@@ -33,6 +34,9 @@ var (
 
 	quotaDatesCacheOnce sync.Once
 	quotaDatesCache     *cachex.HybridCache[[]*model.QuotaData]
+
+	tokenUsageCacheOnce sync.Once
+	tokenUsageCache     *cachex.HybridCache[[]model.TokenUsageStats]
 )
 
 func redisOn() bool {
@@ -111,6 +115,24 @@ func getQuotaDatesCache() *cachex.HybridCache[[]*model.QuotaData] {
 	return quotaDatesCache
 }
 
+func getTokenUsageCache() *cachex.HybridCache[[]model.TokenUsageStats] {
+	tokenUsageCacheOnce.Do(func() {
+		tokenUsageCache = cachex.NewHybridCache[[]model.TokenUsageStats](cachex.HybridCacheConfig[[]model.TokenUsageStats]{
+			Namespace:    cachex.Namespace(dashboardTokenUsageNamespace),
+			Redis:        common.RDB,
+			RedisCodec:   cachex.JSONCodec[[]model.TokenUsageStats]{},
+			RedisEnabled: redisOn,
+			Memory: func() *hot.HotCache[string, []model.TokenUsageStats] {
+				return hot.NewHotCache[string, []model.TokenUsageStats](hot.LRU, 512).
+					WithTTL(dashboardCacheTTL).
+					WithJanitor().
+					Build()
+			},
+		})
+	})
+	return tokenUsageCache
+}
+
 func CachedGetChannelStats(startTs, endTs int64) ([]model.ChannelStats, error) {
 	cache := getChannelStatsCache()
 	key := fmt.Sprintf("%d:%d", startTs, endTs)
@@ -160,6 +182,20 @@ func CachedGetAllQuotaDates(startTs, endTs int64, username string) ([]*model.Quo
 		return v, nil
 	}
 	v, err := model.GetAllQuotaDates(startTs, endTs, username)
+	if err != nil {
+		return nil, err
+	}
+	_ = cache.SetWithTTL(key, v, dashboardCacheTTL)
+	return v, nil
+}
+
+func CachedGetTokenUsageStats(userId int, startTs, endTs int64) ([]model.TokenUsageStats, error) {
+	cache := getTokenUsageCache()
+	key := fmt.Sprintf("%d:%d:%d", userId, startTs, endTs)
+	if v, ok, _ := cache.Get(key); ok {
+		return v, nil
+	}
+	v, err := model.GetTokenUsageStats(userId, startTs, endTs)
 	if err != nil {
 		return nil, err
 	}

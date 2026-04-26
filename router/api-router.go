@@ -329,6 +329,7 @@ func SetApiRouter(router *gin.Engine) {
 		dataRoute.GET("/dashboard/channel", middleware.AdminAuth(), controller.GetChannelDashboardStats)
 		dataRoute.GET("/dashboard/model", middleware.UserAuth(), controller.GetModelPerformanceDashboardStats)
 		dataRoute.GET("/dashboard/model_channel", middleware.AdminAuth(), controller.GetModelChannelCrossDashboardStats)
+		dataRoute.GET("/dashboard/token", middleware.UserAuth(), controller.GetTokenUsageDashboardStats)
 
 		logRoute.GET("/doris", middleware.AdminAuth(), controller.GetDorisLogs)
 		logRoute.GET("/doris/self", middleware.UserAuth(), controller.GetDorisLogsSelf)

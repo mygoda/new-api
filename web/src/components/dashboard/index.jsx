@@ -163,8 +163,14 @@ const Dashboard = () => {
       channelAnalysis.loadModelChannelCrossStats(channelAnalysis.crossStatsModelFilter);
     } else {
       channelAnalysis.loadModelPerformanceStats();
+      channelAnalysis.loadTokenUsageStats();
     }
-  }, [channelAnalysis.loadChannelStats, channelAnalysis.loadModelPerformanceStats, channelAnalysis.loadModelChannelCrossStats]);
+  }, [
+    channelAnalysis.loadChannelStats,
+    channelAnalysis.loadModelPerformanceStats,
+    channelAnalysis.loadModelChannelCrossStats,
+    channelAnalysis.loadTokenUsageStats,
+  ]);
 
   return (
     <div className='h-full'>
@@ -302,6 +308,7 @@ const Dashboard = () => {
             channelStats={channelAnalysis.channelStats}
             modelPerformanceStats={channelAnalysis.modelPerformanceStats}
             modelChannelCrossStats={channelAnalysis.modelChannelCrossStats}
+            tokenUsageStats={channelAnalysis.tokenUsageStats}
             crossStatsModelFilter={channelAnalysis.crossStatsModelFilter}
             onCrossStatsModelFilterChange={(val) => {
               channelAnalysis.setCrossStatsModelFilter(val);

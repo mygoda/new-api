@@ -40,6 +40,7 @@ const ChannelAnalysisPanel = ({
   channelStats,
   modelPerformanceStats,
   modelChannelCrossStats,
+  tokenUsageStats,
   crossStatsModelFilter,
   onCrossStatsModelFilterChange,
   loading,
@@ -429,6 +430,50 @@ const ChannelAnalysisPanel = ({
     },
   ];
 
+  const tokenColumns = [
+    {
+      title: t('令牌名称'),
+      dataIndex: 'token_name',
+      sorter: (a, b) => (a.token_name || '').localeCompare(b.token_name || ''),
+      render: (text, record) => (
+        <span>
+          {text || <span className='text-gray-500'>{t('未命名')}</span>}
+          <span className='text-gray-400 ml-2'>{`ID:${record.token_id}`}</span>
+        </span>
+      ),
+    },
+    {
+      title: t('调用次数'),
+      dataIndex: 'total_requests',
+      sorter: (a, b) => (a.total_requests || 0) - (b.total_requests || 0),
+      render: (val) => (val || 0).toLocaleString(),
+    },
+    {
+      title: t('消耗 tokens'),
+      dataIndex: 'total_tokens',
+      sorter: (a, b) => (a.total_tokens || 0) - (b.total_tokens || 0),
+      render: (val) => (val || 0).toLocaleString(),
+    },
+    {
+      title: t('消耗额度'),
+      dataIndex: 'total_quota',
+      sorter: (a, b) => (a.total_quota || 0) - (b.total_quota || 0),
+      render: (val) => renderQuota(val || 0, 2),
+    },
+    {
+      title: t('每请求Tokens'),
+      dataIndex: 'avg_tokens_per_request',
+      sorter: (a, b) => (a.avg_tokens_per_request || 0) - (b.avg_tokens_per_request || 0),
+      render: (val) => (val || 0).toFixed(1),
+    },
+    {
+      title: t('Stream占比'),
+      dataIndex: 'stream_ratio',
+      sorter: (a, b) => (a.stream_ratio || 0) - (b.stream_ratio || 0),
+      render: (val) => `${((val || 0) * 100).toFixed(1)}%`,
+    },
+  ];
+
   // Extract unique model names for the cross-stats filter
   const crossStatsModelOptions = useMemo(() => {
     if (!modelChannelCrossStats || modelChannelCrossStats.length === 0) return [];
@@ -456,6 +501,9 @@ const ChannelAnalysisPanel = ({
             onChange={setActiveTab}
           >
             <TabPane tab={<span>{tableTabTitle}</span>} itemKey='1' />
+            {!isAdminUser && (
+              <TabPane tab={<span>{t('按令牌')}</span>} itemKey='token' />
+            )}
             <TabPane tab={<span>{t('延迟对比')}</span>} itemKey='2' />
             <TabPane tab={<span>{t('延迟分位数')}</span>} itemKey='6' />
             <TabPane tab={<span>{t('错误率对比')}</span>} itemKey='3' />
@@ -485,6 +533,22 @@ const ChannelAnalysisPanel = ({
               title={isAdminUser ? t('无渠道数据') : t('无模型数据')}
               style={{ padding: 40 }}
             />
+          )}
+        </div>
+      )}
+      {!isAdminUser && activeTab === 'token' && (
+        <div className='p-2'>
+          {(tokenUsageStats || []).length > 0 ? (
+            <Table
+              columns={tokenColumns}
+              dataSource={tokenUsageStats}
+              rowKey='token_id'
+              pagination={tokenUsageStats.length > 10 ? { pageSize: 10 } : false}
+              size='small'
+              loading={loading}
+            />
+          ) : (
+            <Empty title={t('无令牌数据')} style={{ padding: 40 }} />
           )}
         </div>
       )}

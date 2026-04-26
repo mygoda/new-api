@@ -26,6 +26,7 @@ export const useChannelAnalysis = (isAdminUser, inputs, dataExportDefaultTime) =
   const [channelStats, setChannelStats] = useState([]);
   const [modelPerformanceStats, setModelPerformanceStats] = useState([]);
   const [modelChannelCrossStats, setModelChannelCrossStats] = useState([]);
+  const [tokenUsageStats, setTokenUsageStats] = useState([]);
   const [crossStatsModelFilter, setCrossStatsModelFilter] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -90,6 +91,29 @@ export const useChannelAnalysis = (isAdminUser, inputs, dataExportDefaultTime) =
       const { success, message, data } = res.data;
       if (success) {
         setModelChannelCrossStats(data || []);
+      } else {
+        showError(message);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAdminUser, inputs]);
+
+  const loadTokenUsageStats = useCallback(async () => {
+    if (isAdminUser) return;
+    setLoading(true);
+    try {
+      const { start_timestamp, end_timestamp } = inputs;
+      const startTs = Math.floor(Date.parse(start_timestamp) / 1000);
+      const endTs = Math.floor(Date.parse(end_timestamp) / 1000);
+      const res = await API.get(
+        `/api/data/dashboard/token?start_timestamp=${startTs}&end_timestamp=${endTs}`,
+      );
+      const { success, message, data } = res.data;
+      if (success) {
+        setTokenUsageStats(data || []);
       } else {
         showError(message);
       }
@@ -442,12 +466,14 @@ export const useChannelAnalysis = (isAdminUser, inputs, dataExportDefaultTime) =
     channelStats,
     modelPerformanceStats,
     modelChannelCrossStats,
+    tokenUsageStats,
     crossStatsModelFilter,
     setCrossStatsModelFilter,
     loading,
     loadChannelStats,
     loadModelPerformanceStats,
     loadModelChannelCrossStats,
+    loadTokenUsageStats,
     latencyChartSpec,
     latencyPercentileChartSpec,
     errorRateChartSpec,
