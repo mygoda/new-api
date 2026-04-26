@@ -7,6 +7,7 @@ import {
   Anchor,
   TabPane,
   Tabs,
+  Banner,
 } from '@douyinfe/semi-ui';
 import {
   IconCode,
@@ -108,8 +109,9 @@ const Docs = () => {
   const { t } = useTranslation();
   const [statusState] = useContext(StatusContext);
   const isMobile = useIsMobile();
-  const serverAddress =
-    statusState?.status?.server_address || `${window.location.origin}`;
+  const configuredServerAddress = statusState?.status?.server_address || '';
+  const serverAddressMissing = !configuredServerAddress;
+  const serverAddress = configuredServerAddress || 'https://your-domain.com';
   const systemName = statusState?.status?.system_name || 'New API';
 
   const handleCopy = async (text) => {
@@ -171,6 +173,19 @@ const Docs = () => {
               </Tag>
             </div>
           </div>
+
+          {serverAddressMissing && (
+            <Banner
+              type='warning'
+              fullMode={false}
+              closeIcon={null}
+              className='!mb-6'
+              title={t('尚未配置服务器地址')}
+              description={t(
+                '管理员尚未在「系统设置 → 服务器地址」中配置 API 中转地址，下方示例使用占位地址 https://your-domain.com，请配置后再查看完整示例。',
+              )}
+            />
+          )}
 
           {/* ─── 快速开始 ─── */}
           <section id='quick-start' className='mb-12 scroll-mt-20'>
@@ -574,93 +589,165 @@ console.log(response.choices[0].message.content);`}
               {t('中创建的令牌。')}
             </Paragraph>
 
+            {/* ── 分组：CLI 编程代理 ── */}
+            <div className='mt-8 mb-4 flex items-center gap-2'>
+              <div className='h-[2px] flex-1 bg-[var(--semi-color-fill-1)]' />
+              <Tag color='blue' size='large' shape='circle'>
+                {t('CLI 编程代理')}
+              </Tag>
+              <div className='h-[2px] flex-1 bg-[var(--semi-color-fill-1)]' />
+            </div>
+
             {/* ── Claude Code ── */}
-            <Title heading={4} className='!mb-4 !mt-8'>
+            <Title heading={4} className='!mb-3 !mt-6'>
               Claude Code
               <Tag size='small' color='blue' type='light' className='!ml-2'>CLI</Tag>
             </Title>
             <Paragraph className='!mb-3'>
-              {t('Anthropic 官方 AI 编程助手。通过配置文件即可将请求转发到本平台，需要完成以下两步配置。')}
+              {t('Anthropic 官方 AI 编程助手。本平台兼容 Anthropic API，配置完成后可使用平台支持的所有模型（含 Claude / GPT / Gemini 等通过 Anthropic 协议访问）。')}
             </Paragraph>
 
-            <div className='!mb-6'>
-              {/* Step 1 */}
-              <Title heading={5} className='!mb-3 !mt-4'>
-                Step 1: {t('配置')} <Text code>settings.json</Text>
-              </Title>
-              <Paragraph type='tertiary' className='!mb-2'>
-                {t('编辑配置文件')} <Text code>~/.claude/settings.json</Text>（Windows: <Text code>%USERPROFILE%\.claude\settings.json</Text>），{t('写入以下内容：')}
-              </Paragraph>
-              <CodeBlock onCopy={() => handleCopy(`{
-  "env": {
-    "ANTHROPIC_BASE_URL": "${serverAddress}",
-    "ANTHROPIC_API_KEY": "sk-xxxxxxxxxxxxxxxx",
-    "API_TIMEOUT_MS": "3000000",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "ANTHROPIC_MODEL": "claude-sonnet-4-20250514",
-    "CLAUDE_CODE_MAX_MODEL": "claude-sonnet-4-20250514",
-    "CLAUDE_CODE_BUDGET_MODEL": "claude-sonnet-4-20250514"
-  }
-}`)}>
-                {`{
-  "env": {
-    "ANTHROPIC_BASE_URL": "${serverAddress}",
-    "ANTHROPIC_API_KEY": "sk-xxxxxxxxxxxxxxxx",
-    "API_TIMEOUT_MS": "3000000",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "ANTHROPIC_MODEL": "claude-sonnet-4-20250514",
-    "CLAUDE_CODE_MAX_MODEL": "claude-sonnet-4-20250514",
-    "CLAUDE_CODE_BUDGET_MODEL": "claude-sonnet-4-20250514"
-  }
-}`}
-              </CodeBlock>
-              <Paragraph type='tertiary' className='!mt-2 !mb-1' size='small'>
-                {t('参数说明：')}
-              </Paragraph>
-              <ul className='list-disc list-inside text-sm text-[var(--semi-color-text-2)] space-y-1 ml-2 mb-4'>
-                <li><Text code>ANTHROPIC_BASE_URL</Text> — {t('API 中转地址，指向本平台')}</li>
-                <li><Text code>ANTHROPIC_API_KEY</Text> — {t('在')}{' '}
-                  <Link to='/console/token' className='!text-[var(--semi-color-primary)]'>{t('令牌管理')}</Link>{' '}
-                  {t('中创建的密钥')}</li>
-                <li><Text code>API_TIMEOUT_MS</Text> — {t('请求超时时间（毫秒），建议设置较大值以支持长时间任务')}</li>
-                <li><Text code>CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</Text> — {t('禁用非必要流量，减少额外请求')}</li>
-                <li><Text code>ANTHROPIC_MODEL</Text> — {t('默认使用的模型，可按需修改为平台支持的其他模型')}</li>
-                <li><Text code>CLAUDE_CODE_MAX_MODEL</Text> / <Text code>CLAUDE_CODE_BUDGET_MODEL</Text> — {t('高性能/经济模式对应的模型')}</li>
-              </ul>
+            <Banner
+              type='warning'
+              fullMode={false}
+              closeIcon={null}
+              className='!mb-4'
+              title={t('使用前请清除冲突的环境变量')}
+              description={
+                <div>
+                  {t('环境变量优先级高于配置文件。请先确保以下变量未被设置（若曾在 ~/.bashrc / ~/.zshrc 中永久导出，需同步删除对应行）：')}
+                  <div className='mt-2 ml-2 text-sm'>
+                    <Text code>ANTHROPIC_AUTH_TOKEN</Text> · <Text code>ANTHROPIC_API_KEY</Text> · <Text code>ANTHROPIC_BASE_URL</Text>
+                  </div>
+                  <CodeBlock>{`unset ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_BASE_URL`}</CodeBlock>
+                </div>
+              }
+            />
 
-              {/* Step 2 */}
-              <Title heading={5} className='!mb-3 !mt-6'>
-                Step 2: {t('跳过登录引导')}
-              </Title>
-              <Paragraph type='tertiary' className='!mb-2'>
-                {t('编辑')} <Text code>~/.claude.json</Text>（Windows: <Text code>%USERPROFILE%\.claude.json</Text>），{t('写入以下内容以跳过官方登录流程：')}
-              </Paragraph>
-              <CodeBlock onCopy={() => handleCopy(`{
+            <Card className='!mb-4'>
+              <StepCard step={1} title={t('安装 Claude Code')}>
+                <Paragraph>
+                  {t('参考')}{' '}
+                  <a
+                    href='https://docs.claude.com/en/docs/claude-code/setup'
+                    target='_blank'
+                    rel='noreferrer'
+                    className='!text-[var(--semi-color-primary)]'
+                  >
+                    {t('Claude Code 官方安装文档')}
+                  </a>{' '}
+                  {t('完成基础安装。')}
+                </Paragraph>
+              </StepCard>
+
+              <StepCard step={2} title={<>{t('编辑')} <Text code>~/.claude/settings.json</Text></>}>
+                <Paragraph type='tertiary' className='!mb-2'>
+                  Windows: <Text code>%USERPROFILE%\.claude\settings.json</Text>
+                </Paragraph>
+                <CodeBlock onCopy={() => handleCopy(`{
+  "env": {
+    "ANTHROPIC_BASE_URL": "${serverAddress}",
+    "ANTHROPIC_AUTH_TOKEN": "sk-xxxxxxxxxxxxxxxx",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "ANTHROPIC_MODEL": "claude-sonnet-4-20250514",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-20250514",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5-20251001"
+  }
+}`)}>
+                  {`{
+  "env": {
+    "ANTHROPIC_BASE_URL": "${serverAddress}",
+    "ANTHROPIC_AUTH_TOKEN": "sk-xxxxxxxxxxxxxxxx",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "ANTHROPIC_MODEL": "claude-sonnet-4-20250514",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-20250514",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5-20251001"
+  }
+}`}
+                </CodeBlock>
+                <ul className='list-disc list-inside text-sm text-[var(--semi-color-text-2)] space-y-1 mt-3 ml-2'>
+                  <li><Text code>ANTHROPIC_BASE_URL</Text> — {t('指向本平台 API 中转地址')}</li>
+                  <li><Text code>ANTHROPIC_AUTH_TOKEN</Text> — {t('在')}{' '}
+                    <Link to='/console/token' className='!text-[var(--semi-color-primary)]'>{t('令牌管理')}</Link>{' '}
+                    {t('中创建的密钥（以 sk- 开头）')}</li>
+                  <li><Text code>API_TIMEOUT_MS</Text> — {t('请求超时（毫秒），建议设大以支持长时任务')}</li>
+                  <li><Text code>CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</Text> — {t('禁用非必要流量，减少额外请求')}</li>
+                  <li><Text code>ANTHROPIC_MODEL</Text> {t('及')} <Text code>ANTHROPIC_DEFAULT_*_MODEL</Text> — {t('替换为本平台支持的模型，可在')}{' '}
+                    <Link to='/pricing' className='!text-[var(--semi-color-primary)]'>{t('模型广场')}</Link>{' '}
+                    {t('查看完整列表')}</li>
+                </ul>
+              </StepCard>
+
+              <StepCard step={3} title={<>{t('编辑')} <Text code>~/.claude.json</Text> {t('跳过登录引导')}</>}>
+                <Paragraph type='tertiary' className='!mb-2'>
+                  Windows: <Text code>%USERPROFILE%\.claude.json</Text>
+                </Paragraph>
+                <CodeBlock onCopy={() => handleCopy(`{
   "hasCompletedOnboarding": true
 }`)}>
-                {`{
+                  {`{
   "hasCompletedOnboarding": true
 }`}
-              </CodeBlock>
-              <Paragraph type='tertiary' className='!mt-3'>
-                {t('完成以上两步后，在终端执行')} <Text code>claude</Text> {t('即可启动 Claude Code 并自动连接本平台。')}
-              </Paragraph>
-            </div>
+                </CodeBlock>
+              </StepCard>
+
+              <StepCard step={4} title={t('启动并验证')}>
+                <Paragraph className='!mb-2'>
+                  {t('在工作目录执行')} <Text code>claude</Text>，{t('选择「信任此文件夹」(Trust This Folder) 即可开始使用。可在 TUI 中输入以下 slash 命令验证：')}
+                </Paragraph>
+                <CodeBlock>{`/status   # 检查 ANTHROPIC_BASE_URL 指向本平台
+/model    # 显示当前模型`}</CodeBlock>
+              </StepCard>
+            </Card>
+
+            <Title heading={5} className='!mb-3 !mt-6'>
+              {t('在 VS Code 插件中使用 Claude Code')}
+            </Title>
+            <Paragraph type='tertiary' className='!mb-3'>
+              {t('在 VS Code 扩展市场搜索并安装 “Claude Code for VS Code”，然后通过插件设置写入与上方相同的环境变量：')}
+            </Paragraph>
+            <CodeBlock onCopy={() => handleCopy(`{
+  "claudeCode.preferredLocation": "panel",
+  "claudeCode.selectedModel": "claude-sonnet-4-20250514",
+  "claudeCode.environmentVariables": [
+    { "name": "ANTHROPIC_BASE_URL", "value": "${serverAddress}" },
+    { "name": "ANTHROPIC_AUTH_TOKEN", "value": "sk-xxxxxxxxxxxxxxxx" },
+    { "name": "API_TIMEOUT_MS", "value": "3000000" },
+    { "name": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "value": "1" },
+    { "name": "ANTHROPIC_MODEL", "value": "claude-sonnet-4-20250514" }
+  ]
+}`)}>
+              {`{
+  "claudeCode.preferredLocation": "panel",
+  "claudeCode.selectedModel": "claude-sonnet-4-20250514",
+  "claudeCode.environmentVariables": [
+    { "name": "ANTHROPIC_BASE_URL", "value": "${serverAddress}" },
+    { "name": "ANTHROPIC_AUTH_TOKEN", "value": "sk-xxxxxxxxxxxxxxxx" },
+    { "name": "API_TIMEOUT_MS", "value": "3000000" },
+    { "name": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "value": "1" },
+    { "name": "ANTHROPIC_MODEL", "value": "claude-sonnet-4-20250514" }
+  ]
+}`}
+            </CodeBlock>
 
             {/* ── Codex (OpenAI) ── */}
-            <Title heading={4} className='!mb-4 !mt-10'>
+            <Title heading={4} className='!mb-3 !mt-10'>
               Codex (OpenAI)
               <Tag size='small' color='blue' type='light' className='!ml-2'>CLI</Tag>
             </Title>
             <Paragraph className='!mb-3'>
-              {t('OpenAI 官方 AI 编程代理。通过环境变量配置 API 中转地址，支持 GPT-4o、o3 等模型。')}
+              {t('OpenAI 官方 AI 编程代理，支持 GPT 系列与 o 系列模型。本平台 OpenAI 协议入口为')} <Text code>{`${serverAddress}/v1`}</Text>。
             </Paragraph>
 
             <Tabs type='line' className='!mb-6'>
               <TabPane tab={t('环境变量（推荐）')} itemKey='codex-env'>
                 <div className='mt-4'>
                   <Paragraph type='tertiary' className='!mb-3'>
-                    {t('在终端中执行以下命令，或添加到')} <Text code>~/.bashrc</Text> / <Text code>~/.zshrc</Text> {t('中持久化：')}
+                    {t('在终端中执行以下命令，或追加到')} <Text code>~/.bashrc</Text> / <Text code>~/.zshrc</Text> {t('中持久化：')}
                   </Paragraph>
                   <CodeBlock onCopy={() => handleCopy(`# ${t('设置 API 中转地址')}
 export OPENAI_BASE_URL=${serverAddress}/v1
@@ -700,67 +787,271 @@ codex`}
               </TabPane>
             </Tabs>
 
-            {/* ── Cursor ── */}
-            <Title heading={4} className='!mb-4 !mt-10'>
-              Cursor
-              <Tag size='small' color='green' type='light' className='!ml-2'>IDE</Tag>
+            {/* ── OpenCode ── */}
+            <Title heading={4} className='!mb-3 !mt-10'>
+              OpenCode
+              <Tag size='small' color='blue' type='light' className='!ml-2'>CLI</Tag>
             </Title>
             <Paragraph className='!mb-3'>
-              {t('AI 代码编辑器，内置 AI 对话和代码补全功能。')}
+              {t('开源终端 AI 编程代理，支持自定义 Provider。本平台兼容 Anthropic 协议，可作为 OpenCode 的自定义 Provider 接入。')}
             </Paragraph>
 
-            <Card className='!mb-6'>
-              <StepCard step={1} title={t('打开设置')}>
-                <Paragraph>
-                  {t('打开 Cursor，点击左上角齿轮图标 → Settings → Models')}
-                </Paragraph>
+            <Card className='!mb-4'>
+              <StepCard step={1} title={t('安装 OpenCode')}>
+                <Paragraph type='tertiary' className='!mb-2'>{t('使用脚本或 npm：')}</Paragraph>
+                <CodeBlock>{`# ${t('脚本安装')}
+curl -fsSL https://opencode.ai/install | bash
+
+# ${t('或使用 npm')}
+npm i -g opencode-ai`}</CodeBlock>
               </StepCard>
 
-              <StepCard step={2} title={t('配置 OpenAI API Key')}>
-                <Paragraph>
-                  {t('在 OpenAI API Key 输入框中填入你的令牌：')}
+              <StepCard step={2} title={<>{t('编辑配置')} <Text code>~/.config/opencode/opencode.json</Text></>}>
+                <Paragraph type='tertiary' className='!mb-2'>
+                  {t('使用 Anthropic SDK Provider 接入本平台：')}
                 </Paragraph>
-                <div className='mt-2'>
-                  <CodeBlock>sk-xxxxxxxxxxxxxxxx</CodeBlock>
-                </div>
+                <CodeBlock onCopy={() => handleCopy(`{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}": {
+      "npm": "@ai-sdk/anthropic",
+      "options": {
+        "baseURL": "${serverAddress}",
+        "apiKey": "sk-xxxxxxxxxxxxxxxx"
+      },
+      "models": {
+        "claude-sonnet-4-20250514": { "name": "Claude Sonnet 4" },
+        "claude-opus-4-7": { "name": "Claude Opus 4.7" }
+      }
+    }
+  }
+}`)}>
+                  {`{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}": {
+      "npm": "@ai-sdk/anthropic",
+      "options": {
+        "baseURL": "${serverAddress}",
+        "apiKey": "sk-xxxxxxxxxxxxxxxx"
+      },
+      "models": {
+        "claude-sonnet-4-20250514": { "name": "Claude Sonnet 4" },
+        "claude-opus-4-7": { "name": "Claude Opus 4.7" }
+      }
+    }
+  }
+}`}
+                </CodeBlock>
               </StepCard>
 
-              <StepCard step={3} title={t('配置 Base URL')}>
+              <StepCard step={3} title={t('启动并选择模型')}>
                 <Paragraph>
-                  {t('点击 "Override OpenAI Base URL"，填入：')}
-                </Paragraph>
-                <div className='mt-2'>
-                  <CodeBlock onCopy={() => handleCopy(`${serverAddress}/v1`)}>{`${serverAddress}/v1`}</CodeBlock>
-                </div>
-              </StepCard>
-
-              <StepCard step={4} title={t('选择模型并使用')}>
-                <Paragraph>
-                  {t('在模型列表中选择需要的模型（如 gpt-4o、claude-sonnet-4-20250514），即可在 Chat 和 Composer 中使用。')}
+                  {t('在项目目录运行')} <Text code>opencode</Text>，{t('启动后输入')} <Text code>/models</Text> {t('选择刚配置的模型即可使用。')}
                 </Paragraph>
               </StepCard>
             </Card>
 
-            {/* ── VS Code / Continue ── */}
-            <Title heading={4} className='!mb-4 !mt-10'>
-              VS Code — Continue
-              <Tag size='small' color='green' type='light' className='!ml-2'>IDE {t('插件')}</Tag>
+            {/* ── OpenClaw ── */}
+            <Title heading={4} className='!mb-3 !mt-10'>
+              OpenClaw
+              <Tag size='small' color='blue' type='light' className='!ml-2'>CLI</Tag>
             </Title>
             <Paragraph className='!mb-3'>
-              {t('Continue 是开源 AI 代码助手插件，支持 VS Code 和 JetBrains。')}
+              {t('OpenClaw 通过 Gateway 接入第三方模型服务，本平台可作为 OpenAI 兼容 Provider 接入。')}
+            </Paragraph>
+
+            <Card className='!mb-4'>
+              <StepCard step={1} title={t('安装 OpenClaw')}>
+                <Tabs type='line'>
+                  <TabPane tab='macOS / Linux' itemKey='openclaw-unix'>
+                    <CodeBlock>{`curl -fsSL https://openclaw.bot/install.sh | bash`}</CodeBlock>
+                  </TabPane>
+                  <TabPane tab='Windows' itemKey='openclaw-win'>
+                    <CodeBlock>{`iwr -useb https://openclaw.ai/install.ps1 | iex`}</CodeBlock>
+                  </TabPane>
+                </Tabs>
+              </StepCard>
+
+              <StepCard step={2} title={t('启动配置向导')}>
+                <Paragraph>
+                  {t('运行')} <Text code>openclaw configure</Text>，{t('依次选择：')}
+                </Paragraph>
+                <ul className='list-disc list-inside text-sm text-[var(--semi-color-text-2)] space-y-1 mt-2 ml-2'>
+                  <li><Text strong>Gateway</Text> → <Text code>Local (this machine)</Text></li>
+                  <li><Text strong>Sections to configure</Text> → <Text code>Model</Text></li>
+                  <li><Text strong>Model/auth provider</Text> → {t('选择')} <Text code>OpenAI Compatible</Text> {t('（或 Custom Provider）')}</li>
+                  <li><Text strong>Auth method</Text> → <Text code>API Key</Text></li>
+                </ul>
+              </StepCard>
+
+              <StepCard step={3} title={t('填写本平台 API 信息')}>
+                <div className='bg-semi-color-fill-0 rounded-lg p-4 border border-semi-color-border text-sm space-y-2'>
+                  <div><Text strong>Base URL：</Text><Text code>{serverAddress}/v1</Text></div>
+                  <div><Text strong>API Key：</Text><Text code>sk-xxxxxxxxxxxxxxxx</Text></div>
+                  <div><Text strong>Default Model：</Text><Text code>gpt-4o</Text> {t('或其他平台支持的模型')}</div>
+                </div>
+              </StepCard>
+
+              <StepCard step={4} title={t('验证')}>
+                <Paragraph>
+                  {t('执行')} <Text code>openclaw tui</Text>，{t('能正常对话即配置成功。')}
+                </Paragraph>
+              </StepCard>
+            </Card>
+
+            {/* ── 分组：IDE 编辑器 ── */}
+            <div className='mt-12 mb-4 flex items-center gap-2'>
+              <div className='h-[2px] flex-1 bg-[var(--semi-color-fill-1)]' />
+              <Tag color='green' size='large' shape='circle'>
+                {t('IDE 编辑器')}
+              </Tag>
+              <div className='h-[2px] flex-1 bg-[var(--semi-color-fill-1)]' />
+            </div>
+
+            {/* ── Cursor ── */}
+            <Title heading={4} className='!mb-3 !mt-6'>
+              Cursor
+              <Tag size='small' color='green' type='light' className='!ml-2'>IDE</Tag>
+            </Title>
+            <Paragraph className='!mb-3'>
+              {t('AI 代码编辑器，内置 Chat / Composer / Edit。本平台以 OpenAI 兼容协议接入 Cursor 自定义模型。')}
+            </Paragraph>
+
+            <Banner
+              type='warning'
+              fullMode={false}
+              closeIcon={null}
+              className='!mb-3'
+              title={t('使用前请清除冲突的环境变量')}
+              description={
+                <span>
+                  <Text code>OPENAI_API_KEY</Text> · <Text code>OPENAI_BASE_URL</Text> {t('若已设置可能影响 Cursor 的 API 调用，请先清除。')}
+                </span>
+              }
+            />
+
+            <Banner
+              type='info'
+              fullMode={false}
+              closeIcon={null}
+              className='!mb-3'
+              title={t('已知限制')}
+              description={
+                <ul className='list-disc list-inside space-y-1 ml-2 text-sm'>
+                  <li>{t('「Override OpenAI Base URL」是全局设置，开启后会作用于 Cursor 内所有 API Key（包括 Cursor 自带模型用的 Anthropic / GPT Key）。')}</li>
+                  <li>{t('Cursor Tab 自动补全由 Cursor 官方模型驱动，自定义 API Key 不会接管 Tab，仅在 Chat / Composer / Edit 中生效。')}</li>
+                  <li>{t('自定义模型仅 Cursor Pro 订阅可用，免费版会提示 “does not work with your current plan or api key”。')}</li>
+                </ul>
+              }
+            />
+
+            <Card className='!mb-4'>
+              <StepCard step={1} title={t('打开模型设置')}>
+                <Paragraph>
+                  {t('Cursor → Settings → Models，展开 “API Keys” 部分。')}
+                </Paragraph>
+              </StepCard>
+
+              <StepCard step={2} title={t('启用 Override OpenAI Base URL')}>
+                <Paragraph className='!mb-2'>
+                  {t('勾选 “Override OpenAI Base URL”，在下方输入框填入：')}
+                </Paragraph>
+                <CodeBlock onCopy={() => handleCopy(`${serverAddress}/v1`)}>{`${serverAddress}/v1`}</CodeBlock>
+              </StepCard>
+
+              <StepCard step={3} title={t('填写并启用 OpenAI API Key')}>
+                <Paragraph>
+                  {t('在 OpenAI API Key 输入框填入')} <Text code>sk-xxxxxxxxxxxxxxxx</Text>，{t('点击右侧按钮，在弹窗中点击 “Enable OpenAI API Key” 完成验证。')}
+                </Paragraph>
+              </StepCard>
+
+              <StepCard step={4} title={t('添加自定义模型')}>
+                <Paragraph>
+                  {t('Models 板块 → “View All Models” → “Add Custom Model”，输入想使用的模型名（如')} <Text code>claude-sonnet-4-20250514</Text>、<Text code>gpt-4o</Text>），{t('严格按平台支持的模型 ID 填写（注意大小写）。添加后点击启用。')}
+                </Paragraph>
+              </StepCard>
+
+              <StepCard step={5} title={t('在 Chat 中选择并使用')}>
+                <Paragraph>
+                  {t('在聊天面板的模型选择器中选择刚添加的模型，即可开始使用。如出现模型无返回内容，可在 Cursor 设置中将 “Network” 改为 HTTP/1.0 重试。')}
+                </Paragraph>
+              </StepCard>
+            </Card>
+
+            {/* ── TRAE ── */}
+            <Title heading={4} className='!mb-3 !mt-10'>
+              TRAE
+              <Tag size='small' color='green' type='light' className='!ml-2'>IDE</Tag>
+            </Title>
+            <Paragraph className='!mb-3'>
+              {t('字节跳动出品的 AI 原生 IDE。除内置模型外，TRAE 支持通过 API Key 接入自定义 OpenAI 兼容服务商。')}
+            </Paragraph>
+
+            <Card className='!mb-4'>
+              <StepCard step={1} title={t('安装 TRAE')}>
+                <Paragraph>
+                  {t('访问')}{' '}
+                  <a
+                    href='https://www.trae.cn/'
+                    target='_blank'
+                    rel='noreferrer'
+                    className='!text-[var(--semi-color-primary)]'
+                  >
+                    TRAE 官网
+                  </a>{' '}
+                  {t('下载并完成初始设置与登录。')}
+                </Paragraph>
+              </StepCard>
+
+              <StepCard step={2} title={t('打开模型设置')}>
+                <Paragraph>
+                  {t('在 AI 对话框右上角点击 “设置” 图标，进入 “模型” 页签。')}
+                </Paragraph>
+              </StepCard>
+
+              <StepCard step={3} title={t('添加自定义模型')}>
+                <Paragraph className='!mb-2'>
+                  {t('点击 “+ 添加模型”，服务商类型选择 “OpenAI”（或 “OpenAI 兼容”），按下表填写：')}
+                </Paragraph>
+                <div className='bg-semi-color-fill-0 rounded-lg p-4 border border-semi-color-border text-sm space-y-2'>
+                  <div><Text strong>{t('服务商名称')}：</Text><Text>{systemName}</Text></div>
+                  <div><Text strong>API Endpoint / Base URL：</Text><Text code>{`${serverAddress}/v1`}</Text></div>
+                  <div><Text strong>API Key：</Text><Text code>sk-xxxxxxxxxxxxxxxx</Text></div>
+                  <div><Text strong>{t('模型名')}：</Text><Text code>claude-sonnet-4-20250514</Text> / <Text code>gpt-4o</Text></div>
+                </div>
+                <Paragraph type='tertiary' size='small' className='!mt-2'>
+                  {t('TRAE 在添加时会调用接口校验密钥有效性，若失败将显示错误信息，可据此排查。')}
+                </Paragraph>
+              </StepCard>
+            </Card>
+
+            {/* ── 分组：VS Code 插件 ── */}
+            <div className='mt-12 mb-4 flex items-center gap-2'>
+              <div className='h-[2px] flex-1 bg-[var(--semi-color-fill-1)]' />
+              <Tag color='violet' size='large' shape='circle'>
+                {t('VS Code 插件')}
+              </Tag>
+              <div className='h-[2px] flex-1 bg-[var(--semi-color-fill-1)]' />
+            </div>
+
+            {/* ── VS Code / Continue ── */}
+            <Title heading={4} className='!mb-3 !mt-6'>
+              Continue
+              <Tag size='small' color='violet' type='light' className='!ml-2'>VS Code / JetBrains</Tag>
+            </Title>
+            <Paragraph className='!mb-3'>
+              {t('开源 AI 代码助手插件，支持 VS Code 和 JetBrains。')}
             </Paragraph>
 
             <Card className='!mb-4'>
               <StepCard step={1} title={t('安装插件')}>
                 <Paragraph>
-                  {t('在 VS Code 扩展市场搜索 "Continue" 并安装。')}
+                  {t('在 VS Code 扩展市场搜索 “Continue” 并安装。')}
                 </Paragraph>
               </StepCard>
 
-              <StepCard step={2} title={t('编辑配置文件')}>
-                <Paragraph className='!mb-2'>
-                  {t('打开配置文件')} <Text code>~/.continue/config.json</Text>，{t('修改 models 部分：')}
-                </Paragraph>
+              <StepCard step={2} title={<>{t('编辑配置')} <Text code>~/.continue/config.json</Text></>}>
                 <CodeBlock onCopy={() => handleCopy(`{
   "models": [
     {
@@ -802,53 +1093,118 @@ codex`}
 
               <StepCard step={3} title={t('使用')}>
                 <Paragraph>
-                  {t('按')} <Text code>Ctrl+L</Text> / <Text code>Cmd+L</Text> {t('打开对话面板，选择模型即可开始使用。')}
+                  {t('按')} <Text code>Ctrl+L</Text> / <Text code>Cmd+L</Text> {t('打开对话面板，选择模型即可。')}
                 </Paragraph>
               </StepCard>
             </Card>
 
-            {/* ── VS Code / Cline ── */}
-            <Title heading={4} className='!mb-4 !mt-10'>
-              VS Code — Cline
-              <Tag size='small' color='green' type='light' className='!ml-2'>IDE {t('插件')}</Tag>
+            {/* ── Cline ── */}
+            <Title heading={4} className='!mb-3 !mt-10'>
+              Cline
+              <Tag size='small' color='violet' type='light' className='!ml-2'>VS Code</Tag>
             </Title>
             <Paragraph className='!mb-3'>
-              {t('Cline 是自主 AI 编程代理插件，可自动读写文件、执行命令。')}
+              {t('自主 AI 编程代理插件，可自动读写文件、执行命令。建议升级到 3.47.0 或更高版本，并在升级后重启插件与 VS Code。')}
             </Paragraph>
+
+            <Banner
+              type='warning'
+              fullMode={false}
+              closeIcon={null}
+              className='!mb-3'
+              title={t('使用前请清除冲突的环境变量')}
+              description={
+                <span>
+                  <Text code>ANTHROPIC_AUTH_TOKEN</Text> · <Text code>ANTHROPIC_BASE_URL</Text> {t('若已设置请先清除。')}
+                </span>
+              }
+            />
 
             <Card className='!mb-4'>
               <StepCard step={1} title={t('安装插件')}>
                 <Paragraph>
-                  {t('在 VS Code 扩展市场搜索 "Cline" 并安装。')}
+                  {t('VS Code → 扩展 → 搜索 “Cline” → Install，安装完成后重启 VS Code。')}
                 </Paragraph>
               </StepCard>
 
-              <StepCard step={2} title={t('配置 API')}>
-                <Paragraph className='!mb-2'>
-                  {t('打开 Cline 侧边栏 → 点击设置齿轮图标：')}
-                </Paragraph>
-                <div className='bg-semi-color-fill-0 rounded-lg p-4 border border-semi-color-border text-sm space-y-2'>
-                  <div><Text strong>{t('API Provider')}：</Text><Text>OpenAI Compatible</Text></div>
-                  <div><Text strong>Base URL：</Text><Text code>{serverAddress}/v1</Text></div>
-                  <div><Text strong>API Key：</Text><Text code>sk-xxxxxxxxxxxxxxxx</Text></div>
-                  <div><Text strong>Model：</Text><Text code>claude-sonnet-4-20250514</Text></div>
-                </div>
-              </StepCard>
-
-              <StepCard step={3} title={t('使用')}>
+              <StepCard step={2} title={t('打开 Cline 配置面板')}>
                 <Paragraph>
-                  {t('在 Cline 面板中输入任务描述，AI 会自动完成编码、调试等工作。')}
+                  {t('点击侧边栏 Cline 图标 → “Use your own API key” 进入参数配置。')}
+                </Paragraph>
+              </StepCard>
+
+              <StepCard step={3} title={t('选择 Provider 并填写本平台信息')}>
+                <div className='bg-semi-color-fill-0 rounded-lg p-4 border border-semi-color-border text-sm space-y-2'>
+                  <div><Text strong>API Provider：</Text><Text>OpenAI Compatible</Text></div>
+                  <div><Text strong>Base URL：</Text><Text code>{`${serverAddress}/v1`}</Text></div>
+                  <div><Text strong>API Key：</Text><Text code>sk-xxxxxxxxxxxxxxxx</Text></div>
+                  <div><Text strong>Model ID：</Text><Text code>claude-sonnet-4-20250514</Text> {t('或')} <Text code>gpt-4o</Text></div>
+                </div>
+                <Paragraph type='tertiary' size='small' className='!mt-2'>
+                  {t('完成后点击右上角 Done 保存。建议在 Auto-approve 中勾选 Edit，以便 Cline 自动应用代码改动。')}
                 </Paragraph>
               </StepCard>
             </Card>
 
-            {/* ── Cherry Studio / ChatBox / NextChat ── */}
-            <Title heading={4} className='!mb-4 !mt-10'>
-              {t('通用桌面客户端')}
-              <Tag size='small' color='purple' type='light' className='!ml-2'>{t('桌面端')}</Tag>
+            {/* ── Kilo Code ── */}
+            <Title heading={4} className='!mb-3 !mt-10'>
+              Kilo Code
+              <Tag size='small' color='violet' type='light' className='!ml-2'>VS Code</Tag>
             </Title>
             <Paragraph className='!mb-3'>
-              {t('以下客户端均支持 OpenAI API 兼容格式，配置方法类似。')}
+              {t('Kilo Code 是 VS Code 中的 AI 编程插件，配置流程与 Cline 类似。')}
+            </Paragraph>
+
+            <Banner
+              type='warning'
+              fullMode={false}
+              closeIcon={null}
+              className='!mb-3'
+              title={t('使用前请清除冲突的环境变量')}
+              description={
+                <span>
+                  <Text code>ANTHROPIC_AUTH_TOKEN</Text> · <Text code>ANTHROPIC_BASE_URL</Text> {t('若已设置请先清除。')}
+                </span>
+              }
+            />
+
+            <Card className='!mb-4'>
+              <StepCard step={1} title={t('安装插件')}>
+                <Paragraph>
+                  {t('VS Code → 扩展 → 搜索 “Kilo Code” → Install，安装完成后重启 VS Code。')}
+                </Paragraph>
+              </StepCard>
+
+              <StepCard step={2} title={t('打开 Settings 配置面板')}>
+                <Paragraph>
+                  {t('点击 Kilo Code 侧栏的 Settings 按钮进入参数配置。')}
+                </Paragraph>
+              </StepCard>
+
+              <StepCard step={3} title={t('填写本平台 API 信息')}>
+                <div className='bg-semi-color-fill-0 rounded-lg p-4 border border-semi-color-border text-sm space-y-2'>
+                  <div><Text strong>API Provider：</Text><Text>OpenAI Compatible</Text></div>
+                  <div><Text strong>Base URL：</Text><Text code>{`${serverAddress}/v1`}</Text></div>
+                  <div><Text strong>API Key：</Text><Text code>sk-xxxxxxxxxxxxxxxx</Text></div>
+                  <div><Text strong>Model：</Text><Text code>claude-sonnet-4-20250514</Text> {t('或其他平台支持的模型')}</div>
+                </div>
+                <Paragraph type='tertiary' size='small' className='!mt-2'>
+                  {t('依次点击右上角 Save 与 Done 保存配置，即可在 Kilo Code 中开始对话。')}
+                </Paragraph>
+              </StepCard>
+            </Card>
+
+            {/* ── 分组：桌面客户端 ── */}
+            <div className='mt-12 mb-4 flex items-center gap-2'>
+              <div className='h-[2px] flex-1 bg-[var(--semi-color-fill-1)]' />
+              <Tag color='purple' size='large' shape='circle'>
+                {t('桌面客户端')}
+              </Tag>
+              <div className='h-[2px] flex-1 bg-[var(--semi-color-fill-1)]' />
+            </div>
+
+            <Paragraph className='!mb-3 !mt-4'>
+              {t('以下客户端均支持 OpenAI API 兼容格式，配置流程类似。')}
             </Paragraph>
 
             <Tabs type='line' className='!mb-6'>
