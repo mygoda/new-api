@@ -47,6 +47,7 @@ const PricingTopSection = memo(
     setViewMode,
     tokenUnit,
     setTokenUnit,
+    marketplaceMode,
     t,
   }) => {
     const [showFilterModal, setShowFilterModal] = useState(false);
@@ -76,6 +77,7 @@ const PricingTopSection = memo(
                 setViewMode={setViewMode}
                 tokenUnit={tokenUnit}
                 setTokenUnit={setTokenUnit}
+                marketplaceMode={marketplaceMode}
                 t={t}
               />
             </div>
@@ -112,6 +114,7 @@ const PricingTopSection = memo(
             setViewMode={setViewMode}
             tokenUnit={tokenUnit}
             setTokenUnit={setTokenUnit}
+            marketplaceMode={marketplaceMode}
           />
         )}
       </>

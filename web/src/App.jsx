@@ -45,7 +45,6 @@ import Chat2Link from './pages/Chat2Link';
 import Midjourney from './pages/Midjourney';
 import Pricing from './pages/Pricing';
 import MarketplacePage from './pages/Marketplace';
-import MarketplaceDetail from './pages/Marketplace/Detail';
 import Task from './pages/Task';
 import ModelPage from './pages/Model';
 import ModelDeploymentPage from './pages/ModelDeployment';
@@ -397,16 +396,6 @@ function App() {
             <AdminRoute>
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
                 <MarketplacePage />
-              </Suspense>
-            </AdminRoute>
-          }
-        />
-        <Route
-          path='/marketplace/:name'
-          element={
-            <AdminRoute>
-              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <MarketplaceDetail />
               </Suspense>
             </AdminRoute>
           }

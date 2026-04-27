@@ -42,6 +42,7 @@ const SearchActions = memo(
     setViewMode,
     tokenUnit,
     setTokenUnit,
+    marketplaceMode = false,
     t,
   }) => {
     const supportsCurrencyDisplay = siteDisplayType !== 'TOKENS';
@@ -123,14 +124,16 @@ const SearchActions = memo(
               <Switch checked={showRatio} onChange={setShowRatio} />
             </div>
 
-            {/* 视图模式切换按钮 */}
-            <Button
-              theme={viewMode === 'table' ? 'solid' : 'outline'}
-              type={viewMode === 'table' ? 'primary' : 'tertiary'}
-              onClick={handleViewModeToggle}
-            >
-              {t('表格视图')}
-            </Button>
+            {/* 视图模式切换按钮 — marketplace 模式下强制 table，不展示该按钮 */}
+            {!marketplaceMode && (
+              <Button
+                theme={viewMode === 'table' ? 'solid' : 'outline'}
+                type={viewMode === 'table' ? 'primary' : 'tertiary'}
+                onClick={handleViewModeToggle}
+              >
+                {t('表格视图')}
+              </Button>
+            )}
 
             {/* Token单位切换按钮 */}
             <Button
