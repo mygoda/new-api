@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Card,
   DatePicker,
@@ -26,7 +26,7 @@ import {
   Button,
   Tag,
 } from '@douyinfe/semi-ui';
-import { BarChart3, RefreshCw } from 'lucide-react';
+import { BarChart3, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import { VChart } from '@visactor/react-vchart';
 
 import { useTokenAnalysis } from '../../hooks/dashboard/useTokenAnalysis';
@@ -107,10 +107,15 @@ const TokenAnalysisPanel = ({
   const { range, setRange, maxDays, tokenGroups, load, loading } =
     useTokenAnalysis(isAdminUser);
 
-  // 初次挂载和 range 变化后自动拉取
+  // 默认收起，避免每次进数据看板都自动请求后端
+  const [expanded, setExpanded] = useState(false);
+
+  // 仅在展开后拉取；展开后调整 range 也会通过 load 引用变化触发重新加载
   useEffect(() => {
-    load();
-  }, [load]);
+    if (expanded) {
+      load();
+    }
+  }, [expanded, load]);
 
   // Semi DatePicker 的 value 用毫秒时间戳数组
   const pickerValue = useMemo(
@@ -142,68 +147,81 @@ const TokenAnalysisPanel = ({
       {...CARD_PROPS}
       title={
         <div className='flex items-center justify-between w-full flex-wrap gap-2'>
-          <div className={FLEX_CENTER_GAP2}>
+          <div
+            className={`${FLEX_CENTER_GAP2} cursor-pointer select-none`}
+            onClick={() => setExpanded((v) => !v)}
+            role='button'
+            aria-expanded={expanded}
+          >
+            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             <BarChart3 size={18} />
             <span>{t('令牌统计')}</span>
             <Tag size='small' color='light-blue'>
               {t('最近 {{n}} 天', { n: maxDays })}
             </Tag>
+            {!expanded && (
+              <span className='text-gray-400 text-xs'>{t('点击展开')}</span>
+            )}
           </div>
-          <div className='flex items-center gap-2'>
-            <DatePicker
-              type='dateRange'
-              value={pickerValue}
-              onChange={handleRangeChange}
-              disabledDate={disabledDate}
-              size='small'
-              style={{ width: 240 }}
-            />
-            <Button
-              icon={<RefreshCw size={14} />}
-              size='small'
-              onClick={load}
-              loading={loading}
-            >
-              {t('刷新')}
-            </Button>
-          </div>
+          {expanded && (
+            <div className='flex items-center gap-2'>
+              <DatePicker
+                type='dateRange'
+                value={pickerValue}
+                onChange={handleRangeChange}
+                disabledDate={disabledDate}
+                size='small'
+                style={{ width: 240 }}
+              />
+              <Button
+                icon={<RefreshCw size={14} />}
+                size='small'
+                onClick={load}
+                loading={loading}
+              >
+                {t('刷新')}
+              </Button>
+            </div>
+          )}
         </div>
       }
-      bodyStyle={{ padding: 12 }}
+      bodyStyle={{ padding: expanded ? 12 : 0 }}
     >
-      {loading && tokenGroups.length === 0 ? (
-        <div style={{ padding: 60, textAlign: 'center' }}>
-          <Spin size='large' />
-        </div>
-      ) : tokenGroups.length === 0 ? (
-        <Empty title={t('无令牌使用数据')} style={{ padding: 40 }} />
-      ) : (
-        <div className='grid grid-cols-1 lg:grid-cols-2 gap-3'>
-          {tokenGroups.map((g) => (
-            <Card
-              key={g.tokenId}
-              shadows=''
-              bordered
-              headerLine
-              title={
-                <div className='flex items-center justify-between w-full'>
-                  <div className={FLEX_CENTER_GAP2}>
-                    <span className='font-medium'>{g.tokenName}</span>
-                    <span className='text-gray-400 text-xs'>{`ID:${g.tokenId}`}</span>
+      {expanded && (
+        loading && tokenGroups.length === 0 ? (
+          <div style={{ padding: 60, textAlign: 'center' }}>
+            <Spin size='large' />
+          </div>
+        ) : tokenGroups.length === 0 ? (
+          <Empty title={t('无令牌使用数据')} style={{ padding: 40 }} />
+        ) : (
+          <div className='grid grid-cols-1 lg:grid-cols-2 gap-3'>
+            {tokenGroups.map((g) => (
+              <Card
+                key={g.tokenId}
+                shadows=''
+                bordered
+                headerLine
+                title={
+                  <div className='flex items-center justify-between w-full'>
+                    <div className={FLEX_CENTER_GAP2}>
+                      <span className='font-medium'>{g.tokenName}</span>
+                      <span className='text-gray-400 text-xs'>{`ID:${g.tokenId}`}</span>
+                    </div>
+                    <Tag size='small' color='blue'>
+                      {renderNumber(g.totalTokens)} tokens
+                    </Tag>
                   </div>
-                  <Tag size='small' color='blue'>
-                    {renderNumber(g.totalTokens)} tokens
-                  </Tag>
+                }
+                bodyStyle={{ padding: 4 }}
+              >
+                <div style={{ height: 280 }}>
+                  <VChart spec={buildSpec(g, t)} option={CHART_CONFIG} />
                 </div>
-              }
-              bodyStyle={{ padding: 4 }}
-            >
-              <div style={{ height: 280 }}>
-                <VChart spec={buildSpec(g, t)} option={CHART_CONFIG} />
-              </div>
-            </Card>
-          ))}
-        </div>
+              </Card>
+            ))}
+          </div>
+        )
       )}
     </Card>
   );
