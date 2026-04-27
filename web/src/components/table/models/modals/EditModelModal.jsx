@@ -148,6 +148,10 @@ const EditModelModal = (props) => {
     vendor: '',
     vendor_icon: '',
     context_length: '',
+    max_output_tokens: '',
+    capabilities_list: [],
+    knowledge_cutoff: '',
+    long_description: '',
     endpoints: '',
     name_rule: props.editingModel?.model_name ? 0 : undefined, // 通过未配置模型过来的固定为精确匹配
     status: true,
@@ -172,6 +176,10 @@ const EditModelModal = (props) => {
         } else {
           data.tags = [];
         }
+        // 拆解 capabilities csv → 数组（前端 CheckboxGroup 用）
+        data.capabilities_list = data.capabilities
+          ? data.capabilities.split(',').filter(Boolean)
+          : [];
         // endpoints 保持原始 JSON 字符串，若为空设为空串
         if (!data.endpoints) {
           data.endpoints = '';
@@ -223,10 +231,14 @@ const EditModelModal = (props) => {
       const submitData = {
         ...values,
         tags: Array.isArray(values.tags) ? values.tags.join(',') : values.tags,
+        capabilities: Array.isArray(values.capabilities_list)
+          ? values.capabilities_list.join(',')
+          : '',
         endpoints: values.endpoints || '',
         status: values.status ? 1 : 0,
         sync_official: values.sync_official ? 1 : 0,
       };
+      delete submitData.capabilities_list;
 
       if (isEdit) {
         submitData.id = props.editingModel.id;
@@ -506,6 +518,55 @@ const EditModelModal = (props) => {
                       extraText={t(
                         '模型支持的最大上下文长度，仅作展示用，不参与实际调用限制',
                       )}
+                    />
+                  </Col>
+                  <Col span={24}>
+                    <Form.Input
+                      field='max_output_tokens'
+                      label={t('最大输出')}
+                      placeholder={t('如：4096、32768、100K')}
+                      style={{ width: '100%' }}
+                      extraText={t(
+                        '模型单次最大输出 token 数，仅在「模型广场（新）」展示',
+                      )}
+                    />
+                  </Col>
+                  <Col span={24}>
+                    <Form.CheckboxGroup
+                      field='capabilities_list'
+                      label={t('能力')}
+                      direction='horizontal'
+                      extraText={t(
+                        '模型支持的能力，仅在「模型广场（新）」展示',
+                      )}
+                      options={[
+                        { value: 'vision', label: t('视觉') },
+                        { value: 'tool_calling', label: t('工具调用') },
+                        { value: 'reasoning', label: t('推理') },
+                        { value: 'caching', label: t('缓存') },
+                        { value: 'image_generation', label: t('图像生成') },
+                        { value: 'computer_use', label: t('电脑操作') },
+                      ]}
+                    />
+                  </Col>
+                  <Col span={24}>
+                    <Form.Input
+                      field='knowledge_cutoff'
+                      label={t('知识截止')}
+                      placeholder={t('如：2024-04')}
+                      style={{ width: '100%' }}
+                      extraText={t(
+                        '模型训练数据知识截止日期，仅作展示',
+                      )}
+                    />
+                  </Col>
+                  <Col span={24}>
+                    <Form.TextArea
+                      field='long_description'
+                      label={t('详细介绍')}
+                      placeholder={t('支持 markdown，将在「模型广场（新）」详情页渲染')}
+                      rows={8}
+                      style={{ width: '100%' }}
                     />
                   </Col>
                   <Col span={24}>

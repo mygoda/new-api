@@ -80,6 +80,10 @@ type Model struct {
 	VendorID     int            `json:"vendor_id,omitempty" gorm:"index"`
 	Endpoints    string         `json:"endpoints,omitempty" gorm:"type:text"`
 	ContextLength FlexString      `json:"context_length" gorm:"type:varchar(32);default:''"`
+	MaxOutputTokens FlexString    `json:"max_output_tokens" gorm:"type:varchar(32);default:''"`
+	Capabilities    string        `json:"capabilities,omitempty" gorm:"type:varchar(255);default:''"`
+	KnowledgeCutoff string        `json:"knowledge_cutoff,omitempty" gorm:"type:varchar(32);default:''"`
+	LongDescription string        `json:"long_description,omitempty" gorm:"type:text"`
 	Status       int            `json:"status" gorm:"default:1"`
 	SyncOfficial int            `json:"sync_official" gorm:"default:1"`
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
@@ -129,7 +133,7 @@ func (mi *Model) Update() error {
 	mi.UpdatedTime = common.GetTimestamp()
 	// 使用 Select 强制更新所有字段，包括零值
 	return DB.Model(&Model{}).Where("id = ?", mi.Id).
-		Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "context_length", "status", "sync_official", "name_rule", "updated_time").
+		Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "context_length", "max_output_tokens", "capabilities", "knowledge_cutoff", "long_description", "status", "sync_official", "name_rule", "updated_time").
 		Updates(mi).Error
 }
 
