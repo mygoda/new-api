@@ -20,7 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 import React from 'react';
 import ModelPricingPage from '../../components/table/model-pricing/layout/PricingPage';
 
-// 「模型广场（新）」复用「模型广场」全套布局，仅强制 table 视图 + admin-only 详情
+// 「模型」复用「模型广场」全套布局，仅强制 table 视图 + admin-only 详情
 const Marketplace = () => <ModelPricingPage marketplaceMode />;
 
 export default Marketplace;

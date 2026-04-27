@@ -33,6 +33,7 @@ const PricingDisplaySettings = ({
   tokenUnit,
   setTokenUnit,
   loading = false,
+  marketplaceMode = false,
   t,
 }) => {
   const supportsCurrencyDisplay = siteDisplayType !== 'TOKENS';
@@ -46,14 +47,22 @@ const PricingDisplaySettings = ({
           },
         ]
       : []),
-    {
-      value: 'ratio',
-      label: t('显示倍率'),
-    },
-    {
-      value: 'tableView',
-      label: t('表格视图'),
-    },
+    ...(marketplaceMode
+      ? []
+      : [
+          {
+            value: 'ratio',
+            label: t('显示倍率'),
+          },
+        ]),
+    ...(marketplaceMode
+      ? []
+      : [
+          {
+            value: 'tableView',
+            label: t('表格视图'),
+          },
+        ]),
     {
       value: 'tokenUnit',
       label: t('按K显示单位'),

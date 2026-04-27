@@ -34,7 +34,7 @@ import {
 
 const { Text } = Typography;
 
-// 「模型广场（新）」专用详情侧抽屉
+// 「模型」专用详情侧抽屉
 // 复用 ModelHeader / ModelBasicInfo / ModelEndpoints 的视觉风格
 // 在此基础上叠加：能力 / 定价摘要 / 规格参数 / 详细介绍 4 张卡
 const MarketplaceDetailSideSheet = ({

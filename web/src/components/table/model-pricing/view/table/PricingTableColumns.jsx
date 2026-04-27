@@ -21,6 +21,14 @@ import React from 'react';
 import { Tag, Space, Tooltip } from '@douyinfe/semi-ui';
 import { IconHelpCircle } from '@douyinfe/semi-icons';
 import {
+  Eye,
+  Wrench,
+  Brain,
+  Database,
+  Image as ImageIcon,
+  Mouse,
+} from 'lucide-react';
+import {
   renderModelTag,
   stringToColor,
   calculateModelPrice,
@@ -32,6 +40,38 @@ import {
   renderDescription,
 } from '../../../../common/ui/RenderUtils';
 import { useIsMobile } from '../../../../../hooks/common/useIsMobile';
+
+const CAPABILITY_META = {
+  vision: { label: '视觉', Icon: Eye, color: '#10b981' },
+  tool_calling: { label: '工具调用', Icon: Wrench, color: '#6366f1' },
+  reasoning: { label: '推理', Icon: Brain, color: '#a855f7' },
+  caching: { label: '缓存', Icon: Database, color: '#0ea5e9' },
+  image_generation: { label: '图像生成', Icon: ImageIcon, color: '#f59e0b' },
+  computer_use: { label: '电脑操作', Icon: Mouse, color: '#ef4444' },
+};
+
+const renderCapabilities = (caps, t) => {
+  if (!caps || caps.length === 0) return '-';
+  return (
+    <div className='flex items-center gap-1.5 flex-wrap'>
+      {caps.map((c) => {
+        const meta = CAPABILITY_META[c];
+        if (!meta) return null;
+        const Icon = meta.Icon;
+        return (
+          <Tooltip key={c} content={t(meta.label)}>
+            <span
+              className='inline-flex items-center justify-center rounded-md px-1.5 py-0.5'
+              style={{ background: `${meta.color}1a`, color: meta.color }}
+            >
+              <Icon size={14} strokeWidth={2} />
+            </span>
+          </Tooltip>
+        );
+      })}
+    </div>
+  );
+};
 
 function renderQuotaType(type, t) {
   switch (type) {
@@ -113,6 +153,7 @@ export const getPricingTableColumns = ({
   tokenUnit,
   displayPrice,
   showRatio,
+  marketplaceMode = false,
 }) => {
   const isMobile = useIsMobile();
   const priceDataCache = new WeakMap();
@@ -191,6 +232,13 @@ export const getPricingTableColumns = ({
     quotaColumn,
   ];
 
+  const capabilitiesColumn = {
+    title: t('能力'),
+    dataIndex: 'capabilities',
+    width: 200,
+    render: (caps) => renderCapabilities(caps, t),
+  };
+
   const ratioColumn = {
     title: () => (
       <div className='flex items-center space-x-1'>
@@ -251,6 +299,9 @@ export const getPricingTableColumns = ({
 
   const columns = [...baseColumns];
   columns.push(endpointColumn);
+  if (marketplaceMode) {
+    columns.push(capabilitiesColumn);
+  }
   if (showRatio) {
     columns.push(ratioColumn);
   }

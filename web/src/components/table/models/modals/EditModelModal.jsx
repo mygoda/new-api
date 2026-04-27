@@ -527,7 +527,7 @@ const EditModelModal = (props) => {
                       placeholder={t('如：4096、32768、100K')}
                       style={{ width: '100%' }}
                       extraText={t(
-                        '模型单次最大输出 token 数，仅在「模型广场（新）」展示',
+                        '模型单次最大输出 token 数，仅在「模型」展示',
                       )}
                     />
                   </Col>
@@ -537,7 +537,7 @@ const EditModelModal = (props) => {
                       label={t('能力')}
                       direction='horizontal'
                       extraText={t(
-                        '模型支持的能力，仅在「模型广场（新）」展示',
+                        '模型支持的能力，仅在「模型」展示',
                       )}
                       options={[
                         { value: 'vision', label: t('视觉') },
@@ -564,7 +564,7 @@ const EditModelModal = (props) => {
                     <Form.TextArea
                       field='long_description'
                       label={t('详细介绍')}
-                      placeholder={t('支持 markdown，将在「模型广场（新）」详情页渲染')}
+                      placeholder={t('支持 markdown，将在「模型」详情页渲染')}
                       rows={8}
                       style={{ width: '100%' }}
                     />

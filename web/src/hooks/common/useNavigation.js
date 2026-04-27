@@ -50,7 +50,7 @@ export const useNavigation = (t, docsLink, headerNavModules, isAdminUser = false
         to: '/pricing',
       },
       {
-        text: t('模型广场（新）'),
+        text: t('模型'),
         itemKey: 'marketplaceV2',
         to: '/marketplace',
         adminOnly: true,

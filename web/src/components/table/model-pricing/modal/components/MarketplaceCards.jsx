@@ -122,7 +122,7 @@ const ModelPricingSummary = ({ modelData, t }) => {
             {isPerRequest ? t('按次定价') : t('每 1M tokens 定价')}
           </Text>
           <div className='text-xs text-gray-600'>
-            {t('default 分组的基础参考价（不含分组倍率）')}
+            {t('模型基础参考价')}
           </div>
         </div>
       </div>

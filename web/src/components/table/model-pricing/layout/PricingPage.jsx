@@ -99,6 +99,10 @@ const PricingPage = ({ marketplaceMode = false } = {}) => {
     viewMode,
     setViewMode,
     marketplaceMode,
+    // marketplace 模式下，强制以美元价格展示，避免价格列退化为「X 倍率」形式
+    ...(marketplaceMode && pricingData.siteDisplayType === 'TOKENS'
+      ? { siteDisplayType: 'USD' }
+      : {}),
   };
 
   return (

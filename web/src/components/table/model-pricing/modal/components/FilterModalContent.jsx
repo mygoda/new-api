@@ -53,6 +53,7 @@ const FilterModalContent = ({ sidebarProps, t }) => {
     setTokenUnit,
     loading,
     isAdminUser,
+    marketplaceMode = false,
     ...categoryProps
   } = sidebarProps;
 
@@ -86,6 +87,7 @@ const FilterModalContent = ({ sidebarProps, t }) => {
         setViewMode={setViewMode}
         tokenUnit={tokenUnit}
         setTokenUnit={setTokenUnit}
+        marketplaceMode={marketplaceMode}
         loading={loading}
         t={t}
       />
@@ -99,7 +101,7 @@ const FilterModalContent = ({ sidebarProps, t }) => {
         t={t}
       />
 
-      {isAdminUser && (
+      {isAdminUser && !marketplaceMode && (
         <PricingGroups
           filterGroup={filterGroup}
           setFilterGroup={setFilterGroup}

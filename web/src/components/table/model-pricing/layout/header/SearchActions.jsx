@@ -118,11 +118,13 @@ const SearchActions = memo(
               />
             )}
 
-            {/* 显示倍率开关 */}
-            <div className='flex items-center gap-2'>
-              <span className='text-sm text-gray-600'>{t('倍率')}</span>
-              <Switch checked={showRatio} onChange={setShowRatio} />
-            </div>
+            {/* 显示倍率开关 — marketplace 模式下隐藏（分组相关，不需要） */}
+            {!marketplaceMode && (
+              <div className='flex items-center gap-2'>
+                <span className='text-sm text-gray-600'>{t('倍率')}</span>
+                <Switch checked={showRatio} onChange={setShowRatio} />
+              </div>
+            )}
 
             {/* 视图模式切换按钮 — marketplace 模式下强制 table，不展示该按钮 */}
             {!marketplaceMode && (

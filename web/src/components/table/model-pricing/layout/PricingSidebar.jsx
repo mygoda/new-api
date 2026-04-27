@@ -56,6 +56,7 @@ const PricingSidebar = ({
   setTokenUnit,
   loading,
   isAdminUser,
+  marketplaceMode = false,
   t,
   ...categoryProps
 }) => {
@@ -114,7 +115,7 @@ const PricingSidebar = ({
         t={t}
       />
 
-      {isAdminUser && (
+      {isAdminUser && !marketplaceMode && (
         <PricingGroups
           filterGroup={filterGroup}
           setFilterGroup={handleGroupClick}
