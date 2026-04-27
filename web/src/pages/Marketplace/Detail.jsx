@@ -12,14 +12,67 @@ For commercial licensing, please contact support@quantumnous.com
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Spin, Empty, Avatar, Tag, Card, Button, Typography } from '@douyinfe/semi-ui';
+import {
+  Spin,
+  Empty,
+  Avatar,
+  Tag,
+  Card,
+  Button,
+  Table,
+} from '@douyinfe/semi-ui';
 import { ArrowLeft } from 'lucide-react';
 import { API, showError } from '../../helpers';
-import CapabilityIcons from './components/CapabilityIcons';
-import PriceBlock from './components/PriceBlock';
+import { CAPABILITY_META } from './components/CapabilityIcons';
 import MarkdownRenderer from '../../components/common/markdown/MarkdownRenderer';
 
-const { Title, Text } = Typography;
+const formatPrice = (val) => {
+  if (val == null) return '-';
+  if (val >= 1) return `$${val.toFixed(2)}`;
+  if (val >= 0.01) return `$${val.toFixed(3)}`;
+  return `$${val.toFixed(4)}`;
+};
+
+// 能力 pill: icon + label，长方圆角小药丸
+const CapabilityPill = ({ keyName, t }) => {
+  const meta = CAPABILITY_META[keyName];
+  if (!meta) return null;
+  const Icon = meta.Icon;
+  return (
+    <span
+      className='inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium'
+      style={{
+        background: `${meta.color}1a`,
+        color: meta.color,
+      }}
+    >
+      <Icon size={14} strokeWidth={2.2} />
+      <span>{t(meta.label)}</span>
+    </span>
+  );
+};
+
+// 一个 PriceCell：上方小标题 + 大字价格 + 单位
+const PriceCell = ({ title, value, unit }) => (
+  <div className='flex flex-col items-start'>
+    <div className='text-xs uppercase tracking-wider text-gray-400 mb-2'>
+      {title}
+    </div>
+    <div className='flex items-baseline'>
+      <span className='text-3xl font-semibold text-orange-500'>{value}</span>
+      <span className='ml-1 text-xs text-gray-400'>{unit}</span>
+    </div>
+  </div>
+);
+
+const SpecRow = ({ label, value, last }) => (
+  <div
+    className={`flex items-center justify-between py-3 ${last ? '' : 'border-b border-gray-100 dark:border-zinc-800'}`}
+  >
+    <span className='text-sm text-gray-500'>{label}</span>
+    <span className='text-sm font-medium'>{value || '-'}</span>
+  </div>
+);
 
 const MarketplaceDetail = () => {
   const { t } = useTranslation();
@@ -67,21 +120,30 @@ const MarketplaceDetail = () => {
   }
 
   const tags = (model.tags || '').split(',').filter(Boolean);
+  const capabilities = model.capabilities || [];
+  const hasCacheRead = model.cached_price != null;
+  const hasCacheWrite = model.cache_create_price != null;
+  const isPerRequest = model.quota_type === 1;
 
   return (
     <div className='min-h-screen bg-gray-50 dark:bg-zinc-900'>
-      <div className='max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6'>
+      <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6'>
         <Button
           icon={<ArrowLeft size={16} />}
           theme='borderless'
           onClick={() => navigate('/marketplace')}
-          className='mb-4'
+          className='mb-3'
         >
           {t('返回列表')}
         </Button>
 
         {/* Hero */}
-        <Card className='!rounded-2xl mb-4' bodyStyle={{ padding: 24 }}>
+        <Card
+          shadows='always'
+          bordered={false}
+          className='!rounded-2xl mb-4'
+          bodyStyle={{ padding: 28 }}
+        >
           <div className='flex items-start gap-4'>
             {model.icon ? (
               <Avatar size='large' src={model.icon} shape='square' />
@@ -91,9 +153,9 @@ const MarketplaceDetail = () => {
               </Avatar>
             )}
             <div className='flex-1 min-w-0'>
-              <Title heading={4} className='!mb-2 break-all'>
+              <h1 className='text-3xl font-bold mb-2 break-all'>
                 {model.model_name}
-              </Title>
+              </h1>
               {tags.length > 0 && (
                 <div className='flex flex-wrap gap-1 mb-3'>
                   {tags.map((tag) => (
@@ -103,83 +165,165 @@ const MarketplaceDetail = () => {
                   ))}
                 </div>
               )}
-              <CapabilityIcons
-                capabilities={model.capabilities || []}
-                size={16}
-                t={t}
-              />
             </div>
           </div>
+
           {model.description && (
-            <Text type='tertiary' className='!mt-4 block'>
+            <p className='mt-5 text-base leading-relaxed text-gray-600 dark:text-gray-300'>
               {model.description}
-            </Text>
+            </p>
+          )}
+
+          {capabilities.length > 0 && (
+            <div className='mt-5 flex flex-wrap gap-2'>
+              {capabilities.map((c) => (
+                <CapabilityPill key={c} keyName={c} t={t} />
+              ))}
+            </div>
           )}
         </Card>
 
         {/* 模型简介（markdown long_description） */}
         {model.long_description && (
           <Card
+            shadows='always'
+            bordered={false}
             className='!rounded-2xl mb-4'
-            title={t('模型简介')}
-            bodyStyle={{ padding: 20 }}
+            bodyStyle={{ padding: 24 }}
           >
+            <div className='text-xs uppercase tracking-wider text-gray-400 mb-3'>
+              {t('模型简介')}
+            </div>
             <MarkdownRenderer content={model.long_description} />
           </Card>
         )}
 
         {/* 定价 */}
-        <div className='mb-4'>
-          <Title heading={6} className='!mb-2'>
-            {t('定价')}
-          </Title>
-          <PriceBlock model={model} t={t} />
-        </div>
-
-        {/* 技术参数 */}
         <Card
+          shadows='always'
+          bordered={false}
           className='!rounded-2xl mb-4'
-          title={t('技术参数')}
-          bodyStyle={{ padding: 20 }}
+          bodyStyle={{ padding: 24 }}
         >
-          <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-            <div>
-              <div className='text-xs text-gray-500 mb-1'>{t('上下文窗口')}</div>
-              <div className='text-lg font-medium'>
-                {model.context_length || '-'}
-              </div>
-            </div>
-            <div>
-              <div className='text-xs text-gray-500 mb-1'>{t('最大输出')}</div>
-              <div className='text-lg font-medium'>
-                {model.max_output_tokens || '-'}
-              </div>
-            </div>
-            <div>
-              <div className='text-xs text-gray-500 mb-1'>{t('知识截止')}</div>
-              <div className='text-lg font-medium'>
-                {model.knowledge_cutoff || '-'}
-              </div>
-            </div>
-            <div>
-              <div className='text-xs text-gray-500 mb-1'>{t('计费类型')}</div>
-              <div className='text-lg font-medium'>
-                {model.quota_type === 1 ? t('按次计费') : t('按量计费')}
-              </div>
-            </div>
-            {model.endpoints && model.endpoints.length > 0 && (
-              <div className='sm:col-span-2'>
-                <div className='text-xs text-gray-500 mb-1'>{t('支持端点')}</div>
-                <div className='flex flex-wrap gap-1'>
-                  {model.endpoints.map((ep) => (
-                    <Tag key={ep} color='cyan' shape='circle' size='small'>
-                      {ep}
-                    </Tag>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div className='text-xs uppercase tracking-wider text-gray-400 mb-4'>
+            {isPerRequest ? t('按次定价') : t('每 1M tokens 定价')}
           </div>
+          {isPerRequest ? (
+            <PriceCell
+              title={t('每次调用')}
+              value={formatPrice(model.price_per_request)}
+              unit={`/ ${t('次')}`}
+            />
+          ) : (
+            <div className='grid grid-cols-2 sm:grid-cols-4 gap-6'>
+              <PriceCell
+                title={t('输入')}
+                value={formatPrice(model.input_price)}
+                unit='/1M'
+              />
+              <PriceCell
+                title={t('输出')}
+                value={formatPrice(model.output_price)}
+                unit='/1M'
+              />
+              {hasCacheRead && (
+                <PriceCell
+                  title={t('缓存读')}
+                  value={formatPrice(model.cached_price)}
+                  unit='/1M'
+                />
+              )}
+              {hasCacheWrite && (
+                <PriceCell
+                  title={t('缓存写')}
+                  value={formatPrice(model.cache_create_price)}
+                  unit='/1M'
+                />
+              )}
+            </div>
+          )}
+
+          {/* 阶梯计费表 */}
+          {model.tiers && model.tiers.length > 0 && (
+            <div className='mt-6 pt-6 border-t border-gray-100 dark:border-zinc-800'>
+              <div className='text-xs uppercase tracking-wider text-gray-400 mb-3'>
+                {t('阶梯计费')}
+              </div>
+              <Table
+                size='small'
+                pagination={false}
+                dataSource={model.tiers.map((tier, idx) => ({ key: idx, ...tier }))}
+                columns={[
+                  {
+                    title: t('档位 (prompt tokens)'),
+                    dataIndex: 'threshold',
+                    render: (v, _r, idx) => {
+                      if (idx === 0) return `≤ ${v}`;
+                      const prev = model.tiers[idx - 1].threshold;
+                      if (v === 0 || v == null) return `> ${prev}`;
+                      return `${prev + 1} ~ ${v}`;
+                    },
+                  },
+                  {
+                    title: t('输入'),
+                    dataIndex: 'input_price',
+                    render: (v) => `${formatPrice(v)} / 1M`,
+                  },
+                  {
+                    title: t('输出'),
+                    dataIndex: 'output_price',
+                    render: (v) => `${formatPrice(v)} / 1M`,
+                  },
+                  {
+                    title: t('缓存读'),
+                    dataIndex: 'cached_price',
+                    render: (v) => (v != null ? `${formatPrice(v)} / 1M` : '-'),
+                  },
+                ]}
+              />
+            </div>
+          )}
+        </Card>
+
+        {/* SPECIFICATIONS */}
+        <Card
+          shadows='always'
+          bordered={false}
+          className='!rounded-2xl mb-4'
+          bodyStyle={{ padding: 24 }}
+        >
+          <div className='text-xs uppercase tracking-wider text-gray-400 mb-2'>
+            {t('规格参数')}
+          </div>
+          <SpecRow
+            label={t('上下文窗口')}
+            value={model.context_length || '-'}
+          />
+          <SpecRow
+            label={t('最大输出')}
+            value={model.max_output_tokens || '-'}
+          />
+          <SpecRow
+            label={t('计费类型')}
+            value={isPerRequest ? t('按次计费') : t('按量计费')}
+          />
+          <SpecRow
+            label={t('知识截止')}
+            value={model.knowledge_cutoff || '-'}
+            last={!model.endpoints || model.endpoints.length === 0}
+          />
+          {model.endpoints && model.endpoints.length > 0 && (
+            <div className='flex items-start justify-between py-3'>
+              <span className='text-sm text-gray-500'>{t('支持端点')}</span>
+              <div className='flex flex-wrap gap-1 justify-end max-w-[60%]'>
+                {model.endpoints.map((ep) => (
+                  <Tag key={ep} color='cyan' shape='circle' size='small'>
+                    {ep}
+                  </Tag>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
       </div>
     </div>
