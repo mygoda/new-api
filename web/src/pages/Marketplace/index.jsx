@@ -16,23 +16,62 @@ import {
   Card,
   Table,
   Tag,
-  Avatar,
   Input,
   Select,
   Dropdown,
   Button,
   Empty,
   Checkbox,
+  Avatar,
 } from '@douyinfe/semi-ui';
+import {
+  IllustrationNoResult,
+  IllustrationNoResultDark,
+} from '@douyinfe/semi-illustrations';
 import { Search, SlidersHorizontal } from 'lucide-react';
-import { API, showError } from '../../helpers';
-import CapabilityIcons, { CAPABILITY_META } from './components/CapabilityIcons';
+import { API, showError, getLobeHubIcon, stringToColor } from '../../helpers';
+import { renderLimitedItems } from '../../components/common/ui/RenderUtils';
+import { CAPABILITY_META } from './components/CapabilityIcons';
+import CapabilityIcons from './components/CapabilityIcons';
+
+const ICON_CONTAINER =
+  'w-10 h-10 rounded-xl flex items-center justify-center shadow-sm shrink-0';
 
 const formatPrice = (val) => {
   if (val == null) return '-';
   if (val >= 1) return `$${val.toFixed(2)}`;
   if (val >= 0.01) return `$${val.toFixed(3)}`;
   return `$${val.toFixed(4)}`;
+};
+
+const getModelIcon = (model) => {
+  if (model.icon) {
+    return (
+      <div className={ICON_CONTAINER}>{getLobeHubIcon(model.icon, 24)}</div>
+    );
+  }
+  if (model.vendor_icon) {
+    return (
+      <div className={ICON_CONTAINER}>
+        {getLobeHubIcon(model.vendor_icon, 24)}
+      </div>
+    );
+  }
+  return (
+    <Avatar
+      size='small'
+      shape='square'
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        fontSize: 14,
+        fontWeight: 600,
+      }}
+    >
+      {(model.model_name || '?').slice(0, 2).toUpperCase()}
+    </Avatar>
+  );
 };
 
 const Marketplace = () => {
@@ -83,9 +122,9 @@ const Marketplace = () => {
 
     const parseContext = (s) => {
       if (!s) return 0;
-      const t = String(s).toUpperCase().trim();
-      const m = t.match(/^([\d.]+)\s*([KM]?)$/);
-      if (!m) return Number(t) || 0;
+      const text = String(s).toUpperCase().trim();
+      const m = text.match(/^([\d.]+)\s*([KM]?)$/);
+      if (!m) return Number(text) || 0;
       const num = parseFloat(m[1]);
       if (m[2] === 'M') return num * 1_000_000;
       if (m[2] === 'K') return num * 1_000;
@@ -109,123 +148,164 @@ const Marketplace = () => {
     [navigate],
   );
 
+  const renderQuotaTypeTag = (record) => {
+    if (record.quota_type === 1) {
+      return (
+        <Tag color='teal' shape='circle' size='small'>
+          {t('按次计费')}
+        </Tag>
+      );
+    }
+    return (
+      <Tag color='violet' shape='circle' size='small'>
+        {t('按量计费')}
+      </Tag>
+    );
+  };
+
   const columns = [
     {
-      title: <span className='uppercase text-xs tracking-wider'>{t('模型')}</span>,
+      title: t('模型'),
       dataIndex: 'model_name',
       key: 'model_name',
       sorter: (a, b) => (a.model_name || '').localeCompare(b.model_name || ''),
       render: (text, record) => (
-        <div className='flex items-center gap-2'>
-          {record.icon ? (
-            <Avatar size='extra-small' src={record.icon} shape='square' />
-          ) : (
-            <Avatar size='extra-small' shape='square'>
-              {(text || '?').slice(0, 2).toUpperCase()}
-            </Avatar>
-          )}
-          <span className='font-medium truncate max-w-[200px]'>{text}</span>
+        <div className='flex items-center gap-3'>
+          {getModelIcon(record)}
+          <div className='min-w-0'>
+            <div className='font-semibold truncate max-w-[260px]'>{text}</div>
+            {record.description && (
+              <div
+                className='text-xs leading-relaxed line-clamp-1 max-w-[260px] mt-0.5'
+                style={{ color: 'var(--semi-color-text-2)' }}
+              >
+                {record.description}
+              </div>
+            )}
+          </div>
         </div>
       ),
     },
     {
-      title: <span className='uppercase text-xs tracking-wider'>{t('上下文')}</span>,
+      title: t('上下文'),
       dataIndex: 'context_length',
       key: 'context_length',
       align: 'right',
       width: 110,
-      render: (val) => <span className='text-sm'>{val || '-'}</span>,
+      render: (val) =>
+        val ? (
+          <span className='text-sm font-medium'>{val}</span>
+        ) : (
+          <span className='text-sm text-gray-400'>-</span>
+        ),
     },
     {
-      title: <span className='uppercase text-xs tracking-wider'>{t('最大输出')}</span>,
+      title: t('最大输出'),
       dataIndex: 'max_output_tokens',
       key: 'max_output_tokens',
       align: 'right',
       width: 110,
-      render: (val) => <span className='text-sm'>{val || '-'}</span>,
+      render: (val) =>
+        val ? (
+          <span className='text-sm font-medium'>{val}</span>
+        ) : (
+          <span className='text-sm text-gray-400'>-</span>
+        ),
     },
     {
-      title: <span className='uppercase text-xs tracking-wider'>{t('输入价')}</span>,
+      title: t('输入价'),
       dataIndex: 'input_price',
       key: 'input_price',
       align: 'right',
-      width: 110,
+      width: 130,
       sorter: (a, b) => (a.input_price || 0) - (b.input_price || 0),
       render: (_v, record) => {
         if (record.quota_type === 1) {
           return (
-            <span className='text-sm text-orange-500'>
+            <span className='text-sm font-semibold text-orange-500'>
               {formatPrice(record.price_per_request)}
-              <span className='text-gray-400 ml-1'>/{t('次')}</span>
+              <span className='ml-1 text-xs font-normal text-gray-400'>
+                /{t('次')}
+              </span>
             </span>
           );
         }
         return (
-          <span className='text-sm text-orange-500'>
+          <span className='text-sm font-semibold text-orange-500'>
             {formatPrice(record.input_price)}
-            <span className='text-gray-400 ml-1'>/1M</span>
+            <span className='ml-1 text-xs font-normal text-gray-400'>/1M</span>
           </span>
         );
       },
     },
     {
-      title: <span className='uppercase text-xs tracking-wider'>{t('输出价')}</span>,
+      title: t('输出价'),
       dataIndex: 'output_price',
       key: 'output_price',
       align: 'right',
-      width: 110,
+      width: 130,
       sorter: (a, b) => (a.output_price || 0) - (b.output_price || 0),
       render: (_v, record) => {
-        if (record.quota_type === 1) return <span className='text-gray-400'>-</span>;
+        if (record.quota_type === 1) {
+          return <span className='text-sm text-gray-400'>-</span>;
+        }
         return (
-          <span className='text-sm text-orange-500'>
+          <span className='text-sm font-semibold text-orange-500'>
             {formatPrice(record.output_price)}
-            <span className='text-gray-400 ml-1'>/1M</span>
+            <span className='ml-1 text-xs font-normal text-gray-400'>/1M</span>
           </span>
         );
       },
     },
     {
-      title: <span className='uppercase text-xs tracking-wider'>{t('能力')}</span>,
+      title: t('能力'),
       dataIndex: 'capabilities',
       key: 'capabilities',
-      width: 220,
+      width: 180,
       render: (caps) => <CapabilityIcons capabilities={caps || []} size={14} t={t} />,
     },
     {
-      title: <span className='uppercase text-xs tracking-wider'>{t('标签')}</span>,
+      title: t('计费'),
+      dataIndex: 'quota_type',
+      key: 'quota_type',
+      width: 110,
+      render: (_v, record) => renderQuotaTypeTag(record),
+    },
+    {
+      title: t('标签'),
       dataIndex: 'tags',
       key: 'tags',
-      width: 160,
+      width: 200,
       render: (tagsStr) => {
         const tags = (tagsStr || '').split(',').filter(Boolean);
-        if (tags.length === 0) return null;
-        return (
-          <div className='flex flex-wrap gap-1'>
-            {tags.slice(0, 2).map((tag) => (
-              <Tag key={tag} size='small' color='blue' shape='circle'>
-                {tag}
-              </Tag>
-            ))}
-            {tags.length > 2 && (
-              <Tag size='small' color='grey' shape='circle'>
-                +{tags.length - 2}
-              </Tag>
-            )}
-          </div>
-        );
+        if (tags.length === 0) return <span className='text-sm text-gray-400'>-</span>;
+        return renderLimitedItems({
+          items: tags,
+          renderItem: (tg, idx) => (
+            <Tag
+              key={`tag-${idx}`}
+              color={stringToColor(tg)}
+              shape='circle'
+              size='small'
+            >
+              {tg}
+            </Tag>
+          ),
+          maxDisplay: 2,
+        });
       },
     },
   ];
 
-  const filterDropdown = (
-    <Dropdown.Menu className='!p-3 !min-w-[220px]'>
-      <div className='text-xs text-gray-500 mb-2 uppercase tracking-wider'>
+  const filterMenu = (
+    <Dropdown.Menu className='!p-3' style={{ minWidth: 240 }}>
+      <div className='text-xs font-medium text-gray-500 mb-2'>
         {t('能力筛选')}
       </div>
-      {Object.entries(CAPABILITY_META).map(([key, meta]) => (
-        <div key={key} className='py-1'>
+      <div className='space-y-2'>
+        {Object.entries(CAPABILITY_META).map(([key, meta]) => (
           <Checkbox
+            key={key}
             checked={selectedCapabilities.includes(key)}
             onChange={(e) => {
               if (e.target.checked) {
@@ -239,10 +319,10 @@ const Marketplace = () => {
           >
             {t(meta.label)}
           </Checkbox>
-        </div>
-      ))}
+        ))}
+      </div>
       {selectedCapabilities.length > 0 && (
-        <div className='mt-2 pt-2 border-t border-gray-100'>
+        <div className='mt-2 pt-2 border-t border-gray-100 dark:border-zinc-700'>
           <Button
             theme='borderless'
             size='small'
@@ -258,33 +338,49 @@ const Marketplace = () => {
   return (
     <div className='min-h-screen bg-gray-50 dark:bg-zinc-900'>
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6'>
+        {/* Hero */}
         <div className='mb-6'>
-          <h1 className='text-2xl font-semibold mb-1'>{t('模型广场（新）')}</h1>
-          <p className='text-sm text-gray-500'>
-            {t('以模型为主体的现代化广场，展示能力、上下文、定价等关键信息（仅管理员可见）')}
+          <h1 className='text-2xl font-bold mb-1'>{t('模型广场（新）')}</h1>
+          <p
+            className='text-sm'
+            style={{ color: 'var(--semi-color-text-2)' }}
+          >
+            {t(
+              '以模型为主体的现代化广场，展示能力、上下文、定价等关键信息（仅管理员可见）',
+            )}
           </p>
         </div>
 
+        {/* Toolbar Card */}
         <Card
-          shadows='always'
+          className='!rounded-2xl mb-4'
           bordered={false}
-          className='!rounded-2xl'
+          shadows='hover'
           bodyStyle={{ padding: 16 }}
         >
-          <div className='flex items-center gap-3 flex-wrap mb-4'>
+          <div className='flex items-center gap-3 flex-wrap'>
             <Input
               prefix={<Search size={16} />}
               value={searchValue}
               onChange={setSearchValue}
-              placeholder={t('搜索模型名 / 描述')}
+              placeholder={t('搜索模型名 / 描述 / 标签')}
               showClear
               style={{ width: 320 }}
             />
-            <Dropdown trigger='click' position='bottomLeft' render={filterDropdown}>
+            <Dropdown
+              trigger='click'
+              position='bottomLeft'
+              render={filterMenu}
+            >
               <Button icon={<SlidersHorizontal size={14} />}>
                 {t('筛选')}
                 {selectedCapabilities.length > 0 && (
-                  <Tag size='small' color='blue' shape='circle' className='ml-1'>
+                  <Tag
+                    size='small'
+                    color='blue'
+                    shape='circle'
+                    className='ml-1'
+                  >
                     {selectedCapabilities.length}
                   </Tag>
                 )}
@@ -293,9 +389,9 @@ const Marketplace = () => {
             <Select
               value={sortKey}
               onChange={setSortKey}
-              style={{ width: 180 }}
+              style={{ width: 200 }}
               optionList={[
-                { value: 'name', label: t('按名称') },
+                { value: 'name', label: t('按名称排序') },
                 { value: 'context_desc', label: t('上下文 高 → 低') },
                 { value: 'price_asc', label: t('价格 低 → 高') },
                 { value: 'price_desc', label: t('价格 高 → 低') },
@@ -305,27 +401,46 @@ const Marketplace = () => {
               {t('共')} {filteredAndSorted.length} {t('个模型')}
             </span>
           </div>
+        </Card>
 
-          {filteredAndSorted.length === 0 && !loading ? (
-            <Empty title={t('未找到匹配的模型')} style={{ padding: 60 }} />
-          ) : (
-            <Table
-              columns={columns}
-              dataSource={filteredAndSorted}
-              rowKey='model_name'
-              loading={loading}
-              size='middle'
-              pagination={{
-                pageSize: 20,
-                showSizeChanger: false,
-                hideOnSinglePage: true,
-              }}
-              onRow={(record) => ({
-                onClick: () => goDetail(record),
-                style: { cursor: 'pointer' },
-              })}
-            />
-          )}
+        {/* Table Card */}
+        <Card
+          className='!rounded-2xl overflow-hidden'
+          bordered={false}
+          shadows='hover'
+          bodyStyle={{ padding: 0 }}
+        >
+          <Table
+            columns={columns}
+            dataSource={filteredAndSorted}
+            rowKey='model_name'
+            loading={loading}
+            size='middle'
+            scroll={{ x: 'max-content' }}
+            empty={
+              <Empty
+                image={
+                  <IllustrationNoResult style={{ width: 150, height: 150 }} />
+                }
+                darkModeImage={
+                  <IllustrationNoResultDark
+                    style={{ width: 150, height: 150 }}
+                  />
+                }
+                description={t('未找到匹配的模型')}
+                style={{ padding: 40 }}
+              />
+            }
+            pagination={{
+              defaultPageSize: 20,
+              pageSizeOptions: [10, 20, 50, 100],
+              showSizeChanger: true,
+            }}
+            onRow={(record) => ({
+              onClick: () => goDetail(record),
+              style: { cursor: 'pointer' },
+            })}
+          />
         </Card>
       </div>
     </div>
