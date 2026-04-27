@@ -31,12 +31,14 @@ const ChartsPanel = ({
   spec_rank_bar,
   spec_cache_hit,
   dorisEnabled,
+  isAdminUser,
   CARD_PROPS,
   CHART_CONFIG,
   FLEX_CENTER_GAP2,
   hasApiInfoPanel,
   t,
 }) => {
+  const showCacheHit = dorisEnabled && isAdminUser;
   return (
     <Card
       {...CARD_PROPS}
@@ -56,7 +58,7 @@ const ChartsPanel = ({
             <TabPane tab={<span>{t('消耗趋势')}</span>} itemKey='2' />
             <TabPane tab={<span>{t('调用次数分布')}</span>} itemKey='3' />
             <TabPane tab={<span>{t('调用次数排行')}</span>} itemKey='4' />
-            {dorisEnabled && (
+            {showCacheHit && (
               <TabPane tab={<span>{t('缓存命中率')}</span>} itemKey='5' />
             )}
           </Tabs>
@@ -77,7 +79,7 @@ const ChartsPanel = ({
         {activeChartTab === '4' && (
           <VChart spec={spec_rank_bar} option={CHART_CONFIG} />
         )}
-        {activeChartTab === '5' && dorisEnabled && (
+        {activeChartTab === '5' && showCacheHit && (
           <VChart spec={spec_cache_hit} option={CHART_CONFIG} />
         )}
       </div>

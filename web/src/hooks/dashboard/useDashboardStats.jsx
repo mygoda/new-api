@@ -45,6 +45,7 @@ export const useDashboardStats = (
   t,
   cacheStats,
   dorisEnabled,
+  isAdminUser,
 ) => {
   const groupedStatsData = useMemo(
     () => {
@@ -140,6 +141,7 @@ export const useDashboardStats = (
       ];
 
       const hasCacheData =
+        isAdminUser &&
         dorisEnabled &&
         cacheStats &&
         ((cacheStats.cacheTokens || 0) +
@@ -189,6 +191,7 @@ export const useDashboardStats = (
       t,
       cacheStats,
       dorisEnabled,
+      isAdminUser,
     ],
   );
 

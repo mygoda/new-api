@@ -52,6 +52,7 @@ const FilterModalContent = ({ sidebarProps, t }) => {
     tokenUnit,
     setTokenUnit,
     loading,
+    isAdminUser,
     ...categoryProps
   } = sidebarProps;
 
@@ -98,15 +99,17 @@ const FilterModalContent = ({ sidebarProps, t }) => {
         t={t}
       />
 
-      <PricingGroups
-        filterGroup={filterGroup}
-        setFilterGroup={setFilterGroup}
-        usableGroup={categoryProps.usableGroup}
-        groupRatio={categoryProps.groupRatio}
-        models={groupCountModels}
-        loading={loading}
-        t={t}
-      />
+      {isAdminUser && (
+        <PricingGroups
+          filterGroup={filterGroup}
+          setFilterGroup={setFilterGroup}
+          usableGroup={categoryProps.usableGroup}
+          groupRatio={categoryProps.groupRatio}
+          models={groupCountModels}
+          loading={loading}
+          t={t}
+        />
+      )}
 
       <PricingQuotaTypes
         filterQuotaType={filterQuotaType}

@@ -88,6 +88,7 @@ const Dashboard = () => {
     dashboardData.t,
     dashboardData.cacheStats,
     dashboardData.dorisEnabled,
+    dashboardData.isAdminUser,
   );
 
   // ========== 渠道/模型分析 ==========
@@ -217,6 +218,7 @@ const Dashboard = () => {
             spec_rank_bar={dashboardCharts.spec_rank_bar}
             spec_cache_hit={dashboardCharts.spec_cache_hit}
             dorisEnabled={dashboardData.dorisEnabled}
+            isAdminUser={dashboardData.isAdminUser}
             CARD_PROPS={CARD_PROPS}
             CHART_CONFIG={CHART_CONFIG}
             FLEX_CENTER_GAP2={FLEX_CENTER_GAP2}
