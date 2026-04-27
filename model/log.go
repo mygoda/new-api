@@ -1236,11 +1236,25 @@ type TokenDailyModelUsage struct {
 // GetTokenDailyModelUsage aggregates token consumption by (token_id, day, model_name)
 // for a given user within the time window.
 //
-// Uses integer arithmetic on created_at (unix seconds) for the day bucket so the
-// query is portable across SQLite/MySQL/PostgreSQL.
+// 注意：MySQL 中 `/` 是浮点除法（会得到 1234.5678 这类带小数的 DECIMAL），SQLite 整数除整数返回整数，
+// PostgreSQL 整数除整数也返回整数。为保证 DayEpoch 始终是 int64，按数据库类型分支生成 day_epoch
+// 表达式。
 func GetTokenDailyModelUsage(userId int, startTimestamp, endTimestamp int64) ([]TokenDailyModelUsage, error) {
+	var dayExpr string
+	switch {
+	case common.UsingPostgreSQL:
+		// PG 整数除法返回整数，CAST 兜底
+		dayExpr = "((created_at / 86400) * 86400)::bigint"
+	case common.UsingMySQL:
+		// MySQL DIV 是整数除法
+		dayExpr = "(created_at DIV 86400) * 86400"
+	default:
+		// SQLite：整数 / 整数 = 整数
+		dayExpr = "(created_at / 86400) * 86400"
+	}
+
 	selectExpr := "token_id, token_name, model_name, " +
-		"(created_at / 86400) * 86400 AS day_epoch, " +
+		dayExpr + " AS day_epoch, " +
 		"COALESCE(SUM(COALESCE(prompt_tokens,0) + COALESCE(completion_tokens,0)),0) AS total_tokens, " +
 		"COUNT(*) AS total_requests"
 
