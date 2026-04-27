@@ -26,6 +26,7 @@ import DashboardHeader from './DashboardHeader';
 import StatsCards from './StatsCards';
 import ChartsPanel from './ChartsPanel';
 import ChannelAnalysisPanel from './ChannelAnalysisPanel';
+import TokenAnalysisPanel from './TokenAnalysisPanel';
 import ApiInfoPanel from './ApiInfoPanel';
 import AnnouncementsPanel from './AnnouncementsPanel';
 import FaqPanel from './FaqPanel';
@@ -164,13 +165,10 @@ const Dashboard = () => {
     } else {
       channelAnalysis.loadModelPerformanceStats();
     }
-    // 「按令牌」面板对所有用户均按当前登录用户口径展示
-    channelAnalysis.loadTokenUsageStats();
   }, [
     channelAnalysis.loadChannelStats,
     channelAnalysis.loadModelPerformanceStats,
     channelAnalysis.loadModelChannelCrossStats,
-    channelAnalysis.loadTokenUsageStats,
   ]);
 
   return (
@@ -303,13 +301,12 @@ const Dashboard = () => {
       )}
 
       {/* 渠道/模型分析面板 */}
-      {(dashboardData.isAdminUser || channelAnalysis.modelPerformanceStats.length > 0 || channelAnalysis.tokenUsageStats.length > 0) && (
+      {(dashboardData.isAdminUser || channelAnalysis.modelPerformanceStats.length > 0) && (
         <div className='mb-4'>
           <ChannelAnalysisPanel
             channelStats={channelAnalysis.channelStats}
             modelPerformanceStats={channelAnalysis.modelPerformanceStats}
             modelChannelCrossStats={channelAnalysis.modelChannelCrossStats}
-            tokenUsageStats={channelAnalysis.tokenUsageStats}
             crossStatsModelFilter={channelAnalysis.crossStatsModelFilter}
             onCrossStatsModelFilterChange={(val) => {
               channelAnalysis.setCrossStatsModelFilter(val);
@@ -321,7 +318,6 @@ const Dashboard = () => {
             errorRateChartSpec={channelAnalysis.errorRateChartSpec}
             healthScoreChartSpec={channelAnalysis.healthScoreChartSpec}
             qpsChartSpec={channelAnalysis.qpsChartSpec}
-            tokenModelTreemapSpec={channelAnalysis.tokenModelTreemapSpec}
             isAdminUser={dashboardData.isAdminUser}
             activeTab={activeChannelTab}
             setActiveTab={setActiveChannelTab}
@@ -333,6 +329,17 @@ const Dashboard = () => {
           />
         </div>
       )}
+
+      {/* 令牌统计面板（独立时间范围 + 按 token 分组堆叠柱状图）*/}
+      <div className='mb-4'>
+        <TokenAnalysisPanel
+          isAdminUser={dashboardData.isAdminUser}
+          CARD_PROPS={CARD_PROPS}
+          CHART_CONFIG={CHART_CONFIG}
+          FLEX_CENTER_GAP2={FLEX_CENTER_GAP2}
+          t={dashboardData.t}
+        />
+      </div>
     </div>
   );
 };

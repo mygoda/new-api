@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -119,6 +120,38 @@ func GetTokenUsageDashboardStats(c *gin.Context) {
 		return
 	}
 	stats, err := service.CachedGetTokenUsageStats(userId, startTimestamp, endTimestamp)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    stats,
+	})
+}
+
+// GetTokenDailyModelUsageDashboardStats returns per-(token, day, model) token consumption
+// for the current user. Time window is capped: 7 days for common users, 30 days for admins.
+func GetTokenDailyModelUsageDashboardStats(c *gin.Context) {
+	userId := c.GetInt("id")
+	role := c.GetInt("role")
+	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+
+	maxRange := int64(7 * 86400) // common user: 7 days
+	if role >= common.RoleAdminUser {
+		maxRange = 30 * 86400 // admin: 30 days
+	}
+	if endTimestamp-startTimestamp > maxRange {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": fmt.Sprintf("时间跨度不能超过 %d 天", maxRange/86400),
+		})
+		return
+	}
+
+	stats, err := model.GetTokenDailyModelUsage(userId, startTimestamp, endTimestamp)
 	if err != nil {
 		common.ApiError(c, err)
 		return

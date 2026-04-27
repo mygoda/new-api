@@ -20,9 +20,9 @@ import (
 
 type Log struct {
 	Id               int    `json:"id" gorm:"index:idx_created_at_id,priority:1;index:idx_user_id_id,priority:2"`
-	UserId           int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1;index:idx_logs_user_type_created_at,priority:1"`
-	CreatedAt        int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:2;index:idx_created_at_type;index:idx_logs_channel_type_created_at,priority:3;index:idx_logs_user_type_created_at,priority:3"`
-	Type             int    `json:"type" gorm:"index:idx_created_at_type;index:idx_logs_channel_type_created_at,priority:2;index:idx_logs_user_type_created_at,priority:2"`
+	UserId           int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1;index:idx_logs_user_type_created_at,priority:1;index:idx_logs_user_type_token_created_at,priority:1"`
+	CreatedAt        int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:2;index:idx_created_at_type;index:idx_logs_channel_type_created_at,priority:3;index:idx_logs_user_type_created_at,priority:3;index:idx_logs_user_type_token_created_at,priority:4"`
+	Type             int    `json:"type" gorm:"index:idx_created_at_type;index:idx_logs_channel_type_created_at,priority:2;index:idx_logs_user_type_created_at,priority:2;index:idx_logs_user_type_token_created_at,priority:2"`
 	Content          string `json:"content"`
 	Username         string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
 	TokenName        string `json:"token_name" gorm:"index;default:''"`
@@ -34,7 +34,7 @@ type Log struct {
 	IsStream         bool   `json:"is_stream"`
 	ChannelId        int    `json:"channel" gorm:"index;index:idx_logs_channel_type_created_at,priority:1"`
 	ChannelName      string `json:"channel_name" gorm:"->"`
-	TokenId          int    `json:"token_id" gorm:"default:0;index"`
+	TokenId          int    `json:"token_id" gorm:"default:0;index;index:idx_logs_user_type_token_created_at,priority:3"`
 	Group            string `json:"group" gorm:"index"`
 	Ip               string `json:"ip" gorm:"index;default:''"`
 	RequestId        string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
@@ -1219,6 +1219,47 @@ func GetTokenUsageStats(userId int, startTimestamp int64, endTimestamp int64) ([
 		stats[i].Models = usagesByToken[stats[i].TokenId]
 	}
 
+	return stats, nil
+}
+
+// TokenDailyModelUsage represents per-(token, day, model) token consumption breakdown
+// for the dashboard token usage chart.
+type TokenDailyModelUsage struct {
+	TokenId       int    `json:"token_id"`
+	TokenName     string `json:"token_name"`
+	DayEpoch      int64  `json:"day_epoch"` // Unix seconds at 00:00 UTC of the day
+	ModelName     string `json:"model_name"`
+	TotalTokens   int64  `json:"total_tokens"` // prompt + completion
+	TotalRequests int64  `json:"total_requests"`
+}
+
+// GetTokenDailyModelUsage aggregates token consumption by (token_id, day, model_name)
+// for a given user within the time window.
+//
+// Uses integer arithmetic on created_at (unix seconds) for the day bucket so the
+// query is portable across SQLite/MySQL/PostgreSQL.
+func GetTokenDailyModelUsage(userId int, startTimestamp, endTimestamp int64) ([]TokenDailyModelUsage, error) {
+	selectExpr := "token_id, token_name, model_name, " +
+		"(created_at / 86400) * 86400 AS day_epoch, " +
+		"COALESCE(SUM(COALESCE(prompt_tokens,0) + COALESCE(completion_tokens,0)),0) AS total_tokens, " +
+		"COUNT(*) AS total_requests"
+
+	var stats []TokenDailyModelUsage
+	query := LOG_DB.Table("logs").
+		Select(selectExpr).
+		Where("type = ? AND user_id = ? AND token_id > 0", LogTypeConsume, userId)
+	if startTimestamp != 0 {
+		query = query.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		query = query.Where("created_at <= ?", endTimestamp)
+	}
+	if err := query.
+		Group("token_id, token_name, model_name, day_epoch").
+		Order("token_id, day_epoch, model_name").
+		Find(&stats).Error; err != nil {
+		return nil, err
+	}
 	return stats, nil
 }
 

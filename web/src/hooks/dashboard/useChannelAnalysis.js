@@ -26,7 +26,6 @@ export const useChannelAnalysis = (isAdminUser, inputs, dataExportDefaultTime) =
   const [channelStats, setChannelStats] = useState([]);
   const [modelPerformanceStats, setModelPerformanceStats] = useState([]);
   const [modelChannelCrossStats, setModelChannelCrossStats] = useState([]);
-  const [tokenUsageStats, setTokenUsageStats] = useState([]);
   const [crossStatsModelFilter, setCrossStatsModelFilter] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -100,28 +99,6 @@ export const useChannelAnalysis = (isAdminUser, inputs, dataExportDefaultTime) =
       setLoading(false);
     }
   }, [isAdminUser, inputs]);
-
-  const loadTokenUsageStats = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { start_timestamp, end_timestamp } = inputs;
-      const startTs = Math.floor(Date.parse(start_timestamp) / 1000);
-      const endTs = Math.floor(Date.parse(end_timestamp) / 1000);
-      const res = await API.get(
-        `/api/data/dashboard/token?start_timestamp=${startTs}&end_timestamp=${endTs}`,
-      );
-      const { success, message, data } = res.data;
-      if (success) {
-        setTokenUsageStats(data || []);
-      } else {
-        showError(message);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [inputs]);
 
   // 延迟对比柱状图（平均延迟）
   const latencyChartSpec = useMemo(() => {
@@ -461,71 +438,21 @@ export const useChannelAnalysis = (isAdminUser, inputs, dataExportDefaultTime) =
     };
   }, [channelStats, modelPerformanceStats, isAdminUser, t]);
 
-  // 令牌 → 模型 二级 Treemap（按 tokens 数）
-  const tokenModelTreemapSpec = useMemo(() => {
-    const values = (tokenUsageStats || [])
-      .map((tk) => {
-        const tokenLabel = tk.token_name || `ID:${tk.token_id}`;
-        const children = (tk.models || [])
-          .filter((m) => (m.total_tokens || 0) > 0)
-          .map((m) => ({
-            name: m.model_name || t('未知模型'),
-            value: m.total_tokens || 0,
-          }));
-        return {
-          name: tokenLabel,
-          value: tk.total_tokens || 0,
-          children,
-        };
-      })
-      .filter((tk) => (tk.value || 0) > 0);
-
-    return {
-      type: 'treemap',
-      data: [{ id: 'tokenModelTreemap', values }],
-      categoryField: 'name',
-      valueField: 'value',
-      title: {
-        visible: true,
-        text: t('令牌 / 模型 消耗占比'),
-        subtext: t('面积 = tokens 数（prompt + completion）'),
-      },
-      drill: { enable: true },
-      label: { visible: true },
-      nonLeaf: {
-        label: { visible: true, style: { fontWeight: 'bold' } },
-      },
-      tooltip: {
-        mark: {
-          content: [
-            {
-              key: (datum) => datum?.name,
-              value: (datum) => `${(datum?.value || 0).toLocaleString()} tokens`,
-            },
-          ],
-        },
-      },
-    };
-  }, [tokenUsageStats, t]);
-
   return {
     channelStats,
     modelPerformanceStats,
     modelChannelCrossStats,
-    tokenUsageStats,
     crossStatsModelFilter,
     setCrossStatsModelFilter,
     loading,
     loadChannelStats,
     loadModelPerformanceStats,
     loadModelChannelCrossStats,
-    loadTokenUsageStats,
     latencyChartSpec,
     latencyPercentileChartSpec,
     errorRateChartSpec,
     healthScoreChartSpec,
     qpsChartSpec,
-    tokenModelTreemapSpec,
     t,
   };
 };
