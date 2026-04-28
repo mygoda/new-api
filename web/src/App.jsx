@@ -95,6 +95,29 @@ function App() {
     return false; // 默认不需要登录
   }, [statusState?.status?.HeaderNavModules]);
 
+  // 获取「模型」(marketplaceV2) 权限配置：{enabled, requireAdmin}
+  const marketplaceConfig = useMemo(() => {
+    const fallback = { enabled: true, requireAdmin: false };
+    const raw = statusState?.status?.HeaderNavModules;
+    if (!raw) return fallback;
+    try {
+      const modules = JSON.parse(raw);
+      const cfg = modules.marketplaceV2;
+      if (typeof cfg === 'object' && cfg !== null) {
+        return {
+          enabled: cfg.enabled !== false,
+          requireAdmin: cfg.requireAdmin === true,
+        };
+      }
+      if (typeof cfg === 'boolean') {
+        return { enabled: cfg, requireAdmin: false };
+      }
+      return fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }, [statusState?.status?.HeaderNavModules]);
+
   return (
     <SetupCheck>
       <Routes>
@@ -393,11 +416,21 @@ function App() {
         <Route
           path='/marketplace'
           element={
-            <AdminRoute>
-              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <MarketplacePage />
-              </Suspense>
-            </AdminRoute>
+            marketplaceConfig.enabled === false ? (
+              <NotFound />
+            ) : marketplaceConfig.requireAdmin ? (
+              <AdminRoute>
+                <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                  <MarketplacePage />
+                </Suspense>
+              </AdminRoute>
+            ) : (
+              <PrivateRoute>
+                <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                  <MarketplacePage />
+                </Suspense>
+              </PrivateRoute>
+            )
           }
         />
         <Route

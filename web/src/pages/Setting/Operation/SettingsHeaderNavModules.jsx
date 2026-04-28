@@ -46,6 +46,10 @@ export default function SettingsHeaderNavModules(props) {
       enabled: true,
       requireAuth: false, // 默认不需要登录鉴权
     },
+    marketplaceV2: {
+      enabled: true,
+      requireAdmin: false, // 默认所有登录用户可见
+    },
     docs: true,
     about: true,
   });
@@ -54,10 +58,12 @@ export default function SettingsHeaderNavModules(props) {
   function handleHeaderNavModuleChange(moduleKey) {
     return (checked) => {
       const newModules = { ...headerNavModules };
-      if (moduleKey === 'pricing') {
-        // 对于pricing模块，只更新enabled属性
+      if (moduleKey === 'pricing' || moduleKey === 'marketplaceV2') {
+        // 子配置模块只更新 enabled
         newModules[moduleKey] = {
-          ...newModules[moduleKey],
+          ...(typeof newModules[moduleKey] === 'object'
+            ? newModules[moduleKey]
+            : {}),
           enabled: checked,
         };
       } else {
@@ -77,6 +83,18 @@ export default function SettingsHeaderNavModules(props) {
     setHeaderNavModules(newModules);
   }
 
+  // 处理「模型」管理员限制开关
+  function handleMarketplaceAdminChange(checked) {
+    const newModules = { ...headerNavModules };
+    newModules.marketplaceV2 = {
+      ...(typeof newModules.marketplaceV2 === 'object'
+        ? newModules.marketplaceV2
+        : { enabled: true }),
+      requireAdmin: checked,
+    };
+    setHeaderNavModules(newModules);
+  }
+
   // 重置顶栏模块为默认配置
   function resetHeaderNavModules() {
     const defaultModules = {
@@ -85,6 +103,10 @@ export default function SettingsHeaderNavModules(props) {
       pricing: {
         enabled: true,
         requireAuth: false,
+      },
+      marketplaceV2: {
+        enabled: true,
+        requireAdmin: false,
       },
       docs: true,
       about: true,
@@ -142,6 +164,16 @@ export default function SettingsHeaderNavModules(props) {
           };
         }
 
+        // 后向兼容：marketplaceV2 没配过，注入默认（所有登录用户可见）
+        if (!modules.marketplaceV2) {
+          modules.marketplaceV2 = { enabled: true, requireAdmin: false };
+        } else if (typeof modules.marketplaceV2 === 'boolean') {
+          modules.marketplaceV2 = {
+            enabled: modules.marketplaceV2,
+            requireAdmin: false,
+          };
+        }
+
         setHeaderNavModules(modules);
       } catch (error) {
         // 使用默认配置
@@ -151,6 +183,10 @@ export default function SettingsHeaderNavModules(props) {
           pricing: {
             enabled: true,
             requireAuth: false,
+          },
+          marketplaceV2: {
+            enabled: true,
+            requireAdmin: false,
           },
           docs: true,
           about: true,
@@ -177,6 +213,12 @@ export default function SettingsHeaderNavModules(props) {
       title: t('模型广场'),
       description: t('模型定价，需要登录访问'),
       hasSubConfig: true, // 标识该模块有子配置
+    },
+    {
+      key: 'marketplaceV2',
+      title: t('模型'),
+      description: t('以模型为主体的精选展示页'),
+      hasSubConfig: true,
     },
     {
       key: 'docs',
@@ -245,7 +287,7 @@ export default function SettingsHeaderNavModules(props) {
                   <div style={{ marginLeft: '16px' }}>
                     <Switch
                       checked={
-                        module.key === 'pricing'
+                        module.key === 'pricing' || module.key === 'marketplaceV2'
                           ? headerNavModules[module.key]?.enabled
                           : headerNavModules[module.key]
                       }
@@ -255,11 +297,9 @@ export default function SettingsHeaderNavModules(props) {
                   </div>
                 </div>
 
-                {/* 为模型广场添加权限控制子开关 */}
+                {/* 模型广场：登录访问子开关 */}
                 {module.key === 'pricing' &&
-                  (module.key === 'pricing'
-                    ? headerNavModules[module.key]?.enabled
-                    : headerNavModules[module.key]) && (
+                  headerNavModules.pricing?.enabled && (
                     <div
                       style={{
                         borderTop: '1px solid var(--semi-color-border)',
@@ -304,6 +344,61 @@ export default function SettingsHeaderNavModules(props) {
                               headerNavModules.pricing?.requireAuth || false
                             }
                             onChange={handlePricingAuthChange}
+                            size='default'
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {/* 模型(marketplaceV2)：仅管理员访问子开关 */}
+                {module.key === 'marketplaceV2' &&
+                  headerNavModules.marketplaceV2?.enabled && (
+                    <div
+                      style={{
+                        borderTop: '1px solid var(--semi-color-border)',
+                        marginTop: '12px',
+                        paddingTop: '12px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div style={{ flex: 1, textAlign: 'left' }}>
+                          <div
+                            style={{
+                              fontWeight: '500',
+                              fontSize: '12px',
+                              color: 'var(--semi-color-text-1)',
+                              marginBottom: '2px',
+                            }}
+                          >
+                            {t('仅管理员访问')}
+                          </div>
+                          <Text
+                            type='secondary'
+                            size='small'
+                            style={{
+                              fontSize: '11px',
+                              color: 'var(--semi-color-text-2)',
+                              lineHeight: '1.4',
+                              display: 'block',
+                            }}
+                          >
+                            {t('关闭后所有登录用户都能访问「模型」页面')}
+                          </Text>
+                        </div>
+                        <div style={{ marginLeft: '16px' }}>
+                          <Switch
+                            checked={
+                              headerNavModules.marketplaceV2?.requireAdmin ===
+                              true
+                            }
+                            onChange={handleMarketplaceAdminChange}
                             size='default'
                           />
                         </div>

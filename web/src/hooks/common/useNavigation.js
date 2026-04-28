@@ -26,6 +26,7 @@ export const useNavigation = (t, docsLink, headerNavModules, isAdminUser = false
       home: true,
       console: true,
       pricing: true,
+      marketplaceV2: { enabled: true, requireAdmin: false },
       docs: true,
       about: true,
     };
@@ -53,7 +54,6 @@ export const useNavigation = (t, docsLink, headerNavModules, isAdminUser = false
         text: t('模型'),
         itemKey: 'marketplaceV2',
         to: '/marketplace',
-        adminOnly: true,
       },
       {
         text: t('文档'),
@@ -69,14 +69,27 @@ export const useNavigation = (t, docsLink, headerNavModules, isAdminUser = false
 
     // 根据配置过滤导航链接
     return allLinks.filter((link) => {
-      if (link.adminOnly) {
-        return isAdminUser;
-      }
       if (link.itemKey === 'pricing') {
-        // 支持新的pricing配置格式
+        // 支持新的 pricing 配置格式（{enabled, requireAuth}）
         return typeof modules.pricing === 'object'
           ? modules.pricing.enabled
           : modules.pricing;
+      }
+      if (link.itemKey === 'marketplaceV2') {
+        // marketplaceV2 默认开启 + 默认 requireAdmin=false（所有登录用户可见）
+        // 配置格式：{enabled: bool, requireAdmin: bool}
+        const cfg = modules.marketplaceV2;
+        let enabled = true;
+        let requireAdmin = false;
+        if (typeof cfg === 'object' && cfg !== null) {
+          enabled = cfg.enabled !== false;
+          requireAdmin = cfg.requireAdmin === true;
+        } else if (typeof cfg === 'boolean') {
+          enabled = cfg;
+        }
+        if (!enabled) return false;
+        if (requireAdmin && !isAdminUser) return false;
+        return true;
       }
       return modules[link.itemKey] === true;
     });
