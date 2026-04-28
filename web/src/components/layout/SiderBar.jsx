@@ -99,6 +99,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         text: t('请求日志'),
         itemKey: 'request_logs',
         to: '/request_logs',
+        className: isAdmin() ? '' : 'tableHiddle',
       },
       {
         text: t('账单'),
@@ -159,7 +160,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
     });
 
     return filteredItems;
-  }, [t, isModuleVisible]);
+  }, [t, isModuleVisible, isAdmin()]);
 
   const adminItems = useMemo(() => {
     const items = [
