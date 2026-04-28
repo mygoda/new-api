@@ -206,14 +206,6 @@ const PricingPage = ({ marketplaceMode = false } = {}) => {
 
   return (
     <div className='bg-white'>
-      {marketplaceMode && (
-        <UserDiscountBanner
-          userGroup={userGroupName}
-          ratio={effectiveUserRatio}
-          hasOverride={userOverrideRatio > 0}
-          t={t}
-        />
-      )}
       <Layout className='pricing-layout'>
         {!isMobile && (
           <Sider className='pricing-scroll-hide pricing-sidebar'>
@@ -222,6 +214,14 @@ const PricingPage = ({ marketplaceMode = false } = {}) => {
         )}
 
         <Content className='pricing-scroll-hide pricing-content'>
+          {marketplaceMode && (
+            <UserDiscountBanner
+              userGroup={userGroupName}
+              ratio={effectiveUserRatio}
+              hasOverride={userOverrideRatio > 0}
+              t={t}
+            />
+          )}
           <PricingContent
             {...allProps}
             isMobile={isMobile}
