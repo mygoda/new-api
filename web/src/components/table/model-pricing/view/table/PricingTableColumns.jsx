@@ -141,6 +141,26 @@ function renderSupportedEndpoints(endpoints) {
   );
 }
 
+// 把倍率转成「N 折」/「原价」/「Nx 倍率」文案
+function formatDiscountText(ratio, t) {
+  if (ratio == null || isNaN(ratio) || ratio <= 0) return null;
+  if (Math.abs(ratio - 1) < 1e-6) return t('原价');
+  if (ratio < 1) {
+    const zhe = ratio * 10;
+    const zheStr = Math.abs(zhe - Math.round(zhe)) < 1e-3
+      ? String(Math.round(zhe))
+      : zhe.toFixed(1);
+    return `${t('享')} ${zheStr} ${t('折')}`;
+  }
+  return `${ratio}x`;
+}
+
+function ratioSourceLabel(source, t) {
+  if (source === 'model') return t('模型专属倍率');
+  if (source === 'user') return t('用户专属倍率');
+  return t('分组倍率');
+}
+
 export const getPricingTableColumns = ({
   t,
   selectedGroup,
@@ -157,6 +177,7 @@ export const getPricingTableColumns = ({
 }) => {
   const isMobile = useIsMobile();
   const priceDataCache = new WeakMap();
+  const marketplacePriceDataCache = new WeakMap();
 
   const getPriceData = (record) => {
     let cache = priceDataCache.get(record);
@@ -171,6 +192,28 @@ export const getPricingTableColumns = ({
         quotaDisplayType: siteDisplayType,
       });
       priceDataCache.set(record, cache);
+    }
+    return cache;
+  };
+
+  // marketplace 模式下，价格按行内 `_user_effective_ratio` 计算
+  const getMarketplacePriceData = (record) => {
+    let cache = marketplacePriceDataCache.get(record);
+    if (!cache) {
+      const eff = Number(record._user_effective_ratio) > 0
+        ? Number(record._user_effective_ratio)
+        : 1;
+      const fakeGroup = '__user__';
+      cache = calculateModelPrice({
+        record,
+        selectedGroup: fakeGroup,
+        groupRatio: { [fakeGroup]: eff },
+        tokenUnit,
+        displayPrice,
+        currency,
+        quotaDisplayType: siteDisplayType,
+      });
+      marketplacePriceDataCache.set(record, cache);
     }
     return cache;
   };
@@ -239,6 +282,43 @@ export const getPricingTableColumns = ({
     render: (caps) => renderCapabilities(caps, t),
   };
 
+  // marketplace 模式下：每行显示当前用户对该模型的有效倍率与折扣
+  const discountColumn = {
+    title: t('折扣'),
+    dataIndex: '_user_effective_ratio',
+    width: 130,
+    sorter: (a, b) =>
+      Number(a._user_effective_ratio || 1) - Number(b._user_effective_ratio || 1),
+    render: (_v, record) => {
+      const ratio = Number(record._user_effective_ratio);
+      if (!ratio || ratio <= 0) return <span className='text-gray-400'>-</span>;
+      const text = formatDiscountText(ratio, t);
+      const ratioText = Math.abs(ratio - 1) < 1e-6
+        ? '1x'
+        : `${Number(ratio.toFixed(3))}x`;
+      const source = record._user_ratio_source;
+      const tagColor =
+        source === 'model' ? 'violet' : source === 'user' ? 'blue' : 'orange';
+      return (
+        <Tooltip content={ratioSourceLabel(source, t)}>
+          <div className='flex flex-col gap-1'>
+            <Tag color={tagColor} shape='circle' size='small'>
+              {ratioText}
+            </Tag>
+            {text && (
+              <span
+                className='text-xs'
+                style={{ color: 'var(--semi-color-text-2)' }}
+              >
+                {text}
+              </span>
+            )}
+          </div>
+        </Tooltip>
+      );
+    },
+  };
+
   const ratioColumn = {
     title: () => (
       <div className='flex items-center space-x-1'>
@@ -281,7 +361,9 @@ export const getPricingTableColumns = ({
     dataIndex: 'model_price',
     ...(isMobile ? {} : { fixed: 'right' }),
     render: (text, record, index) => {
-      const priceData = getPriceData(record);
+      const priceData = marketplaceMode
+        ? getMarketplacePriceData(record)
+        : getPriceData(record);
       const priceItems = getModelPriceItems(priceData, t, siteDisplayType);
 
       return (
@@ -301,6 +383,7 @@ export const getPricingTableColumns = ({
   columns.push(endpointColumn);
   if (marketplaceMode) {
     columns.push(capabilitiesColumn);
+    columns.push(discountColumn);
   }
   if (showRatio) {
     columns.push(ratioColumn);
