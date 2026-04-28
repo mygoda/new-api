@@ -73,28 +73,6 @@ function App() {
   const location = useLocation();
   const [statusState] = useContext(StatusContext);
 
-  // 获取模型广场权限配置
-  const pricingRequireAuth = useMemo(() => {
-    const headerNavModulesConfig = statusState?.status?.HeaderNavModules;
-    if (headerNavModulesConfig) {
-      try {
-        const modules = JSON.parse(headerNavModulesConfig);
-
-        // 处理向后兼容性：如果pricing是boolean，默认不需要登录
-        if (typeof modules.pricing === 'boolean') {
-          return false; // 默认不需要登录鉴权
-        }
-
-        // 如果是对象格式，使用requireAuth配置
-        return modules.pricing?.requireAuth === true;
-      } catch (error) {
-        console.error('解析顶栏模块配置失败:', error);
-        return false; // 默认不需要登录
-      }
-    }
-    return false; // 默认不需要登录
-  }, [statusState?.status?.HeaderNavModules]);
-
   // 获取「模型」(marketplaceV2) 权限配置：{enabled, requireAdmin}
   const marketplaceConfig = useMemo(() => {
     const fallback = { enabled: true, requireAdmin: false };
@@ -397,20 +375,11 @@ function App() {
         <Route
           path='/pricing'
           element={
-            pricingRequireAuth ? (
-              <PrivateRoute>
-                <Suspense
-                  fallback={<Loading></Loading>}
-                  key={location.pathname}
-                >
-                  <Pricing />
-                </Suspense>
-              </PrivateRoute>
-            ) : (
+            <AdminRoute>
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
                 <Pricing />
               </Suspense>
-            )
+            </AdminRoute>
           }
         />
         <Route
@@ -425,11 +394,9 @@ function App() {
                 </Suspense>
               </AdminRoute>
             ) : (
-              <PrivateRoute>
-                <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                  <MarketplacePage />
-                </Suspense>
-              </PrivateRoute>
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <MarketplacePage />
+              </Suspense>
             )
           }
         />

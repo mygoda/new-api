@@ -70,13 +70,15 @@ export const useNavigation = (t, docsLink, headerNavModules, isAdminUser = false
     // 根据配置过滤导航链接
     return allLinks.filter((link) => {
       if (link.itemKey === 'pricing') {
-        // 支持新的 pricing 配置格式（{enabled, requireAuth}）
-        return typeof modules.pricing === 'object'
+        // 模型广场（旧）—— 仅管理员可见
+        const enabled = typeof modules.pricing === 'object'
           ? modules.pricing.enabled
           : modules.pricing;
+        if (!enabled) return false;
+        return isAdminUser;
       }
       if (link.itemKey === 'marketplaceV2') {
-        // marketplaceV2 默认开启 + 默认 requireAdmin=false（所有登录用户可见）
+        // marketplaceV2 默认开启 + 默认 requireAdmin=false（所有用户可见，含未登录）
         // 配置格式：{enabled: bool, requireAdmin: bool}
         const cfg = modules.marketplaceV2;
         let enabled = true;
