@@ -876,7 +876,7 @@ console.log(response.choices[0].message.content);`}
                   <li><Text code>API_TIMEOUT_MS</Text> — {t('请求超时（毫秒），建议设大以支持长时任务')}</li>
                   <li><Text code>CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</Text> — {t('禁用非必要流量，减少额外请求')}</li>
                   <li><Text code>ANTHROPIC_MODEL</Text> {t('及')} <Text code>ANTHROPIC_DEFAULT_*_MODEL</Text> — {t('替换为本平台支持的模型，可在')}{' '}
-                    <Link to='/pricing' className='!text-[var(--semi-color-primary)]'>{t('模型广场')}</Link>{' '}
+                    <Link to='/marketplace' className='!text-[var(--semi-color-primary)]'>{t('模型广场')}</Link>{' '}
                     {t('查看完整列表')}</li>
                 </ul>
               </StepCard>
@@ -1484,7 +1484,7 @@ npm i -g opencode-ai`}</CodeBlock>
               <Paragraph className='!mb-4'>
                 {t('平台支持 OpenAI、Claude、Gemini、DeepSeek、通义千问等多家模型厂商，具体可用模型及定价请查看模型广场。')}
               </Paragraph>
-              <Link to='/pricing'>
+              <Link to='/marketplace'>
                 <button className='px-6 py-2 rounded-lg bg-[var(--semi-color-primary)] text-white hover:opacity-90 transition-opacity'>
                   {t('查看模型广场')} →
                 </button>
@@ -1519,7 +1519,7 @@ npm i -g opencode-ai`}</CodeBlock>
               >
                 <Paragraph>
                   {t('支持 GPT-4o、GPT-4、Claude 3.5/4、Gemini 2.0、DeepSeek V3/R1、通义千问等主流模型。具体列表请查看')}{' '}
-                  <Link to='/pricing' className='!text-[var(--semi-color-primary)]'>
+                  <Link to='/marketplace' className='!text-[var(--semi-color-primary)]'>
                     {t('模型广场')}
                   </Link>
                   。
