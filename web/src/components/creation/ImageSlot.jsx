@@ -110,19 +110,17 @@ const ImageSlot = ({ label, value, onChange, maxSizeMB = 10 }) => {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={[
-          'relative w-full aspect-[4/3] rounded-xl border-2 border-dashed transition-all duration-200 flex items-center justify-center overflow-hidden group',
+          'relative w-full aspect-[4/3] rounded-lg border-2 border-dashed transition-colors flex items-center justify-center overflow-hidden group',
           isFilled
-            ? 'border-transparent bg-gray-100 shadow-sm'
+            ? 'border-transparent bg-gray-50'
             : dragOver
-              ? 'border-blue-500 bg-blue-50/80 cursor-pointer scale-[1.02]'
-              : 'border-gray-300 bg-gradient-to-br from-gray-50 to-white hover:border-blue-400 hover:bg-blue-50/30 cursor-pointer',
+              ? 'border-blue-400 bg-blue-50/60 cursor-pointer'
+              : 'border-gray-200 bg-white hover:border-gray-300 cursor-pointer',
         ].join(' ')}
       >
         {uploading ? (
-          <div className='flex flex-col items-center gap-2'>
-            <div className='w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center'>
-              <Spin size='middle' />
-            </div>
+          <div className='flex flex-col items-center gap-1.5'>
+            <Spin size='middle' />
             <Text type='tertiary' className='!text-xs'>
               {t('上传中…')}
             </Text>
@@ -134,24 +132,21 @@ const ImageSlot = ({ label, value, onChange, maxSizeMB = 10 }) => {
               alt={label}
               className='w-full h-full object-cover'
             />
-            <div className='absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity' />
             <button
               type='button'
               onClick={(e) => {
                 e.stopPropagation();
                 onChange?.('');
               }}
-              className='absolute top-2 right-2 bg-black/60 hover:bg-red-500 backdrop-blur-sm rounded-lg p-1.5 text-white transition-all opacity-0 group-hover:opacity-100 shadow-lg'
+              className='absolute top-1.5 right-1.5 bg-black/50 hover:bg-black/70 rounded p-1 text-white transition-colors opacity-0 group-hover:opacity-100'
             >
               <X size={14} />
             </button>
           </>
         ) : (
-          <div className='flex flex-col items-center gap-2 text-gray-400 px-3 text-center'>
-            <div className='w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors'>
-              <ImagePlus size={22} strokeWidth={1.5} />
-            </div>
-            <Text type='tertiary' className='!text-xs !text-gray-500 font-medium'>
+          <div className='flex flex-col items-center gap-1.5 text-gray-400 px-3 text-center'>
+            <ImagePlus size={22} strokeWidth={1.5} />
+            <Text type='tertiary' className='!text-xs'>
               {t('点击 / 拖拽 / 粘贴')}
             </Text>
             <button
@@ -160,7 +155,7 @@ const ImageSlot = ({ label, value, onChange, maxSizeMB = 10 }) => {
                 e.stopPropagation();
                 setShowUrlInput((v) => !v);
               }}
-              className='inline-flex items-center gap-1 text-[11px] text-blue-500 hover:text-blue-700 mt-0.5 px-2 py-1 rounded-md hover:bg-blue-50 transition-colors'
+              className='inline-flex items-center gap-1 text-[11px] text-blue-500 hover:text-blue-700 mt-0.5'
             >
               <LinkIcon size={11} />
               {t('或粘贴图片 URL')}
@@ -176,12 +171,12 @@ const ImageSlot = ({ label, value, onChange, maxSizeMB = 10 }) => {
             value={urlText}
             onChange={(e) => setUrlText(e.target.value)}
             placeholder='https://...'
-            className='flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500'
+            className='flex-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:border-blue-400'
           />
           <button
             type='button'
             onClick={handleUrlSubmit}
-            className='px-3 py-1.5 text-xs bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg shadow-sm hover:shadow-md transition-shadow'
+            className='px-3 py-1.5 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors'
           >
             {t('确定')}
           </button>

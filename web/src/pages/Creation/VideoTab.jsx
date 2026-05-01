@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, Button, Toast, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { Send, Code2 } from 'lucide-react';
+import { Send, Code2, Sparkles } from 'lucide-react';
 
 import ModelPicker from '../../components/creation/ModelPicker';
 import PromptComposer from '../../components/creation/PromptComposer';
@@ -15,7 +15,6 @@ import AssetCard from '../../components/creation/AssetCard';
 import ImageSlot from '../../components/creation/ImageSlot';
 import DebugPanel from '../../components/playground/DebugPanel';
 
-import { VIDEO_MODELS, getModelSchema } from '../../constants/creation/models';
 import { normalize, validate, buildCurl } from '../../services/creation/normalizer';
 import {
   loadConfig,
@@ -31,6 +30,7 @@ import {
 } from '../../services/creation/storage';
 import { useVideoTaskPolling } from '../../hooks/creation/useVideoTaskPolling';
 import { useDebugState } from '../../hooks/creation/useDebugState';
+import { useDynamicModels } from '../../hooks/creation/useDynamicModels';
 import { API } from '../../helpers/api';
 
 const { Text } = Typography;
@@ -45,7 +45,6 @@ function defaultsFromSchema(schema) {
   return out;
 }
 
-// 单任务的轮询适配组件：把 Hook 包成 child component 才能动态多个
 const TaskPoller = ({ taskId, assetId, onUpdate, onTerminal }) => {
   useVideoTaskPolling(taskId, {
     onUpdate: (data) => onUpdate(assetId, data),
@@ -56,13 +55,12 @@ const TaskPoller = ({ taskId, assetId, onUpdate, onTerminal }) => {
 
 const VideoTab = () => {
   const { t } = useTranslation();
+  const { models, loading: modelsLoading, getSchemaFor } = useDynamicModels(MODALITY);
 
   const initial = loadConfig(MODALITY) || {};
-  const [model, setModel] = useState(initial.model || VIDEO_MODELS[0]?.modelName);
-  const schema = useMemo(() => getModelSchema(model), [model]);
-  const [params, setParams] = useState(
-    initial.params || defaultsFromSchema(schema),
-  );
+  const [model, setModel] = useState(initial.model || '');
+  const schema = useMemo(() => getSchemaFor(model), [model, getSchemaFor]);
+  const [params, setParams] = useState(initial.params || {});
   const [prompt, setPrompt] = useState(initial.prompt || '');
   const [mode, setMode] = useState(initial.mode || 't2v');
   const [imageFirst, setImageFirst] = useState(initial.image_first || '');
@@ -71,10 +69,21 @@ const VideoTab = () => {
   const [assets, setAssets] = useState(loadAssets);
   const debug = useDebugState();
 
-  // 模型支持的子模式集合
   const supportedModes = schema?.modes || ['t2v'];
 
-  // 模型切换：若当前 mode 不支持，强制回退到 t2v
+  // 自动选中第一个模型
+  useEffect(() => {
+    if (modelsLoading || models.length === 0) return;
+    const exists = models.some((m) => m.modelName === model);
+    if (!exists) {
+      const firstModel = models[0].modelName;
+      setModel(firstModel);
+      const sch = getSchemaFor(firstModel);
+      if (sch) setParams(defaultsFromSchema(sch));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelsLoading, models]);
+
   React.useEffect(() => {
     if (!supportedModes.includes(mode)) {
       setMode('t2v');
@@ -84,15 +93,13 @@ const VideoTab = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model]);
 
-  // 进入页面时恢复轮询：localStorage:active_tasks 里未结束的任务
   useEffect(() => {
     const active = loadActiveTasks();
     if (active.length === 0) return;
     setAssets((prev) => {
-      // 给每个 active task 在 list 中找 / 创建对应 asset
       const known = new Set(prev.map((a) => a.taskId).filter(Boolean));
       const toAdd = active
-        .filter((t) => !known.has(t.taskId))
+        .filter((t) => !known.has(t.taskId) && t.modality === MODALITY)
         .map((t) => ({
           id: genId(),
           modality: MODALITY,
@@ -111,7 +118,6 @@ const VideoTab = () => {
     saveConfig(MODALITY, { model, params, prompt, mode, image_first: imageFirst, image_last: imageLast });
   }, [model, params, prompt, mode, imageFirst, imageLast]);
 
-  // 实时预览请求体
   useEffect(() => {
     if (!schema || !prompt) {
       debug.setPreview(null);
@@ -135,7 +141,7 @@ const VideoTab = () => {
   }, [model, params, prompt, mode, imageFirst, imageLast]);
 
   const switchModel = useCallback((next) => {
-    const nextSchema = getModelSchema(next);
+    const nextSchema = getSchemaFor(next);
     if (!nextSchema) return;
     const filtered = {};
     for (const k of Object.keys(nextSchema.fields || {})) {
@@ -144,7 +150,7 @@ const VideoTab = () => {
     }
     setParams(filtered);
     setModel(next);
-  }, [params]);
+  }, [params, getSchemaFor]);
 
   const handleParamChange = useCallback((name, value) => {
     setParams((prev) => ({ ...prev, [name]: value }));
@@ -197,9 +203,7 @@ const VideoTab = () => {
       prev.map((a) => (a.id === assetId ? { ...a, ...patch } : a)),
     );
     updateAsset(assetId, patch);
-    const taskId = (
-      assets.find((a) => a.id === assetId) || {}
-    ).taskId;
+    const taskId = (assets.find((a) => a.id === assetId) || {}).taskId;
     if (taskId) untrackActiveTask(taskId);
   }, [assets]);
 
@@ -245,16 +249,12 @@ const VideoTab = () => {
     try {
       const res = await API.post(req.url, req.body);
       debug.setResponse(res?.data ?? res);
-      // 任务接口返回：{ task_id, status } 或直接 OpenAIVideo 形态
       const payload = res?.data?.data ?? res?.data;
       const taskId = payload?.task_id || payload?.id;
       if (!taskId) {
         throw new Error('upstream returned no task_id');
       }
-      const updated = {
-        status: 'in_progress',
-        taskId,
-      };
+      const updated = { status: 'in_progress', taskId };
       setAssets((prev) =>
         prev.map((a) => (a.id === placeholderId ? { ...a, ...updated } : a)),
       );
@@ -265,6 +265,7 @@ const VideoTab = () => {
         prompt,
         params: { ...params },
         createdAt: Date.now(),
+        modality: MODALITY,
       });
       Toast.info(t('任务已提交，开始生成…'));
     } catch (e) {
@@ -302,8 +303,7 @@ const VideoTab = () => {
   );
 
   return (
-    <div className='flex h-full overflow-hidden bg-gradient-to-br from-gray-50 to-white'>
-      {/* 隐藏的轮询挂载点 — 每个进行中任务一个 */}
+    <div className='flex h-full overflow-hidden'>
       {activeTasks.map((a) => (
         <TaskPoller
           key={a.taskId + ':' + a.id}
@@ -315,49 +315,52 @@ const VideoTab = () => {
       ))}
 
       {/* 左侧 - 设置面板 */}
-      <div className='w-[340px] flex-shrink-0 overflow-y-auto border-r border-gray-200/60 bg-white/95 backdrop-blur-sm'>
-        <div className='p-5 space-y-6'>
-          {/* 模型选择 */}
-          <div>
-            <div className='flex items-center gap-2 mb-3'>
-              <div className='w-1 h-4 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full'></div>
-              <Text strong className='!text-sm !text-gray-900'>
-                {t('选择模型')}
-              </Text>
-            </div>
-            <ModelPicker
-              models={VIDEO_MODELS}
-              value={model}
-              onChange={switchModel}
-            />
-          </div>
-
-          {/* 参数面板 */}
-          {schema && (
+      <div className='w-80 flex-shrink-0 overflow-y-auto border-r border-gray-100 bg-white'>
+        <Card bordered={false} bodyStyle={{ padding: 16 }}>
+          <div className='space-y-5'>
             <div>
-              <div className='flex items-center gap-2 mb-3'>
-                <div className='w-1 h-4 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full'></div>
-                <Text strong className='!text-sm !text-gray-900'>
-                  {t('生成参数')}
+              <div className='flex items-center gap-2 mb-2'>
+                <Sparkles size={16} className='text-gray-500' />
+                <Text strong className='!text-sm'>
+                  {t('模型')}
+                </Text>
+                <Text type='tertiary' className='!text-xs ml-auto'>
+                  {models.length} {t('个可用')}
                 </Text>
               </div>
-              <ParamPanel
-                schema={schema}
-                params={params}
-                onParamChange={handleParamChange}
+              <ModelPicker
+                models={models}
+                value={model}
+                onChange={switchModel}
+                loading={modelsLoading}
               />
             </div>
-          )}
-        </div>
+            {schema && (
+              <div>
+                <div className='flex items-center gap-2 mb-2'>
+                  <Text strong className='!text-sm'>
+                    {t('生成参数')}
+                  </Text>
+                </div>
+                <ParamPanel
+                  schema={schema}
+                  params={params}
+                  onParamChange={handleParamChange}
+                />
+              </div>
+            )}
+          </div>
+        </Card>
       </div>
 
+      {/* 中央 - 创作画布 */}
       <div className='flex-1 flex flex-col overflow-hidden'>
-        <div className='p-5 border-b border-gray-200/60 bg-white/95 backdrop-blur-sm shadow-sm space-y-4'>
-          {/* 子模式 Pill - 优化设计 */}
+        <div className='p-4 border-b border-gray-100 bg-white space-y-3'>
+          {/* 子模式 - Semi UI 标准按钮组风格 */}
           {supportedModes.length > 1 && (
             <div className='flex items-center gap-2'>
-              <Text className='!text-xs !text-gray-500 mr-1'>{t('生成模式')}</Text>
-              <div className='flex gap-1.5 p-1 bg-gray-100 rounded-lg'>
+              <Text className='!text-xs !text-gray-500'>{t('生成模式')}</Text>
+              <div className='inline-flex gap-0.5 p-0.5 bg-gray-100 rounded-md'>
                 {[
                   { key: 't2v', label: '文生视频' },
                   { key: 'i2v', label: '图生视频' },
@@ -370,9 +373,9 @@ const VideoTab = () => {
                       type='button'
                       onClick={() => setMode(m.key)}
                       className={[
-                        'px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200',
+                        'px-3 py-1 text-xs rounded transition-colors',
                         mode === m.key
-                          ? 'bg-white text-purple-600 shadow-sm'
+                          ? 'bg-white text-gray-900 shadow-sm'
                           : 'text-gray-600 hover:text-gray-900',
                       ].join(' ')}
                     >
@@ -383,26 +386,17 @@ const VideoTab = () => {
             </div>
           )}
 
-          {/* I2V / Keyframes 的图槽 */}
           {(mode === 'i2v' || mode === 'keyframes') && (
             <div
               className={
                 mode === 'keyframes'
-                  ? 'grid grid-cols-2 gap-4'
+                  ? 'grid grid-cols-2 gap-3 max-w-md'
                   : 'grid grid-cols-1 gap-3 max-w-xs'
               }
             >
-              <ImageSlot
-                label='首帧'
-                value={imageFirst}
-                onChange={setImageFirst}
-              />
+              <ImageSlot label='首帧' value={imageFirst} onChange={setImageFirst} />
               {mode === 'keyframes' && (
-                <ImageSlot
-                  label='尾帧'
-                  value={imageLast}
-                  onChange={setImageLast}
-                />
+                <ImageSlot label='尾帧' value={imageLast} onChange={setImageLast} />
               )}
             </div>
           )}
@@ -415,35 +409,27 @@ const VideoTab = () => {
             maxLength={1000}
           />
           <div className='flex items-center justify-between'>
-            <div className='px-3 py-1.5 rounded-lg bg-purple-50 border border-purple-100'>
-              <Text className='!text-xs !text-purple-700 font-medium'>
-                {estimate != null
-                  ? t('预计消耗 {{n}} 点', { n: estimate })
-                  : t('提交后按实际计费')}
-              </Text>
-            </div>
+            <Text type='tertiary' className='!text-xs'>
+              {estimate != null
+                ? t('预计消耗 {{n}} 点', { n: estimate })
+                : t('提交后按实际计费')}
+            </Text>
             <div className='flex items-center gap-2'>
               <Tooltip content={t('调试面板')}>
                 <Button
-                  theme={debug.showPanel ? 'solid' : 'light'}
-                  type={debug.showPanel ? 'primary' : 'tertiary'}
-                  icon={<Code2 size={15} />}
+                  theme={debug.showPanel ? 'solid' : 'borderless'}
+                  type='tertiary'
+                  icon={<Code2 size={14} />}
                   onClick={debug.togglePanel}
-                  className='shadow-sm'
                 />
               </Tooltip>
               <Button
                 theme='solid'
                 type='primary'
-                size='large'
-                icon={<Send size={16} />}
+                icon={<Send size={14} />}
                 loading={submitting}
                 onClick={handleSubmit}
-                className='shadow-lg shadow-purple-500/30 px-6'
-                style={{
-                  background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
-                  border: 'none',
-                }}
+                disabled={!model || !prompt.trim()}
               >
                 {t('生成视频')}
               </Button>
@@ -451,18 +437,13 @@ const VideoTab = () => {
           </div>
         </div>
 
-        <div className='flex-1 overflow-y-auto p-6'>
+        <div className='flex-1 overflow-y-auto p-4 bg-gray-50'>
           {videoAssets.length === 0 ? (
-            <div className='h-full flex flex-col items-center justify-center'>
-              <div className='w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center mb-4'>
-                <Send size={32} className='text-purple-600' strokeWidth={1.5} />
-              </div>
-              <Text className='!text-gray-400 !text-sm'>
-                {t('还没有作品，先来生成第一段吧～')}
-              </Text>
+            <div className='h-full flex items-center justify-center text-gray-400 text-sm'>
+              {t('还没有作品，先来生成第一段吧～')}
             </div>
           ) : (
-            <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5'>
+            <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
               {videoAssets.map((a) => (
                 <AssetCard
                   key={a.id}
@@ -477,7 +458,7 @@ const VideoTab = () => {
       </div>
 
       {debug.showPanel && (
-        <div className='w-[420px] flex-shrink-0 border-l border-gray-200/60 bg-white/95 backdrop-blur-sm overflow-hidden shadow-xl'>
+        <div className='w-96 flex-shrink-0 border-l border-gray-100 bg-white overflow-hidden'>
           <DebugPanel
             debugData={debug.debugData}
             activeDebugTab={debug.activeTab}

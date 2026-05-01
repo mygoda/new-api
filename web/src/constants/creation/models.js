@@ -327,3 +327,106 @@ export function getModelsForModality(modality) {
   if (modality === 'video') return VIDEO_MODELS;
   return [];
 }
+
+/**
+ * 为动态加载的模型推导兜底 schema
+ * 当 /api/pricing 返回的模型不在硬编码列表中时，根据厂商/模型名匹配最接近的预设
+ */
+export function inferModelSchema(modelInfo) {
+  const { modelName, vendor, modality } = modelInfo;
+  const lowerName = (modelName || '').toLowerCase();
+
+  // 1. 优先精确匹配
+  const exact = getModelSchema(modelName);
+  if (exact) return exact;
+
+  // 2. 按厂商/系列匹配预设
+  if (modality === 'image') {
+    if (vendor === 'midjourney' || /midjourney|^mj-/.test(lowerName)) {
+      const mj = IMAGE_MODELS.find((m) => m.modelName === 'midjourney');
+      return mj ? { ...mj, modelName, displayName: modelName } : null;
+    }
+    if (vendor === 'openai' || /gpt|dall-e/.test(lowerName)) {
+      const tpl = IMAGE_MODELS.find((m) => m.modelName === 'gpt-image-1');
+      return tpl ? { ...tpl, modelName, displayName: modelName } : null;
+    }
+    // 通用图像生成兜底
+    return {
+      modelName,
+      displayName: modelName,
+      vendor,
+      modality: 'image',
+      protocol: 'openai-image',
+      endpoint: '/v1/images/generations',
+      fields: {
+        size: {
+          type: FIELD.segmented,
+          options: ['1024x1024', '1024x1536', '1536x1024'],
+          default: '1024x1024',
+          group: PARAM_GROUP.basic,
+          label: '尺寸',
+        },
+        n: {
+          type: FIELD.number,
+          min: 1,
+          max: 4,
+          default: 1,
+          group: PARAM_GROUP.basic,
+          label: '生成数量',
+        },
+      },
+      pricing: { unit: '张', estimate: ({ n = 1 }) => 40 * n },
+    };
+  }
+
+  if (modality === 'video') {
+    if (vendor === 'kling' || /^kling/.test(lowerName)) {
+      const tpl = VIDEO_MODELS.find((m) => m.modelName === 'kling-v1-6');
+      return tpl ? { ...tpl, modelName, displayName: modelName } : null;
+    }
+    if (vendor === 'doubao' || /seedance|doubao/.test(lowerName)) {
+      const tpl = VIDEO_MODELS.find((m) => m.modelName === 'doubao-seedance-1-0-pro-250528');
+      return tpl ? { ...tpl, modelName, displayName: modelName } : null;
+    }
+    if (vendor === 'openai' || /sora/.test(lowerName)) {
+      const tpl = VIDEO_MODELS.find((m) => m.modelName === 'sora-2');
+      return tpl ? { ...tpl, modelName, displayName: modelName } : null;
+    }
+    // 通用视频生成兜底
+    return {
+      modelName,
+      displayName: modelName,
+      vendor,
+      modality: 'video',
+      protocol: 'openai-video',
+      endpoint: '/v1/video/generations',
+      modes: ['t2v'],
+      fields: {
+        duration: {
+          type: FIELD.segmented,
+          options: [5, 10],
+          default: 5,
+          group: PARAM_GROUP.basic,
+          label: '时长（秒）',
+        },
+        ratio: {
+          type: FIELD.ratio,
+          options: ['16:9', '9:16', '1:1'],
+          default: '16:9',
+          group: PARAM_GROUP.basic,
+          label: '宽高比',
+        },
+        seed: {
+          type: FIELD.seed,
+          default: -1,
+          group: PARAM_GROUP.advanced,
+          label: '随机种子',
+        },
+      },
+      pricing: { unit: '秒', estimate: ({ duration = 5 }) => Math.round(duration * 50) },
+    };
+  }
+
+  return null;
+}
+

@@ -1,125 +1,146 @@
 /*
 Copyright (C) 2025 QuantumNous
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-For commercial licensing, please contact support@quantumnous.com
+SPDX-License-Identifier: AGPL-3.0-or-later
 */
 
-import React, { useMemo } from 'react';
-import { Typography, Tag } from '@douyinfe/semi-ui';
+import React, { useMemo, useState } from 'react';
+import { Typography, Input, Spin, Empty } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { Sparkles, Check } from 'lucide-react';
+import { Search, Check } from 'lucide-react';
 
 const { Text } = Typography;
 
-// 厂商颜色映射
-const VENDOR_COLORS = {
-  openai: { bg: 'from-emerald-500 to-teal-600', light: 'bg-emerald-50 text-emerald-700' },
-  anthropic: { bg: 'from-orange-500 to-amber-600', light: 'bg-orange-50 text-orange-700' },
-  google: { bg: 'from-blue-500 to-indigo-600', light: 'bg-blue-50 text-blue-700' },
-  midjourney: { bg: 'from-purple-500 to-pink-600', light: 'bg-purple-50 text-purple-700' },
-  stability: { bg: 'from-cyan-500 to-blue-600', light: 'bg-cyan-50 text-cyan-700' },
-  doubao: { bg: 'from-red-500 to-pink-600', light: 'bg-red-50 text-red-700' },
-  jimeng: { bg: 'from-pink-500 to-rose-600', light: 'bg-pink-50 text-pink-700' },
-  kling: { bg: 'from-indigo-500 to-purple-600', light: 'bg-indigo-50 text-indigo-700' },
-  hailuo: { bg: 'from-violet-500 to-purple-600', light: 'bg-violet-50 text-violet-700' },
-  vidu: { bg: 'from-teal-500 to-cyan-600', light: 'bg-teal-50 text-teal-700' },
-  default: { bg: 'from-gray-500 to-gray-600', light: 'bg-gray-50 text-gray-700' },
-};
-
-const getVendorStyle = (vendor) => {
-  const v = (vendor || '').toLowerCase();
-  return VENDOR_COLORS[v] || VENDOR_COLORS.default;
-};
-
-// 模型卡片选择器：网格展示，单选高亮
-const ModelPicker = ({ models, value, onChange }) => {
+/**
+ * 模型选择器
+ *
+ * 设计：
+ * - 与 Playground 风格统一：中性灰色 + 清晰边框 + 极简
+ * - 支持搜索（模型多时实用）
+ * - 列表式展示（不用大卡片，节省空间）
+ * - 选中态：左侧蓝色竖条 + 浅灰背景
+ */
+const ModelPicker = ({ models, value, onChange, loading = false }) => {
   const { t } = useTranslation();
-  const list = useMemo(() => models || [], [models]);
+  const [keyword, setKeyword] = useState('');
 
-  if (!list.length) {
+  const list = useMemo(() => {
+    const arr = models || [];
+    if (!keyword.trim()) return arr;
+    const k = keyword.toLowerCase();
+    return arr.filter(
+      (m) =>
+        (m.modelName || '').toLowerCase().includes(k) ||
+        (m.displayName || '').toLowerCase().includes(k) ||
+        (m.vendor || '').toLowerCase().includes(k),
+    );
+  }, [models, keyword]);
+
+  if (loading) {
     return (
-      <div className='rounded-xl bg-gray-50 border border-dashed border-gray-200'>
-        <div className='py-8 text-center'>
-          <div className='w-12 h-12 rounded-full bg-gray-100 mx-auto mb-3 flex items-center justify-center'>
-            <Sparkles size={20} className='text-gray-400' />
-          </div>
-          <Text type='tertiary' className='!text-sm'>{t('暂无可用模型')}</Text>
-        </div>
+      <div className='py-8 flex justify-center'>
+        <Spin size='middle' />
       </div>
     );
   }
 
+  if (!models || models.length === 0) {
+    return (
+      <Empty
+        image={null}
+        description={
+          <Text type='tertiary' size='small'>
+            {t('暂无可用模型')}
+          </Text>
+        }
+        className='!py-6'
+      />
+    );
+  }
+
   return (
-    <div className='grid grid-cols-1 gap-2.5'>
-      {list.map((m) => {
-        const active = m.modelName === value;
-        const vStyle = getVendorStyle(m.vendor);
-        return (
-          <button
-            key={m.modelName}
-            type='button'
-            onClick={() => onChange?.(m.modelName)}
-            className={[
-              'group relative text-left rounded-xl transition-all duration-200 px-3.5 py-3 overflow-hidden',
-              active
-                ? 'bg-gradient-to-br from-blue-50 via-white to-purple-50 ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/10'
-                : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-md hover:-translate-y-0.5',
-            ].join(' ')}
-          >
-            {/* 选中状态指示器 */}
-            {active && (
-              <div className='absolute top-2 right-2 w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg'>
-                <Check size={12} className='text-white' strokeWidth={3} />
-              </div>
-            )}
+    <div className='space-y-2'>
+      {/* 搜索框 - 仅当模型超过 6 个时显示 */}
+      {models.length > 6 && (
+        <Input
+          prefix={<Search size={14} className='text-gray-400 ml-2' />}
+          placeholder={t('搜索模型')}
+          value={keyword}
+          onChange={setKeyword}
+          showClear
+          size='small'
+          className='!rounded-md'
+        />
+      )}
 
-            <div className='flex items-start gap-3'>
-              {/* 厂商图标 */}
-              <div
-                className={`flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br ${vStyle.bg} flex items-center justify-center shadow-md`}
+      {/* 模型列表 */}
+      <div className='space-y-1 max-h-[420px] overflow-y-auto pr-1 -mr-1'>
+        {list.length === 0 ? (
+          <div className='py-4 text-center'>
+            <Text type='tertiary' size='small'>
+              {t('未找到匹配的模型')}
+            </Text>
+          </div>
+        ) : (
+          list.map((m) => {
+            const active = m.modelName === value;
+            return (
+              <button
+                key={m.modelName}
+                type='button'
+                onClick={() => onChange?.(m.modelName)}
+                className={[
+                  'group relative w-full text-left rounded-md px-2.5 py-2 transition-colors',
+                  active
+                    ? 'bg-blue-50 border border-blue-200'
+                    : 'border border-transparent hover:bg-gray-50',
+                ].join(' ')}
               >
-                <Sparkles size={18} className='text-white' strokeWidth={2.5} />
-              </div>
+                {/* 左侧选中指示条 */}
+                {active && (
+                  <span className='absolute left-0 top-2 bottom-2 w-0.5 bg-blue-500 rounded-r' />
+                )}
 
-              <div className='flex-1 min-w-0'>
-                <div className='flex items-center gap-1.5 mb-0.5'>
-                  <Text
-                    strong
-                    className={`!text-sm truncate ${
-                      active ? '!text-gray-900' : '!text-gray-800'
-                    }`}
-                  >
-                    {m.displayName || m.modelName}
-                  </Text>
+                <div className='flex items-center gap-2 pl-1.5'>
+                  <div className='flex-1 min-w-0'>
+                    <div className='flex items-center gap-2'>
+                      <Text
+                        className={`!text-sm truncate ${
+                          active ? '!text-blue-700 font-medium' : '!text-gray-800'
+                        }`}
+                      >
+                        {m.displayName || m.modelName}
+                      </Text>
+                      {m.vendor && m.vendor !== 'other' && (
+                        <Text
+                          type='tertiary'
+                          className='!text-[10px] !text-gray-400 uppercase tracking-wide flex-shrink-0'
+                        >
+                          {m.vendor}
+                        </Text>
+                      )}
+                    </div>
+                    {m.description && (
+                      <Text
+                        type='tertiary'
+                        className='!text-[11px] !text-gray-400 truncate block'
+                      >
+                        {m.description}
+                      </Text>
+                    )}
+                  </div>
+                  {active && (
+                    <Check
+                      size={14}
+                      className='text-blue-500 flex-shrink-0'
+                      strokeWidth={2.5}
+                    />
+                  )}
                 </div>
-                <div className='flex items-center gap-1.5'>
-                  <span
-                    className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${vStyle.light}`}
-                  >
-                    {m.vendor}
-                  </span>
-                  <Text type='tertiary' className='!text-[11px] truncate'>
-                    {m.modality === 'video' ? t('视频生成') : t('图像生成')}
-                  </Text>
-                </div>
-              </div>
-            </div>
-          </button>
-        );
-      })}
+              </button>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 };
