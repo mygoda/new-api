@@ -36,9 +36,7 @@
 
 ## 配置入口
 
-管理员进入 **设置 → 运营设置** 页面底部，即可看到"渠道亲和性"配置区域。
-
-> **注意**：渠道亲和度组件需要在 `OperationSetting.jsx` 中引入 `SettingsChannelAffinity`。如果页面中没有显示，请确认该组件已正确导入和渲染。
+管理员进入 **设置 → 运营设置** 页面底部，即可看到"渠道亲和性"配置区域（前端组件 `SettingsChannelAffinity`，已在 `OperationSetting.jsx` 注册）。
 
 ---
 
@@ -314,14 +312,17 @@
 
 ### 缓存 Key 格式
 
+实际写入缓存时，命名空间前缀是 `new-api:channel_affinity:v1`，后缀拼接规则如下（中括号表示**可选段**）：
+
 ```
-new-api:channel_affinity:v1:[rule_name]:[using_group]:[affinity_value_hash]
+new-api:channel_affinity:v1[:<rule_name>][:<using_group>]:<affinity_value>
 ```
 
-其中：
-- `rule_name` — 仅在 `include_rule_name=true` 时包含
-- `using_group` — 仅在 `include_using_group=true` 时包含
-- `affinity_value_hash` — 亲和值原文（非哈希）
+- `rule_name` — 仅在规则开启 `include_rule_name=true` 时拼入
+- `using_group` — 仅在规则开启 `include_using_group=true` 时拼入
+- `affinity_value` — `key_sources` 提取出的**原文**（不做 hash），如 user_id、prompt_cache_key 等
+
+> 日志里显示的 `key_fp`（亲和值 SHA1 前 8 位）和 `key_hint`（首尾各 4 字符）是为了**展示脱敏**，与缓存 key 无关。
 
 ### 手动清除缓存
 
@@ -383,6 +384,53 @@ GET /api/log/channel_affinity_usage_cache?rule_name=claude+cli+trace&using_group
 - 缓存命中率（命中次数 / 总请求次数）
 - Token 用量（prompt / completion / total）
 - 缓存 Token 比例（反映上游 Prompt Cache 效果）
+
+---
+
+## 排查与验证
+
+### 如何确认一次请求是否命中亲和规则
+
+1. **看「使用日志」**（推荐）：admin 视角下，命中行的「渠道」Tag 右上角会出现一颗黄色 **✨**，hover 显示 `rule_name / selected_group / key_source / key_hint / key_fp`，点击可打开亲和缓存详情弹窗。
+2. **看 `admin_info.channel_affinity`**：日志详情里能看到完整字段（见下方"日志与监控"）。
+3. **看 admin 接口 `GET /api/option/channel_affinity_cache`**：返回当前缓存条目数；如果为 0 说明从来没有规则被命中过。
+
+### 「每次都同一个渠道但没有 ✨ 标记」是什么原因？
+
+如果使用日志没有 ✨，说明本次请求**没有匹配上任何亲和规则**，"每次都同一渠道"是普通调度的结果，与亲和度无关。常见原因：
+
+| 现象 | 排查 |
+|---|---|
+| **该模型在分组下只有 1 个启用渠道** | `SELECT a.\`group\`, a.model, COUNT(*) FROM abilities a JOIN channels c ON c.id=a.channel_id WHERE a.enabled=1 AND c.status=1 GROUP BY a.\`group\`, a.model;` 看是不是 `enabled_channels=1`。物理上没的选，跟亲和度无关。 |
+| **请求 path 不匹配规则的 `path_regex`** | 默认两条规则只覆盖 `/v1/responses`、`/v1/messages`。打 `/v1/chat/completions` 等其他端点不会命中。 |
+| **规则匹配但 `key_sources` 取不到值** | `gjson + metadata.user_id` 要求请求体里**真的带这个字段**。普通 SDK / curl 不会带，只有 Claude CLI 等工具默认带。 |
+| **规则首次命中** | 第 1 次命中规则时**写缓存**但**返回 `(0, false)` 不绑定**，下一次同 key 才会读到 channel。所以"第一次"日志里也不会有 ✨。 |
+| **缓存 TTL 过期** | 默认 3600s。低频用户两次请求间隔超过 TTL 就会重新选渠道。 |
+
+### 想让特定流量走亲和度，怎么做？
+
+1. **先确认该模型在「渠道管理」里有 ≥2 个启用渠道**，否则亲和无意义。
+2. **再确认请求的 path / model 能命中规则**（默认两条不够就自己加一条）。
+3. **再确认 `key_sources` 能从请求里取到稳定的值**（推荐用 `context_int + id` 或 `context_int + token_id`，因为它们 100% 由 middleware 设进 context，免受客户端实现差异影响）。
+
+最稳的兜底配置（命中所有已认证请求）：
+
+```json
+{
+  "name": "fallback-token-affinity",
+  "model_regex": [".*"],
+  "path_regex": [],
+  "key_sources": [
+    { "type": "context_int", "key": "token_id" },
+    { "type": "context_int", "key": "id" }
+  ],
+  "ttl_seconds": 1800,
+  "include_using_group": true,
+  "include_rule_name": true
+}
+```
+
+将这条规则放在**列表最末尾**作为兜底，前面更精确的规则（如 codex/claude CLI trace）优先生效。
 
 ---
 

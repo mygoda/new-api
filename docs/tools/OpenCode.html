@@ -1,0 +1,127 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://platform.minimaxi.com/docs/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+<AgentInstructions>
+
+## Submitting Feedback
+
+If you encounter incorrect, outdated, or confusing documentation on this page, submit feedback:
+
+POST https://platform.minimaxi.com/docs/feedback
+
+```json
+{
+  "path": "/token-plan/opencode",
+  "feedback": "Description of the issue"
+}
+```
+
+Only submit feedback when you have something specific and actionable to report.
+
+</AgentInstructions>
+
+# OpenCode
+
+> 在 OpenCode 中使用 MiniMax 文本模型进行 AI 编程。
+
+## 安装 OpenCode
+
+* 使用 `curl` 安装 OpenCode
+
+```bash theme={null}
+curl -fsSL https://opencode.ai/install | bash
+```
+
+* 使用 `npm` 安装 OpenCode
+
+```bash theme={null}
+npm i -g opencode-ai
+```
+
+更多信息请参考 [OpenCode 官网](https://opencode.ai/)
+
+## 使用内置的 MiniMax-M2.7 模型
+
+<img src="https://filecdn.minimax.chat/public/27e87eed-d606-47a2-a229-3588b817d712.png" width="60%" />
+
+## 配置 MiniMax API
+
+<Steps>
+  <Step title="运行认证命令">
+    ```bash theme={null}
+    opencode auth login
+    ```
+  </Step>
+
+  <Step title="选择 Provider">
+    当提示选择 provider 时，搜索并选择 **"MiniMax Token Plan（minimaxi.com）"**
+
+    <img src="https://filecdn.minimax.chat/public/c09921c6-f2a3-4c04-b884-fa6b686364c0.png" width="60%" />
+  </Step>
+
+  <Step title="输入 API Key">
+    当提示输入 API 密钥时，输入您的 **MiniMax API Key**
+
+    <img src="https://filecdn.minimax.chat/public/d1439d2f-51cb-4c30-a3f2-754c89b468ac.png" width="80%" />
+  </Step>
+
+  <Step title="开始使用">
+    回到命令行界面，输入 `opencode` 开始使用 **MiniMax-M2.7**
+
+    <img src="https://filecdn.minimax.chat/public/b1c43e4f-f6ed-469e-9c4b-defc85726a30.png" width="80%" />
+  </Step>
+</Steps>
+
+**其他配置方式：**
+
+<Steps>
+  <Step title="编辑配置文件">
+    编辑 OpenCode 的配置文件，路径为 `~/.config/opencode/opencode.json`，将以下配置添加到配置文件中：
+
+    <Warning>
+      **重要提示:使用前请先清除 Anthropic 环境变量**
+
+      在配置前，请确保清除以下 Anthropic 相关的环境变量，以免影响 MiniMax API 的正常使用：
+
+      * `ANTHROPIC_AUTH_TOKEN`
+      * `ANTHROPIC_BASE_URL`
+    </Warning>
+
+    ```json theme={null}
+    {
+      "$schema": "https://opencode.ai/config.json",
+      "provider": {
+        "minimax": {
+          "npm": "@ai-sdk/anthropic",
+          "options": {
+            "baseURL": "https://api.minimaxi.com/anthropic/v1",
+            "apiKey": "<MINIMAX_API_KEY> (可选)"
+          },
+          "models": {
+            "MiniMax-M2.7": {
+              "name": "MiniMax-M2.7"
+            }
+          }
+        }
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="启动 OpenCode">
+    进入项目目录，启动 `opencode`
+
+    ```bash theme={null}
+    cd /path/to/your/project
+
+    opencode
+    ```
+  </Step>
+
+  <Step title="选择模型">
+    输入 `/models`，选择 "**MiniMax-M2.7**" 模型并在 OpenCode 中开始使用
+
+    <img src="https://filecdn.minimax.chat/token-plan/openclaw/zh-select-model-m27.jpg" width="80%" />
+  </Step>
+</Steps>

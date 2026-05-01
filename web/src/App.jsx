@@ -49,6 +49,7 @@ import Task from './pages/Task';
 import ModelPage from './pages/Model';
 import ModelDeploymentPage from './pages/ModelDeployment';
 import Playground from './pages/Playground';
+import Creation from './pages/Creation';
 import Subscription from './pages/Subscription';
 import OAuth2Callback from './components/auth/OAuth2Callback';
 import PersonalSetting from './components/settings/PersonalSetting';
@@ -177,6 +178,22 @@ function App() {
           element={
             <PrivateRoute>
               <Playground />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path='/console/creation'
+          element={
+            <PrivateRoute>
+              <Creation />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path='/console/creation/:tab'
+          element={
+            <PrivateRoute>
+              <Creation />
             </PrivateRoute>
           }
         />

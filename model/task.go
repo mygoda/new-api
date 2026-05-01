@@ -430,6 +430,21 @@ func TaskBulkUpdateByID(ids []int64, params map[string]any) error {
 		Updates(params).Error
 }
 
+// UpdateTaskResultURL 仅更新指定任务的 PrivateData.ResultURL 字段。
+// 用于 asset mirror 完成后回写镜像 URL；不动 status / progress / quota 等字段，避免与 CAS 冲突。
+func UpdateTaskResultURL(id int64, newURL string) error {
+	if newURL == "" {
+		return nil
+	}
+	var t Task
+	if err := DB.Select("id", "private_data").Where("id = ?", id).First(&t).Error; err != nil {
+		return err
+	}
+	t.PrivateData.ResultURL = newURL
+	return DB.Model(&Task{}).Where("id = ?", id).
+		Update("private_data", t.PrivateData).Error
+}
+
 type TaskQuotaUsage struct {
 	Mode  string  `json:"mode"`
 	Count float64 `json:"count"`

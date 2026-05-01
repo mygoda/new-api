@@ -445,6 +445,12 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		} else if taskResult.Url != "" {
 			// Direct upstream URL (e.g. Kling, Ali, Doubao, etc.)
 			task.PrivateData.ResultURL = taskResult.Url
+			// 可选：异步把上游短期 URL 镜像到我们对象存储；成功后回写 ResultURL
+			MirrorUpstreamURLAsync(task.TaskID, task.UserId, taskResult.Url, func(newURL string) {
+				if err := model.UpdateTaskResultURL(task.ID, newURL); err != nil {
+					common.SysError("UpdateTaskResultURL after mirror failed: " + err.Error())
+				}
+			})
 		} else {
 			// No URL from adaptor — construct proxy URL using public task ID
 			task.PrivateData.ResultURL = taskcommon.BuildProxyURL(task.TaskID)

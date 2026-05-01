@@ -1,0 +1,131 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://platform.minimaxi.com/docs/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+<AgentInstructions>
+
+## Submitting Feedback
+
+If you encounter incorrect, outdated, or confusing documentation on this page, submit feedback:
+
+POST https://platform.minimaxi.com/docs/feedback
+
+```json
+{
+  "path": "/token-plan/openclaw",
+  "feedback": "Description of the issue"
+}
+```
+
+Only submit feedback when you have something specific and actionable to report.
+
+</AgentInstructions>
+
+# OpenClaw
+
+> 在 OpenClaw 中使用 MiniMax M2.7 模型。
+
+## 安装 OpenClaw
+
+在终端中运行以下命令安装（老用户同样可以用此命令更新）：
+
+<Tabs>
+  <Tab title="macOS / Linux">
+    ```bash theme={null}
+    curl -fsSL https://openclaw.bot/install.sh | bash
+    ```
+  </Tab>
+
+  <Tab title="Windows">
+    ```powershell theme={null}
+    iwr -useb https://openclaw.ai/install.ps1 | iex
+    ```
+  </Tab>
+</Tabs>
+
+***
+
+## 配置 MiniMax 模型
+
+安装完成后会自动进入配置引导。若没有自动开始，运行：
+
+```bash theme={null}
+openclaw configure
+```
+
+选择认证方式开始配置：
+
+<Tabs>
+  <Tab title="OAuth 登录（推荐）">
+    <Steps>
+      <Step title="选择 Gateway 和模块">
+        * Where will the Gateway run? → 选择 **Local (this machine)**
+        * Select sections to configure → 选择 **Model**
+        * Model/auth provider → 选择 **MiniMax**
+        * MiniMax auth method → 选择 **MiniMax CN — OAuth (minimaxi.com)**
+
+        <img src="https://filecdn.minimax.chat/public/31b13265-79e4-4162-8985-de00fbfe2b87.png" style={{borderRadius: '8px', marginTop: '12px', maxWidth: '100%'}} />
+      </Step>
+
+      <Step title="登录授权">
+        自动弹出登录页，登录并授权。
+
+        <img src="https://filecdn.minimax.chat/public/809a685b-8fca-4aa5-bdbf-4d2536f8f8fb.jpeg" style={{borderRadius: '8px', marginTop: '12px', maxWidth: '60%'}} />
+      </Step>
+
+      <Step title="确认模型">
+        系统默认勾选 `MiniMax-M2.5` 和 `MiniMax-M2.7`，并将 M2.7 设为默认，直接回车确认即可。
+
+        <img src="https://filecdn.minimax.chat/public/02f7f340-ba3f-4b04-9798-aaa7168a2a2f.png" style={{borderRadius: '8px', marginTop: '12px', maxWidth: '100%'}} />
+      </Step>
+
+      <Step title="验证">
+        输入 `openclaw tui`，能正常对话即配置成功。
+
+        <img src="https://filecdn.minimax.chat/public/2e90577e-ff97-4b74-8511-45f64fe02fd3.png" style={{borderRadius: '8px', marginTop: '12px', maxWidth: '100%'}} />
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="API Key 手动配置">
+    <Steps>
+      <Step title="选择认证方式">
+        * Where will the Gateway run? → 选择 **Local (this machine)**
+        * Select sections to configure → 选择 **Model**
+        * Model/auth provider → 选择 **MiniMax**
+        * MiniMax auth method：
+          * 中国大陆用户 → **MiniMax CN — API Key (minimaxi.com)**
+          * 海外用户 → **MiniMax Global — API Key (minimax.io)**
+
+        <img src="https://mintcdn.com/minimax-zh/kpwl9avqkcFIxqOO/images/openclaw-auth-method-apikey.png?fit=max&auto=format&n=kpwl9avqkcFIxqOO&q=85&s=afb339d8649cdc393dff2c9286569454" style={{borderRadius: '8px', marginTop: '12px', maxWidth: '100%'}} width="1594" height="418" data-path="images/openclaw-auth-method-apikey.png" />
+      </Step>
+
+      <Step title="填写 API Key">
+        填入你的 MiniMax API Key，然后回车使用默认模型选项。
+      </Step>
+
+      <Step title="完成功能配置">
+        按需配置以下选项：
+
+        * **Channel**：选择在哪个 App 中对话
+        * **Skill**：按需安装技能
+        * **Hooks**（可选）：
+          * 💾 `session-memory`：执行 `/new` 时自动保存会话上下文
+          * 📝 `command-logger`：记录所有命令到日志文件
+          * 🚀 `boot-md`：网关启动时运行 BOOT.md
+      </Step>
+
+      <Step title="验证">
+        输入 `openclaw tui`，能正常对话即配置成功。
+
+        <img src="https://filecdn.minimax.chat/public/f2775a9a-e0b8-4eef-b2f7-2440cc6e622d.png" style={{borderRadius: '8px', marginTop: '12px', maxWidth: '100%'}} />
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+***
+
+<Tip>
+  使用 MiniMax 作为模型提供商时，OpenClaw 的 `image` 工具会自动接入 MiniMax [图像理解 MCP 服务](/token-plan/mcp-guide)，无需额外配置即可获得图像理解能力。
+</Tip>

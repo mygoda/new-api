@@ -52,6 +52,7 @@ const routerMap = {
   request_logs: '/console/request-logs',
   billing: '/console/billing',
   playground: '/console/playground',
+  creation: '/console/creation',
   personal: '/console/personal',
   dealer_users: '/console/dealer/users',
   dealer_billing: '/console/dealer/billing',
@@ -251,6 +252,11 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         text: t('操练场'),
         itemKey: 'playground',
         to: '/playground',
+      },
+      {
+        text: t('创作中心'),
+        itemKey: 'creation',
+        to: '/creation',
       },
       {
         text: t('聊天'),

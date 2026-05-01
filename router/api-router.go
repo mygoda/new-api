@@ -57,6 +57,11 @@ func SetApiRouter(router *gin.Engine) {
 		// Universal secure verification routes
 		apiRouter.POST("/verify", middleware.UserAuth(), middleware.CriticalRateLimit(), controller.UniversalVerify)
 
+		// 创作中心：图床
+		// 上传走 UserAuth；获取走任意（local 模式回源，凭 URL 即可访问）
+		apiRouter.POST("/upload/image", middleware.UserAuth(), controller.UploadImage)
+		apiRouter.GET("/upload/file/*path", controller.ServeUploadedFile)
+
 		userRoute := apiRouter.Group("/user")
 		{
 			userRoute.POST("/register", middleware.CriticalRateLimit(), middleware.TurnstileCheck(), controller.Register)
@@ -382,6 +387,15 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			taskRoute.GET("/self", middleware.UserAuth(), controller.GetUserTask)
 			taskRoute.GET("/", middleware.AdminAuth(), controller.GetAllTask)
+		}
+
+		creationRoute := apiRouter.Group("/creation")
+		creationRoute.Use(middleware.UserAuth())
+		{
+			creationRoute.GET("/assets", controller.GetCreationAssets)
+			creationRoute.POST("/assets", controller.CreateCreationAsset)
+			creationRoute.PUT("/assets/:id", controller.UpdateCreationAsset)
+			creationRoute.DELETE("/assets/:id", controller.DeleteCreationAsset)
 		}
 
 		vendorRoute := apiRouter.Group("/vendors")

@@ -1,0 +1,64 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://platform.minimaxi.com/docs/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+<AgentInstructions>
+
+## Submitting Feedback
+
+If you encounter incorrect, outdated, or confusing documentation on this page, submit feedback:
+
+POST https://platform.minimaxi.com/docs/feedback
+
+```json
+{
+  "path": "/token-plan/cline",
+  "feedback": "Description of the issue"
+}
+```
+
+Only submit feedback when you have something specific and actionable to report.
+
+</AgentInstructions>
+
+# Cline
+
+> 在 Cline 中使用 MiniMax-M2.7 模型进行 AI 编程。
+
+## 安装 Cline
+
+1. 打开 VS Code，点击左侧活动栏中的扩展图标，在搜索框中输入 `Cline`
+2. 点击 `Install` 按钮进行安装，安装完成后，可能需要重启 VS Code
+
+<img src="https://filecdn.minimax.chat/public/f1ba35cd-16b0-4bb3-aec0-6e27d5c5c7e9.png" width="80%" />
+
+3. 完成安装后，可以在左侧活动栏中看到 "Cline" 的图标
+
+<img src="https://filecdn.minimax.chat/public/cc07cac7-ef54-49ad-920a-5dd48c363911.png" width="60%" />
+
+<Warning>
+  若已安装 Cline，请升级至 3.47.0 或更高版本，并重启插件和 VS code 以确保正常使用。
+</Warning>
+
+## 配置 MiniMax API
+
+<Warning>
+  **重要提示：使用前请先清除 Anthropic 环境变量**
+
+  在配置前，请确保清除以下 Anthropic 相关的环境变量，以免影响 MiniMax API 的正常使用：
+
+  * `ANTHROPIC_AUTH_TOKEN`
+  * `ANTHROPIC_BASE_URL`
+</Warning>
+
+1. 点击"**Use your own API key**"按钮，进入 Cline 的参数配置界面
+2. API Provider -> 选择"**MiniMax**"
+3. MiniMax Entrypoint -> 选择 `api.minimaxi.com`
+4. MiniMax API Key -> 输入您的 **API Key**
+5. 点击右上角的 "Done"，保存配置
+
+<img src="https://filecdn.minimax.chat/public/89c64611-8294-4451-8172-7c1237e0fbd3.png" width="60%" />
+
+6. 勾选 Auto-approve 中的"Edit"选项框，开始使用"MiniMax-M2.7"
+
+<img src="https://filecdn.minimax.chat/public/fcc52e54-90ba-46ae-a798-d0b931543ca8.png" width="80%" />

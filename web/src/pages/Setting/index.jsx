@@ -34,6 +34,7 @@ import {
   CreditCard,
   Server,
   Activity,
+  Sparkles,
 } from 'lucide-react';
 
 import SystemSetting from '../../components/settings/SystemSetting';
@@ -44,6 +45,7 @@ import RateLimitSetting from '../../components/settings/RateLimitSetting';
 import ModelSetting from '../../components/settings/ModelSetting';
 import DashboardSetting from '../../components/settings/DashboardSetting';
 import RatioSetting from '../../components/settings/RatioSetting';
+import CreationSetting from '../../components/settings/CreationSetting';
 import ChatsSetting from '../../components/settings/ChatsSetting';
 import DrawingSetting from '../../components/settings/DrawingSetting';
 import PaymentSetting from '../../components/settings/PaymentSetting';
@@ -97,6 +99,16 @@ const Setting = () => {
       ),
       content: <DrawingSetting />,
       itemKey: 'drawing',
+    });
+    panes.push({
+      tab: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <Sparkles size={18} />
+          {t('创作中心设置')}
+        </span>
+      ),
+      content: <CreationSetting />,
+      itemKey: 'creation',
     });
     panes.push({
       tab: (
