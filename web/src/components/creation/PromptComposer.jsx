@@ -54,18 +54,23 @@ const PromptComposer = ({
   };
 
   return (
-    <div className='space-y-2'>
+    <div className='space-y-3'>
       <div className='flex items-center justify-between'>
-        <Text strong className='!text-sm'>
-          {t('提示词')}
-        </Text>
         <div className='flex items-center gap-2'>
+          <div className='w-1 h-4 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full'></div>
+          <Text strong className='!text-sm !text-gray-900'>
+            {t('提示词')}
+          </Text>
+        </div>
+        <div className='flex items-center gap-1'>
           {examples.length > 0 && (
             <Button
               size='small'
               theme='borderless'
-              icon={<Sparkles size={14} />}
+              type='tertiary'
+              icon={<Sparkles size={13} />}
               onClick={() => setShowExamples((v) => !v)}
+              className='!text-xs'
             >
               {t('示例')}
             </Button>
@@ -74,37 +79,45 @@ const PromptComposer = ({
             <Button
               size='small'
               theme='borderless'
-              icon={<Wand2 size={14} />}
+              type='primary'
+              icon={<Wand2 size={13} />}
               loading={enhancing}
               onClick={handleEnhance}
-            >
-              {t('优化')}
-            </Button>
-          </Tooltip>
-          <Tooltip content={t('字符数 / 上限')}>
-            <Text
-              type={len > maxLength ? 'danger' : 'tertiary'}
-              size='small'
               className='!text-xs'
             >
-              {len} / {maxLength}
-            </Text>
+              {t('AI 优化')}
+            </Button>
           </Tooltip>
+          <div className='w-px h-4 bg-gray-200 mx-1'></div>
+          <Text
+            type={len > maxLength ? 'danger' : 'tertiary'}
+            size='small'
+            className='!text-[11px] tabular-nums'
+          >
+            {len} / {maxLength}
+          </Text>
         </div>
       </div>
 
-      <Input
-        value={value}
-        onChange={onChange}
-        rows={5}
-        placeholder={t('描述你想要生成的内容…')}
-        autosize={{ minRows: 4, maxRows: 12 }}
-        showClear
-        className='!rounded-lg'
-      />
+      <div className='relative group'>
+        <Input
+          value={value}
+          onChange={onChange}
+          rows={5}
+          placeholder={t('描述你想要生成的内容…')}
+          autosize={{ minRows: 4, maxRows: 12 }}
+          showClear
+          className='!rounded-xl !text-sm'
+          style={{
+            background: '#fafafa',
+            border: '1.5px solid #e5e7eb',
+            transition: 'all 0.2s',
+          }}
+        />
+      </div>
 
       {showExamples && examples.length > 0 && (
-        <div className='grid grid-cols-2 gap-2 mt-2'>
+        <div className='grid grid-cols-2 gap-2 mt-2 animate-in fade-in slide-in-from-top-1 duration-200'>
           {examples.map((ex) => (
             <button
               key={ex.title}
@@ -113,37 +126,49 @@ const PromptComposer = ({
                 onChange(ex.text);
                 setShowExamples(false);
               }}
-              className='text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-xs'
+              className='group text-left px-3 py-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gradient-to-br hover:from-blue-50 hover:to-purple-50 hover:border-blue-300 hover:shadow-sm transition-all duration-200'
             >
-              <div className='font-medium mb-1'>{ex.title}</div>
-              <div className='text-gray-500 line-clamp-2'>{ex.text}</div>
+              <div className='flex items-center gap-1.5 mb-1'>
+                <Sparkles size={11} className='text-blue-500' />
+                <div className='font-semibold text-xs text-gray-900'>
+                  {ex.title}
+                </div>
+              </div>
+              <div className='text-gray-500 line-clamp-2 text-[11px]'>
+                {ex.text}
+              </div>
             </button>
           ))}
         </div>
       )}
 
       <Modal
-        title={t('提示词优化建议')}
+        title={
+          <span className='flex items-center gap-2'>
+            <Wand2 size={16} className='text-purple-600' />
+            {t('提示词优化建议')}
+          </span>
+        }
         visible={showEnhanced}
         onCancel={() => setShowEnhanced(false)}
         onOk={acceptEnhanced}
         okText={t('采用优化后的')}
         cancelText={t('保留原文')}
-        width={620}
+        width={680}
       >
         <Spin spinning={enhancing}>
           <Tabs type='line' size='small'>
             <TabPane tab={t('优化后')} itemKey='new'>
-              <div className='whitespace-pre-wrap text-sm bg-blue-50 p-3 rounded'>
+              <div className='whitespace-pre-wrap text-sm bg-gradient-to-br from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-100'>
                 {enhancedText}
               </div>
               <Text type='tertiary' className='!text-xs block mt-2'>
                 {t('使用模型：')}
-                {usedModel}
+                <span className='font-medium text-gray-700'>{usedModel}</span>
               </Text>
             </TabPane>
             <TabPane tab={t('原文')} itemKey='old'>
-              <div className='whitespace-pre-wrap text-sm bg-gray-50 p-3 rounded text-gray-500'>
+              <div className='whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded-lg border border-gray-200 text-gray-600'>
                 {value}
               </div>
             </TabPane>

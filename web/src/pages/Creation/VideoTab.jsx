@@ -302,7 +302,7 @@ const VideoTab = () => {
   );
 
   return (
-    <div className='flex h-full overflow-hidden'>
+    <div className='flex h-full overflow-hidden bg-gradient-to-br from-gray-50 to-white'>
       {/* 隐藏的轮询挂载点 — 每个进行中任务一个 */}
       {activeTasks.map((a) => (
         <TaskPoller
@@ -314,56 +314,72 @@ const VideoTab = () => {
         />
       ))}
 
-      <div className='w-80 flex-shrink-0 overflow-y-auto border-r border-gray-100 bg-white'>
-        <Card bordered={false} bodyStyle={{ padding: 16 }}>
-          <div className='space-y-5'>
-            <div>
-              <Text strong className='!text-sm'>{t('模型')}</Text>
-              <div className='mt-2'>
-                <ModelPicker
-                  models={VIDEO_MODELS}
-                  value={model}
-                  onChange={switchModel}
-                />
-              </div>
+      {/* 左侧 - 设置面板 */}
+      <div className='w-[340px] flex-shrink-0 overflow-y-auto border-r border-gray-200/60 bg-white/95 backdrop-blur-sm'>
+        <div className='p-5 space-y-6'>
+          {/* 模型选择 */}
+          <div>
+            <div className='flex items-center gap-2 mb-3'>
+              <div className='w-1 h-4 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full'></div>
+              <Text strong className='!text-sm !text-gray-900'>
+                {t('选择模型')}
+              </Text>
             </div>
-            {schema && (
+            <ModelPicker
+              models={VIDEO_MODELS}
+              value={model}
+              onChange={switchModel}
+            />
+          </div>
+
+          {/* 参数面板 */}
+          {schema && (
+            <div>
+              <div className='flex items-center gap-2 mb-3'>
+                <div className='w-1 h-4 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full'></div>
+                <Text strong className='!text-sm !text-gray-900'>
+                  {t('生成参数')}
+                </Text>
+              </div>
               <ParamPanel
                 schema={schema}
                 params={params}
                 onParamChange={handleParamChange}
               />
-            )}
-          </div>
-        </Card>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className='flex-1 flex flex-col overflow-hidden'>
-        <div className='p-4 border-b border-gray-100 bg-white space-y-3'>
-          {/* 子模式 Pill */}
+        <div className='p-5 border-b border-gray-200/60 bg-white/95 backdrop-blur-sm shadow-sm space-y-4'>
+          {/* 子模式 Pill - 优化设计 */}
           {supportedModes.length > 1 && (
-            <div className='flex flex-wrap gap-2'>
-              {[
-                { key: 't2v', label: '文生视频' },
-                { key: 'i2v', label: '图生视频' },
-                { key: 'keyframes', label: '首尾帧' },
-              ]
-                .filter((m) => supportedModes.includes(m.key))
-                .map((m) => (
-                  <button
-                    key={m.key}
-                    type='button'
-                    onClick={() => setMode(m.key)}
-                    className={[
-                      'px-3 py-1 text-xs rounded-full border transition-colors',
-                      mode === m.key
-                        ? 'bg-blue-500 text-white border-blue-500'
-                        : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400',
-                    ].join(' ')}
-                  >
-                    {t(m.label)}
-                  </button>
-                ))}
+            <div className='flex items-center gap-2'>
+              <Text className='!text-xs !text-gray-500 mr-1'>{t('生成模式')}</Text>
+              <div className='flex gap-1.5 p-1 bg-gray-100 rounded-lg'>
+                {[
+                  { key: 't2v', label: '文生视频' },
+                  { key: 'i2v', label: '图生视频' },
+                  { key: 'keyframes', label: '首尾帧' },
+                ]
+                  .filter((m) => supportedModes.includes(m.key))
+                  .map((m) => (
+                    <button
+                      key={m.key}
+                      type='button'
+                      onClick={() => setMode(m.key)}
+                      className={[
+                        'px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200',
+                        mode === m.key
+                          ? 'bg-white text-purple-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900',
+                      ].join(' ')}
+                    >
+                      {t(m.label)}
+                    </button>
+                  ))}
+              </div>
             </div>
           )}
 
@@ -372,7 +388,7 @@ const VideoTab = () => {
             <div
               className={
                 mode === 'keyframes'
-                  ? 'grid grid-cols-2 gap-3'
+                  ? 'grid grid-cols-2 gap-4'
                   : 'grid grid-cols-1 gap-3 max-w-xs'
               }
             >
@@ -399,26 +415,35 @@ const VideoTab = () => {
             maxLength={1000}
           />
           <div className='flex items-center justify-between'>
-            <Text type='tertiary' className='!text-xs'>
-              {estimate != null
-                ? t('预计消耗 {{n}} 点', { n: estimate })
-                : t('提交后按实际计费')}
-            </Text>
+            <div className='px-3 py-1.5 rounded-lg bg-purple-50 border border-purple-100'>
+              <Text className='!text-xs !text-purple-700 font-medium'>
+                {estimate != null
+                  ? t('预计消耗 {{n}} 点', { n: estimate })
+                  : t('提交后按实际计费')}
+              </Text>
+            </div>
             <div className='flex items-center gap-2'>
               <Tooltip content={t('调试面板')}>
                 <Button
-                  theme={debug.showPanel ? 'solid' : 'borderless'}
-                  type='tertiary'
-                  icon={<Code2 size={14} />}
+                  theme={debug.showPanel ? 'solid' : 'light'}
+                  type={debug.showPanel ? 'primary' : 'tertiary'}
+                  icon={<Code2 size={15} />}
                   onClick={debug.togglePanel}
+                  className='shadow-sm'
                 />
               </Tooltip>
               <Button
                 theme='solid'
                 type='primary'
-                icon={<Send size={14} />}
+                size='large'
+                icon={<Send size={16} />}
                 loading={submitting}
                 onClick={handleSubmit}
+                className='shadow-lg shadow-purple-500/30 px-6'
+                style={{
+                  background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                  border: 'none',
+                }}
               >
                 {t('生成视频')}
               </Button>
@@ -426,13 +451,18 @@ const VideoTab = () => {
           </div>
         </div>
 
-        <div className='flex-1 overflow-y-auto p-4 bg-gray-50'>
+        <div className='flex-1 overflow-y-auto p-6'>
           {videoAssets.length === 0 ? (
-            <div className='h-full flex items-center justify-center text-gray-400 text-sm'>
-              {t('还没有作品，先来生成第一段吧～')}
+            <div className='h-full flex flex-col items-center justify-center'>
+              <div className='w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center mb-4'>
+                <Send size={32} className='text-purple-600' strokeWidth={1.5} />
+              </div>
+              <Text className='!text-gray-400 !text-sm'>
+                {t('还没有作品，先来生成第一段吧～')}
+              </Text>
             </div>
           ) : (
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5'>
               {videoAssets.map((a) => (
                 <AssetCard
                   key={a.id}
@@ -447,7 +477,7 @@ const VideoTab = () => {
       </div>
 
       {debug.showPanel && (
-        <div className='w-96 flex-shrink-0 border-l border-gray-100 bg-white overflow-hidden'>
+        <div className='w-[420px] flex-shrink-0 border-l border-gray-200/60 bg-white/95 backdrop-blur-sm overflow-hidden shadow-xl'>
           <DebugPanel
             debugData={debug.debugData}
             activeDebugTab={debug.activeTab}

@@ -254,11 +254,6 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         to: '/playground',
       },
       {
-        text: t('创作中心'),
-        itemKey: 'creation',
-        to: '/creation',
-      },
-      {
         text: t('聊天'),
         itemKey: 'chat',
         items: chatItems,
@@ -273,6 +268,24 @@ const SiderBar = ({ onNavigate = () => {} }) => {
 
     return filteredItems;
   }, [chatItems, t, isModuleVisible]);
+
+  const creationItems = useMemo(() => {
+    const items = [
+      {
+        text: t('创作中心'),
+        itemKey: 'creation',
+        to: '/creation',
+      },
+    ];
+
+    // 根据配置过滤项目
+    const filteredItems = items.filter((item) => {
+      const configVisible = isModuleVisible('chat', item.itemKey);
+      return configVisible;
+    });
+
+    return filteredItems;
+  }, [t, isModuleVisible]);
 
   // 更新路由映射，添加聊天路由
   const updateRouterMapWithChats = (chats) => {
@@ -498,6 +511,19 @@ const SiderBar = ({ onNavigate = () => {} }) => {
               )}
               {chatMenuItems.map((item) => renderSubItem(item))}
             </div>
+          )}
+
+          {/* 创作中心区域 */}
+          {hasSectionVisibleModules('chat') && creationItems.length > 0 && (
+            <>
+              <Divider className='sidebar-divider' />
+              <div className='sidebar-section'>
+                {!collapsed && (
+                  <div className='sidebar-group-label'>{t('创作')}</div>
+                )}
+                {creationItems.map((item) => renderNavItem(item))}
+              </div>
+            </>
           )}
 
           {/* 控制台区域 */}
