@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 */
 
 import React, { useMemo, useState } from 'react';
-import { Typography, Input, Spin, Empty } from '@douyinfe/semi-ui';
+import { Typography, Input, Spin } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import { Search, Check } from 'lucide-react';
 
@@ -45,15 +45,14 @@ const ModelPicker = ({ models, value, onChange, loading = false }) => {
 
   if (!models || models.length === 0) {
     return (
-      <Empty
-        image={null}
-        description={
-          <Text type='tertiary' size='small'>
-            {t('暂无可用模型')}
-          </Text>
-        }
-        className='!py-6'
-      />
+      <div className='py-6 px-3 text-center bg-gray-50 rounded-md border border-dashed border-gray-200'>
+        <Text type='tertiary' size='small' className='block mb-1'>
+          {t('暂无可用模型')}
+        </Text>
+        <Text type='tertiary' className='!text-[11px] !text-gray-400'>
+          {t('请在「模型管理」中启用相关模型')}
+        </Text>
+      </div>
     );
   }
 

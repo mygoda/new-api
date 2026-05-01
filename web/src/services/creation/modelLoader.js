@@ -1,81 +1,99 @@
 // services/creation/modelLoader.js
 //
-// 从 /api/pricing 加载模型并按模态过滤
-// 图像生成: supported_endpoint_types 包含 image-generation
-// 视频生成: supported_endpoint_types 包含 openai-video
+// 从「模型管理」（GET /api/creation/models）加载模型并按模态过滤
+//
+// 后端 endpoints 字段（model_meta.endpoints，逗号分隔字符串）的可能值：
+//   - chat / image / video / audio / embedding / rerank ...
+//   - 或者更细粒度的 endpoint type：image-generation / openai-video 等
+//
+// 我们同时支持这两种命名约定，确保兼容
+//
+// 不再使用硬编码 fallback：模型管理里没启用的就不显示
 
 import { API } from '../../helpers/api';
 
-const ENDPOINT_TYPE_MAP = {
-  image: ['image-generation'],
-  video: ['openai-video'],
+// 模态对应的 endpoint 关键字
+const ENDPOINT_KEYWORDS = {
+  image: ['image', 'image-generation', 'images', 'midjourney', 'mj'],
+  video: ['video', 'openai-video', 'kling', 'sora', 'jimeng-video', 'hailuo', 'vidu'],
 };
 
-// MJ 等特殊模型的识别规则（不依赖 endpoint_types）
-const SPECIAL_MODEL_PATTERNS = {
-  image: [/midjourney/i, /^mj-/i],
-  video: [/^kling/i, /^sora/i, /seedance/i, /jimeng-video/i, /hailuo/i, /vidu/i],
-};
-
-let pricingCache = null;
+let modelsCache = null;
 let lastFetchTime = 0;
 const CACHE_TTL = 60 * 1000; // 60s
 
-async function fetchPricing() {
+async function fetchModels() {
   const now = Date.now();
-  if (pricingCache && now - lastFetchTime < CACHE_TTL) {
-    return pricingCache;
+  if (modelsCache && now - lastFetchTime < CACHE_TTL) {
+    return modelsCache;
   }
   try {
-    const res = await API.get('/api/pricing');
+    const res = await API.get('/api/creation/models');
     if (res?.data?.success) {
-      pricingCache = res.data.data || [];
+      modelsCache = res.data.data || [];
       lastFetchTime = now;
-      return pricingCache;
+      return modelsCache;
     }
   } catch (e) {
-    console.error('[creation] fetch pricing failed', e);
+    console.error('[creation] fetch models failed', e);
   }
-  return pricingCache || [];
+  return modelsCache || [];
 }
 
-// 厂商识别（基于 owner_by 或模型名称前缀）
+// 厂商识别（基于 vendor_name 或模型名前缀）
 function detectVendor(model) {
-  const owner = (model.owner_by || '').toLowerCase();
+  const vendor = (model.vendor_name || '').toLowerCase();
+  if (vendor) return vendor;
+
+  const name = (model.model_name || '').toLowerCase();
+  if (name.includes('gpt') || name.includes('dall-e') || name.includes('o1')) return 'openai';
+  if (name.includes('claude')) return 'anthropic';
+  if (name.includes('gemini') || name.includes('imagen')) return 'google';
+  if (name.match(/midjourney|^mj-/)) return 'midjourney';
+  if (name.includes('stable-')) return 'stability';
+  if (name.includes('doubao') || name.includes('seedance') || name.includes('seedream')) return 'doubao';
+  if (name.includes('jimeng')) return 'jimeng';
+  if (name.includes('kling')) return 'kling';
+  if (name.includes('hailuo') || name.includes('minimax')) return 'hailuo';
+  if (name.includes('vidu')) return 'vidu';
+  if (name.includes('sora')) return 'openai';
+  return 'other';
+}
+
+// 判断模型是否支持目标模态
+function matchModality(model, modality) {
+  const keywords = ENDPOINT_KEYWORDS[modality] || [];
+  const endpoints = (model.endpoints || []).map((e) => e.toLowerCase());
+  const tags = (model.tags || '').toLowerCase();
   const name = (model.model_name || '').toLowerCase();
 
-  if (owner.includes('openai') || name.includes('gpt') || name.includes('dall-e')) return 'openai';
-  if (owner.includes('anthropic') || name.includes('claude')) return 'anthropic';
-  if (owner.includes('google') || name.includes('gemini') || name.includes('imagen')) return 'google';
-  if (owner.includes('midjourney') || name.includes('midjourney') || name.match(/^mj-/)) return 'midjourney';
-  if (owner.includes('stability') || name.includes('stable-')) return 'stability';
-  if (owner.includes('doubao') || name.includes('doubao') || name.includes('seedance') || name.includes('seedream')) return 'doubao';
-  if (owner.includes('jimeng') || name.includes('jimeng')) return 'jimeng';
-  if (owner.includes('kling') || name.includes('kling')) return 'kling';
-  if (owner.includes('hailuo') || name.includes('hailuo') || name.includes('minimax')) return 'hailuo';
-  if (owner.includes('vidu') || name.includes('vidu')) return 'vidu';
-  return owner || 'other';
+  // 1. endpoints 字段精确匹配
+  if (endpoints.some((e) => keywords.includes(e))) return true;
+
+  // 2. tags 字段包含模态关键字
+  if (keywords.some((k) => tags.includes(k))) return true;
+
+  // 3. 模型名包含模态特征（兜底，针对未配置 endpoints 的旧模型）
+  if (modality === 'video') {
+    if (/sora|kling|seedance|jimeng-video|hailuo|vidu|veo/.test(name)) return true;
+  }
+  if (modality === 'image') {
+    if (/dall-e|midjourney|^mj-|imagen|stable-diffusion|gpt-image|seedream|jimeng-img/.test(name)) return true;
+  }
+
+  return false;
 }
 
 /**
  * 加载指定模态的可用模型列表
  * @param {'image' | 'video'} modality
- * @returns {Promise<Array>} 模型列表，已转换成 { modelName, displayName, vendor, modality, ... }
+ * @returns {Promise<Array>} 模型列表
  */
 export async function loadModelsForModality(modality) {
-  const pricing = await fetchPricing();
-  if (!Array.isArray(pricing)) return [];
+  const all = await fetchModels();
+  if (!Array.isArray(all)) return [];
 
-  const targetEndpoints = ENDPOINT_TYPE_MAP[modality] || [];
-  const specialPatterns = SPECIAL_MODEL_PATTERNS[modality] || [];
-
-  const filtered = pricing.filter((m) => {
-    // 1. 按 endpoint_types 过滤
-    const types = m.supported_endpoint_types || [];
-    if (types.some((t) => targetEndpoints.includes(t))) return true;
-    // 2. 按特殊模型名匹配
-    return specialPatterns.some((re) => re.test(m.model_name || ''));
-  });
+  const filtered = all.filter((m) => matchModality(m, modality));
 
   return filtered.map((m) => ({
     modelName: m.model_name,
@@ -84,16 +102,14 @@ export async function loadModelsForModality(modality) {
     modality,
     icon: m.icon || '',
     description: m.description || '',
-    quotaType: m.quota_type, // 0=按 token / 1=按次
-    modelPrice: m.model_price,
-    modelRatio: m.model_ratio,
-    enableGroups: m.enable_groups || [],
     tags: m.tags || '',
-    raw: m, // 保留原始数据
+    endpoints: m.endpoints || [],
+    capabilities: m.capabilities || [],
+    raw: m,
   }));
 }
 
-export function clearPricingCache() {
-  pricingCache = null;
+export function clearModelsCache() {
+  modelsCache = null;
   lastFetchTime = 0;
 }

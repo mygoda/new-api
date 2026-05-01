@@ -146,6 +146,58 @@ func GetMarketplaceModels(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": list})
 }
 
+// CreationModelInfo 创作中心使用的精简模型信息
+// 不包含价格倍率等敏感字段，仅暴露：模型名、描述、图标、endpoints、capabilities
+type CreationModelInfo struct {
+	ModelName       string   `json:"model_name"`
+	Description     string   `json:"description,omitempty"`
+	Icon            string   `json:"icon,omitempty"`
+	Tags            string   `json:"tags,omitempty"`
+	VendorID        int      `json:"vendor_id,omitempty"`
+	VendorName      string   `json:"vendor_name,omitempty"`
+	Endpoints       []string `json:"endpoints,omitempty"`        // 模型管理表中显式配置的 endpoints
+	Capabilities    []string `json:"capabilities,omitempty"`     // 能力标签（vision / function-call 等）
+}
+
+// GetCreationModels 公开接口：返回模型管理（model_meta 表）中已启用的模型列表
+//
+// 设计目的：
+//   - 让创作中心从「模型管理」获取真实的模型列表（而不是 pricing/abilities 的合并）
+//   - 不暴露任何价格、倍率等敏感信息
+//   - 通过 endpoints 字段供前端按模态过滤
+//
+// 鉴权：公开接口，未登录也可访问
+func GetCreationModels(c *gin.Context) {
+	var models []*model.Model
+	if err := model.DB.Where("status = ?", 1).Find(&models).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+
+	// 加载 vendors 用于回填 vendor_name
+	vendors := model.GetVendors()
+	vendorMap := make(map[int]string, len(vendors))
+	for _, v := range vendors {
+		vendorMap[v.ID] = v.Name
+	}
+
+	list := make([]CreationModelInfo, 0, len(models))
+	for _, m := range models {
+		info := CreationModelInfo{
+			ModelName:    m.ModelName,
+			Description:  m.Description,
+			Icon:         m.Icon,
+			Tags:         m.Tags,
+			VendorID:     m.VendorID,
+			VendorName:   vendorMap[m.VendorID],
+			Endpoints:    splitEndpoints(m.Endpoints),
+			Capabilities: splitCapabilities(m.Capabilities),
+		}
+		list = append(list, info)
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": list})
+}
+
 // GetMarketplaceModelDetail admin-only 模型广场（新）单模型详情
 func GetMarketplaceModelDetail(c *gin.Context) {
 	name := c.Param("name")
