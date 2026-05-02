@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -61,10 +62,33 @@ func splitCapabilities(s string) []string {
 	return out
 }
 
+// splitEndpoints 解析 model_meta.endpoints 字段
+//
+// 该字段历史上有两种存储格式：
+//   - JSON 数组字符串：["openai","anthropic"]（新格式）
+//   - 逗号分隔：openai,anthropic（旧格式）
+//
+// 此函数兼容两种格式
 func splitEndpoints(s string) []string {
+	s = strings.TrimSpace(s)
 	if s == "" {
 		return nil
 	}
+	// 优先尝试 JSON 数组解析
+	if strings.HasPrefix(s, "[") {
+		var arr []string
+		if err := json.Unmarshal([]byte(s), &arr); err == nil {
+			out := make([]string, 0, len(arr))
+			for _, p := range arr {
+				p = strings.TrimSpace(p)
+				if p != "" {
+					out = append(out, p)
+				}
+			}
+			return out
+		}
+	}
+	// 退化到逗号分隔
 	parts := strings.Split(s, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
