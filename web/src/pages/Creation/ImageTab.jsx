@@ -6,15 +6,17 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Button, Toast, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { Send, Code2 } from 'lucide-react';
+import { Send, Code2, Layers } from 'lucide-react';
 
 import ModelPicker from '../../components/creation/ModelPicker';
 import PromptComposer from '../../components/creation/PromptComposer';
 import ParamPanel from '../../components/creation/ParamPanel';
 import AssetCard from '../../components/creation/AssetCard';
 import AssetGroupCard from '../../components/creation/AssetGroupCard';
+import BatchCompareCard from '../../components/creation/BatchCompareCard';
+import BatchModelPicker from '../../components/creation/BatchModelPicker';
 import PresetGrid from '../../components/creation/PresetGrid';
-import DebugPanel from '../../components/playground/DebugPanel';
+import CreationDebugPanel from '../../components/creation/CreationDebugPanel';
 
 import { normalize, validate, buildCurl } from '../../services/creation/normalizer';
 import {
@@ -32,7 +34,7 @@ import {
 import { useDebugState } from '../../hooks/creation/useDebugState';
 import { useMjTaskPolling } from '../../hooks/creation/useMjTaskPolling';
 import { useDynamicModels } from '../../hooks/creation/useDynamicModels';
-import { groupAssets } from '../../utils/creation/groupAssets';
+import { groupAssets, combineWithBatches } from '../../utils/creation/groupAssets';
 import { showErrorModal } from '../../utils/creation/errorReporter';
 import { API } from '../../helpers/api';
 import { tokenAuthHeader, loadActiveToken } from '../../services/creation/tokens';
@@ -68,6 +70,7 @@ const ImageTab = () => {
   const [prompt, setPrompt] = useState(initial.prompt || '');
   const [submitting, setSubmitting] = useState(false);
   const [assets, setAssets] = useState(loadAssets);
+  const [showBatch, setShowBatch] = useState(false);
   const debug = useDebugState();
 
   // 模型加载完成后自动选中 + 合并默认参数
@@ -317,6 +320,77 @@ const ImageTab = () => {
     }
   };
 
+  // 批量对比提交：同一提示词并发到多个模型
+  // 每个模型一条记录，共享 batchId；只取每个模型的第一张图
+  const handleBatchSubmit = async (modelNames) => {
+    if (!Array.isArray(modelNames) || modelNames.length < 2) return;
+    if (!prompt.trim()) {
+      Toast.warning(t('请先输入提示词'));
+      return;
+    }
+    if (!loadActiveToken()?.key) {
+      Toast.warning(t('请先在右上角选择或创建一个 Token'));
+      return;
+    }
+
+    setShowBatch(false);
+    setSubmitting(true);
+    const batchId = genId();
+    const placeholders = modelNames.map((name) => {
+      const id = genId();
+      return {
+        id,
+        groupId: id,         // 每个模型一个独立 group，便于 combineWithBatches 合并
+        batchId,
+        modality: MODALITY,
+        modelName: name,
+        prompt,
+        params: { ...params },
+        status: 'pending',
+        createdAt: Date.now(),
+      };
+    });
+    setAssets((prev) => [...placeholders, ...prev]);
+    placeholders.forEach((p) => appendAsset(p));
+    Toast.info(t('已发起 {{n}} 个模型并发对比生成', { n: modelNames.length }));
+
+    await Promise.all(
+      modelNames.map(async (name, idx) => {
+        const placeholderId = placeholders[idx].id;
+        const sch = getSchemaFor(name);
+        if (!sch) {
+          const patch = { status: 'failed', errorMessage: '该模型缺少 schema 配置' };
+          setAssets((prev) => prev.map((a) => (a.id === placeholderId ? { ...a, ...patch } : a)));
+          updateAsset(placeholderId, patch);
+          return;
+        }
+        try {
+          // 强制 n=1 简化对比
+          const unified = { model: name, prompt, ...params, n: 1 };
+          const req = normalize(unified, sch);
+          const res = await API.post(req.url, req.body, { headers: tokenAuthHeader() });
+          const items = res?.data?.data || [];
+          const url = items[0]?.url || (items[0]?.b64_json ? `data:image/png;base64,${items[0].b64_json}` : '');
+          if (!url) throw new Error('upstream returned no image');
+          const patch = { status: 'success', assetUrl: url };
+          setAssets((prev) => prev.map((a) => (a.id === placeholderId ? { ...a, ...patch } : a)));
+          updateAsset(placeholderId, patch);
+        } catch (e) {
+          const msg =
+            e?.response?.data?.error?.message ||
+            e?.response?.data?.message ||
+            e?.message ||
+            '请求失败';
+          const patch = { status: 'failed', errorMessage: msg };
+          setAssets((prev) => prev.map((a) => (a.id === placeholderId ? { ...a, ...patch } : a)));
+          updateAsset(placeholderId, patch);
+        }
+      }),
+    );
+
+    setSubmitting(false);
+  };
+
   const handleReplay = (asset) => {
     if (asset.modelName !== model) switchModel(asset.modelName);
     if (asset.params) setParams(asset.params);
@@ -379,6 +453,7 @@ const ImageTab = () => {
     (a) => a.taskId && (a.status === 'in_progress' || a.status === 'queued'),
   );
   const groupedAssets = useMemo(() => groupAssets(imageAssets), [imageAssets]);
+  const renderRows = useMemo(() => combineWithBatches(groupedAssets), [groupedAssets]);
 
   return (
     <div className='flex h-full overflow-hidden bg-[#fafafa]'>
@@ -446,7 +521,21 @@ const ImageTab = () => {
           ) : (
             <div className='p-6'>
               <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4'>
-                {groupedAssets.map((g) => {
+                {renderRows.map((row) => {
+                  if (row.kind === 'batch') {
+                    return (
+                      <div key={row.id} className='col-span-full'>
+                        <BatchCompareCard
+                          batch={row}
+                          onDelete={() => {
+                            setAssets((prev) => prev.filter((a) => a.batchId !== row.batchId));
+                            (row.items || []).forEach((it) => removeAsset(it.id));
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+                  const g = row;
                   const allSuccess = (g.items || []).every((it) => it.status === 'success');
                   const isMulti = (g.items || []).length > 1 && allSuccess;
                   if (isMulti) {
@@ -491,7 +580,18 @@ const ImageTab = () => {
             />
             <div className='mt-3 flex items-center justify-end'>
               <div className='flex items-center gap-2'>
-                <Tooltip content={t('调试面板（查看请求体 / cURL）')}>
+                <Tooltip content={t('批量对比 · 多模型同提示词')}>
+                  <Button
+                    theme='borderless'
+                    type='tertiary'
+                    icon={<Layers size={14} />}
+                    onClick={() => setShowBatch(true)}
+                    disabled={!prompt.trim() || models.length < 2}
+                  >
+                    {t('批量对比')}
+                  </Button>
+                </Tooltip>
+                <Tooltip content={t('调试面板（查看请求体 / 响应）')}>
                   <Button
                     theme={debug.showPanel ? 'solid' : 'borderless'}
                     type='tertiary'
@@ -518,17 +618,18 @@ const ImageTab = () => {
       </main>
 
       {debug.showPanel && (
-        <aside className='w-[400px] flex-shrink-0 border-l border-gray-200/70 bg-white overflow-hidden'>
-          <DebugPanel
-            debugData={debug.debugData}
-            activeDebugTab={debug.activeTab}
-            onActiveDebugTabChange={debug.setActiveTab}
-            styleState={{ isMobile: false }}
-            onCloseDebugPanel={debug.togglePanel}
-            customRequestMode={false}
-          />
+        <aside className='w-[420px] flex-shrink-0 border-l border-gray-200/70 bg-white overflow-hidden'>
+          <CreationDebugPanel debug={debug} onClose={debug.togglePanel} />
         </aside>
       )}
+
+      <BatchModelPicker
+        visible={showBatch}
+        models={models}
+        initial={model ? [model] : []}
+        onCancel={() => setShowBatch(false)}
+        onConfirm={(picked) => handleBatchSubmit(picked)}
+      />
     </div>
   );
 };

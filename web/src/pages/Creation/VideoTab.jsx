@@ -14,7 +14,7 @@ import ParamPanel from '../../components/creation/ParamPanel';
 import AssetCard from '../../components/creation/AssetCard';
 import ImageSlot from '../../components/creation/ImageSlot';
 import PresetGrid from '../../components/creation/PresetGrid';
-import DebugPanel from '../../components/playground/DebugPanel';
+import CreationDebugPanel from '../../components/creation/CreationDebugPanel';
 
 import { normalize, validate, buildCurl } from '../../services/creation/normalizer';
 import {
@@ -512,15 +512,8 @@ const VideoTab = () => {
       </main>
 
       {debug.showPanel && (
-        <aside className='w-[400px] flex-shrink-0 border-l border-gray-200/70 bg-white overflow-hidden'>
-          <DebugPanel
-            debugData={debug.debugData}
-            activeDebugTab={debug.activeTab}
-            onActiveDebugTabChange={debug.setActiveTab}
-            styleState={{ isMobile: false }}
-            onCloseDebugPanel={debug.togglePanel}
-            customRequestMode={false}
-          />
+        <aside className='w-[420px] flex-shrink-0 border-l border-gray-200/70 bg-white overflow-hidden'>
+          <CreationDebugPanel debug={debug} onClose={debug.togglePanel} />
         </aside>
       )}
     </div>

@@ -23,6 +23,7 @@ export function groupAssets(assets) {
         errorMessage: a.errorMessage,
         progress: a.progress,
         taskId: a.taskId,
+        batchId: a.batchId,
         items: [],
       });
       order.push(gid);
@@ -34,4 +35,39 @@ export function groupAssets(assets) {
   }
 
   return order.map((id) => groups.get(id));
+}
+
+// 进一步：把 batchId 相同的若干 group 聚合成一个 batch 行
+// 返回 [{ kind: 'batch' | 'group', ... }]
+export function combineWithBatches(groups) {
+  const out = [];
+  const batchMap = new Map();
+  for (const g of groups || []) {
+    if (g.batchId) {
+      if (!batchMap.has(g.batchId)) {
+        const batch = {
+          kind: 'batch',
+          id: g.batchId,
+          batchId: g.batchId,
+          modality: g.modality,
+          prompt: g.prompt,
+          params: g.params,
+          createdAt: g.createdAt,
+          items: [],
+          _idx: out.length,
+        };
+        batchMap.set(g.batchId, batch);
+        out.push(batch);
+      }
+      const b = batchMap.get(g.batchId);
+      // 一个 group 可能含多张图，但 batch 模式下我们强制 n=1，
+      // 因此取该 group 第一个 asset 即可
+      const first = (g.items || [])[0];
+      if (first) b.items.push(first);
+      if ((g.createdAt || 0) > (b.createdAt || 0)) b.createdAt = g.createdAt;
+    } else {
+      out.push({ kind: 'group', ...g });
+    }
+  }
+  return out;
 }
