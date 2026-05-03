@@ -19,11 +19,18 @@ const ENDPOINT_KEYWORDS = {
   chat: ['chat', 'chat-completions', 'completions', 'messages', 'responses'],
 };
 
-// 模型名兜底正则（endpoints/tags 都没匹配上时用）
+// capabilities 字段的关键字（多模态模型在「模型管理」里通常会标这些能力）
+const CAPABILITY_KEYWORDS = {
+  image: ['image-generation', 'image-edit', 'image', 'multimodal'],
+  video: ['video-generation', 'video', 'multimodal'],
+  chat: ['chat', 'function-calling', 'tool-use', 'multimodal'],
+};
+
+// 模型名兜底正则（endpoints/tags/capabilities 都没匹配上时用）
 const NAME_FALLBACK_REGEX = {
-  image: /dall-e|midjourney|^mj-|imagen|stable-diffusion|gpt-image|seedream|jimeng-img/,
+  image: /dall-e|midjourney|^mj-|imagen|stable-diffusion|gpt-image|seedream|jimeng-img|nano-banana|gemini[\w.-]*image|flux|sdxl|qwen-image/,
   video: /sora|kling|seedance|jimeng-video|hailuo|vidu|veo/,
-  chat: /gpt-[0-9]|^o[0-9]|claude|gemini-(pro|flash)|qwen|glm|deepseek|moonshot|yi-|llama/,
+  chat: /gpt-[0-9]|^o[0-9]|claude|gemini-(pro|flash|2|1)|qwen|glm|deepseek|moonshot|yi-|llama/,
 };
 
 // 暴露给 UI（admin "筛选规则" Popover 用）
@@ -33,11 +40,13 @@ export function getFilterRules(modality) {
     source: 'GET /api/creation/models（status=1 已启用）',
     modality,
     endpointKeywords: ENDPOINT_KEYWORDS[modality] || [],
+    capabilityKeywords: CAPABILITY_KEYWORDS[modality] || [],
     nameFallbackRegex: reg ? reg.source : '',
     matchOrder: [
       'endpoints 字段精确匹配（含 image/image-generation 等关键字）',
+      'capabilities 字段命中（multimodal/image-generation 等）',
       'tags 字段包含模态关键字',
-      '模型名命中模态兜底正则',
+      '模型名命中模态兜底正则（含 gemini 多模态系列）',
     ],
   };
 }
@@ -87,17 +96,22 @@ function detectVendor(model) {
 // 判断模型是否支持目标模态
 function matchModality(model, modality) {
   const keywords = ENDPOINT_KEYWORDS[modality] || [];
+  const capKeys = CAPABILITY_KEYWORDS[modality] || [];
   const endpoints = (model.endpoints || []).map((e) => e.toLowerCase());
+  const caps = (model.capabilities || []).map((c) => c.toLowerCase());
   const tags = (model.tags || '').toLowerCase();
   const name = (model.model_name || '').toLowerCase();
 
   // 1. endpoints 字段精确匹配
   if (endpoints.some((e) => keywords.includes(e))) return true;
 
-  // 2. tags 字段包含模态关键字
+  // 2. capabilities 字段命中（multimodal / image-generation 等）
+  if (caps.some((c) => capKeys.includes(c))) return true;
+
+  // 3. tags 字段包含模态关键字
   if (keywords.some((k) => tags.includes(k))) return true;
 
-  // 3. 模型名命中兜底正则
+  // 4. 模型名命中兜底正则
   const fallback = NAME_FALLBACK_REGEX[modality];
   if (fallback && fallback.test(name)) return true;
 

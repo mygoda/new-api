@@ -54,6 +54,22 @@ const Bubble = ({ rules, total, hit }) => (
       </div>
     </div>
 
+    {rules.capabilityKeywords && rules.capabilityKeywords.length > 0 && (
+      <div>
+        <Text type='tertiary' className='!text-[10px] !block mb-0.5'>capabilities 字段关键字</Text>
+        <div className='flex flex-wrap gap-1'>
+          {rules.capabilityKeywords.map((k) => (
+            <code
+              key={k}
+              className='px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded text-[11px] border border-purple-100'
+            >
+              {k}
+            </code>
+          ))}
+        </div>
+      </div>
+    )}
+
     {rules.nameFallbackRegex && (
       <div>
         <Text type='tertiary' className='!text-[10px] !block mb-0.5'>模型名兜底正则</Text>
