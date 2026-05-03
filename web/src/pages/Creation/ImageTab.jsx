@@ -489,19 +489,7 @@ const ImageTab = () => {
               maxLength={1000}
               onSubmit={handleSubmit}
             />
-            <div className='mt-3 flex items-center justify-between'>
-              <div className='flex items-center gap-2'>
-                {estimate != null ? (
-                  <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600'>
-                    <span className='w-1 h-1 rounded-full bg-blue-500' />
-                    {t('预计 {{n}} 点', { n: estimate })}
-                  </span>
-                ) : (
-                  <Text type='tertiary' className='!text-[11px]'>
-                    {t('按实际生成量计费')}
-                  </Text>
-                )}
-              </div>
+            <div className='mt-3 flex items-center justify-end'>
               <div className='flex items-center gap-2'>
                 <Tooltip content={t('调试面板（查看请求体 / cURL）')}>
                   <Button

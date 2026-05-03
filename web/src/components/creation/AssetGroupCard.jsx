@@ -13,6 +13,7 @@ import { Card, Button, Tag, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { Download, Copy, RotateCcw, Trash2, Sparkles, Maximize2, Wand2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import AssetCard from './AssetCard';
+import { copyText, downloadUrl } from '../../utils/creation/clipboard';
 
 const { Text, Paragraph } = Typography;
 
@@ -152,7 +153,7 @@ const AssetGroupCard = ({
                     model: group.modelName,
                     params: group.params || {},
                   };
-                  navigator.clipboard?.writeText(JSON.stringify(payload, null, 2));
+                  copyText(JSON.stringify(payload, null, 2));
                   onCopyPrompt?.(group);
                 }}
               />

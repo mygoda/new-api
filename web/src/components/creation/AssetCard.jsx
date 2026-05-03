@@ -8,6 +8,7 @@ import { Card, Button, Tag, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { Download, Copy, RotateCcw, Trash2, Image as ImageIcon, Video as VideoIcon, Sparkles, Maximize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getProgressNarrative } from '../../utils/creation/progressNarrative';
+import { copyText, downloadUrl } from '../../utils/creation/clipboard';
 
 const { Text, Paragraph } = Typography;
 
@@ -120,16 +121,6 @@ const AssetCard = ({ asset, onReplay, onDelete, onCopyPrompt, onRetry, onSwitchM
           <Tag size='small' color={isVideo ? 'violet' : 'blue'}>
             {asset.modelName}
           </Tag>
-          {asset.actualQuota != null && (
-            <Tag size='small' color='grey'>
-              {asset.actualQuota} {t('点')}
-            </Tag>
-          )}
-          {asset.estimatedQuota != null && asset.actualQuota == null && (
-            <Tag size='small' color='grey'>
-              ≈{asset.estimatedQuota} {t('点')}
-            </Tag>
-          )}
         </div>
 
         <Paragraph
@@ -151,7 +142,10 @@ const AssetCard = ({ asset, onReplay, onDelete, onCopyPrompt, onRetry, onSwitchM
                       type='tertiary'
                       icon={<Download size={13} />}
                       onClick={() =>
-                        window.open(asset.assetUrl, '_blank', 'noopener,noreferrer')
+                        downloadUrl(
+                          asset.assetUrl,
+                          `${asset.modelName || 'asset'}-${asset.id || Date.now()}.png`,
+                        )
                       }
                     />
                   </Tooltip>
@@ -161,7 +155,7 @@ const AssetCard = ({ asset, onReplay, onDelete, onCopyPrompt, onRetry, onSwitchM
                       theme='borderless'
                       type='tertiary'
                       icon={<Copy size={13} />}
-                      onClick={() => navigator.clipboard?.writeText(asset.assetUrl)}
+                      onClick={() => copyText(asset.assetUrl)}
                     />
                   </Tooltip>
                 </>
@@ -188,7 +182,7 @@ const AssetCard = ({ asset, onReplay, onDelete, onCopyPrompt, onRetry, onSwitchM
                       model: asset.modelName,
                       params: asset.params || {},
                     };
-                    navigator.clipboard?.writeText(JSON.stringify(payload, null, 2));
+                    copyText(JSON.stringify(payload, null, 2));
                     onCopyPrompt?.(asset);
                   }}
                 />

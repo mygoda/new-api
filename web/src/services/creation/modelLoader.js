@@ -16,6 +16,7 @@ import { API } from '../../helpers/api';
 const ENDPOINT_KEYWORDS = {
   image: ['image', 'image-generation', 'images', 'midjourney', 'mj'],
   video: ['video', 'openai-video', 'kling', 'sora', 'jimeng-video', 'hailuo', 'vidu'],
+  chat: ['chat', 'chat-completions', 'completions', 'messages', 'responses'],
 };
 
 let modelsCache = null;
@@ -80,6 +81,10 @@ function matchModality(model, modality) {
   if (modality === 'image') {
     if (/dall-e|midjourney|^mj-|imagen|stable-diffusion|gpt-image|seedream|jimeng-img/.test(name)) return true;
   }
+  if (modality === 'chat') {
+    // 仅靠模型名兜底：常见 chat 系列
+    if (/gpt-[0-9]|^o[0-9]|claude|gemini-(pro|flash)|qwen|glm|deepseek|moonshot|yi-|llama/.test(name)) return true;
+  }
 
   return false;
 }
@@ -112,4 +117,19 @@ export async function loadModelsForModality(modality) {
 export function clearModelsCache() {
   modelsCache = null;
   lastFetchTime = 0;
+}
+
+// 加载可用 Chat 模型（供"AI 优化提示词"使用）。
+// 用户需显式在前端选一个；没有候选时返回空数组。
+export async function loadChatModels() {
+  const all = await fetchModels();
+  if (!Array.isArray(all)) return [];
+
+  const filtered = all.filter((m) => matchModality(m, 'chat'));
+  return filtered.map((m) => ({
+    modelName: m.model_name,
+    vendor: detectVendor(m),
+    description: m.description || '',
+    endpoints: m.endpoints || [],
+  }));
 }

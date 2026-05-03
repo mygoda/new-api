@@ -4,10 +4,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Empty, Input, Select, Spin, Toast, Button, Tag } from '@douyinfe/semi-ui';
+import { Empty, Input, Spin, Toast, Button, Typography } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { Cloud, HardDrive } from 'lucide-react';
-import AssetCard from '../../components/creation/AssetCard';
+import { Cloud, HardDrive, Search, Image as ImageIcon, Video as VideoIcon, Grid3x3 } from 'lucide-react';
+import GalleryCard from '../../components/creation/GalleryCard';
 import { loadAssets, removeAsset } from '../../services/creation/storage';
 import {
   isCloudEnabled,
@@ -15,6 +15,14 @@ import {
   deleteCloudAsset,
   migrateLocalToCloud,
 } from '../../services/creation/cloudGallery';
+
+const { Text, Title } = Typography;
+
+const FILTERS = [
+  { key: 'all', label: '全部', icon: Grid3x3 },
+  { key: 'image', label: '图像', icon: ImageIcon },
+  { key: 'video', label: '视频', icon: VideoIcon },
+];
 
 const GalleryTab = () => {
   const { t } = useTranslation();
@@ -99,82 +107,156 @@ const GalleryTab = () => {
   };
 
   const filtered = useMemo(() => {
-    return assets.filter((a) => {
-      if (filter !== 'all' && a.modality !== filter) return false;
-      if (
-        keyword &&
-        !(a.prompt || '').toLowerCase().includes(keyword.toLowerCase())
-      )
-        return false;
-      return true;
-    });
+    return assets
+      .filter((a) => a.status === 'success' || !a.status)
+      .filter((a) => {
+        if (filter !== 'all' && a.modality !== filter) return false;
+        if (
+          keyword &&
+          !(a.prompt || '').toLowerCase().includes(keyword.toLowerCase())
+        )
+          return false;
+        return true;
+      });
   }, [assets, keyword, filter]);
 
+  const counts = useMemo(() => {
+    const out = { all: 0, image: 0, video: 0 };
+    for (const a of assets) {
+      if (a.status && a.status !== 'success') continue;
+      out.all += 1;
+      if (a.modality === 'image') out.image += 1;
+      if (a.modality === 'video') out.video += 1;
+    }
+    return out;
+  }, [assets]);
+
   return (
-    <div className='h-full overflow-y-auto p-4 bg-gray-50'>
-      <div className='flex flex-wrap gap-2 mb-4 items-center'>
-        <Input
-          value={keyword}
-          onChange={setKeyword}
-          placeholder={t('按提示词搜索')}
-          style={{ width: 280 }}
-          showClear
-        />
-        <Select
-          value={filter}
-          onChange={setFilter}
-          style={{ width: 140 }}
-          optionList={[
-            { label: t('全部'), value: 'all' },
-            { label: t('图像'), value: 'image' },
-            { label: t('视频'), value: 'video' },
-          ]}
-        />
+    <div className='h-full overflow-y-auto bg-[#fafafa]'>
+      {/* 顶部标题 + 数据源切换 */}
+      <div className='sticky top-0 z-10 bg-[#fafafa]/85 backdrop-blur-md border-b border-gray-200/60'>
+        <div className='max-w-[1400px] mx-auto px-6 pt-5 pb-3'>
+          <div className='flex items-baseline justify-between mb-4'>
+            <div>
+              <Title heading={5} className='!m-0 !text-gray-900'>
+                {t('作品库')}
+              </Title>
+              <Text type='tertiary' className='!text-[12px]'>
+                {useCloud ? t('云端归档') : t('本地浏览器记录')} · {filtered.length} {t('件作品')}
+              </Text>
+            </div>
 
-        {cloudEnabled && (
-          <>
-            <Button
-              theme={useCloud ? 'solid' : 'borderless'}
-              type={useCloud ? 'primary' : 'tertiary'}
-              icon={useCloud ? <Cloud size={14} /> : <HardDrive size={14} />}
-              onClick={toggleSource}
-            >
-              {useCloud ? t('云端') : t('本地')}
-            </Button>
-            {useCloud && (
-              <Button
-                size='small'
-                theme='borderless'
-                loading={migrating}
-                onClick={handleMigrate}
-              >
-                {t('迁移本地作品')}
-              </Button>
+            {cloudEnabled && (
+              <div className='flex items-center gap-2'>
+                <div className='inline-flex rounded-md border border-gray-200 bg-white p-0.5'>
+                  <button
+                    onClick={() => !useCloud || toggleSource()}
+                    className={[
+                      'inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] transition-colors',
+                      !useCloud
+                        ? 'bg-gray-900 text-white font-medium shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900',
+                    ].join(' ')}
+                  >
+                    <HardDrive size={12} />
+                    {t('本地')}
+                  </button>
+                  <button
+                    onClick={() => useCloud || toggleSource()}
+                    className={[
+                      'inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] transition-colors',
+                      useCloud
+                        ? 'bg-gray-900 text-white font-medium shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900',
+                    ].join(' ')}
+                  >
+                    <Cloud size={12} />
+                    {t('云端')}
+                  </button>
+                </div>
+                {useCloud && (
+                  <Button
+                    size='small'
+                    theme='borderless'
+                    type='tertiary'
+                    loading={migrating}
+                    onClick={handleMigrate}
+                    className='!text-[11px]'
+                  >
+                    {t('迁移本地作品')}
+                  </Button>
+                )}
+              </div>
             )}
-          </>
-        )}
+          </div>
 
-        <Tag size='small' className='ml-auto'>
-          {t('共 {{n}} 条', { n: filtered.length })}
-        </Tag>
+          {/* 过滤 + 搜索 */}
+          <div className='flex items-center gap-2'>
+            <div className='inline-flex rounded-md border border-gray-200 bg-white p-0.5'>
+              {FILTERS.map(({ key, label, icon: Icon }) => {
+                const active = filter === key;
+                const cnt = counts[key];
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={[
+                      'inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-[12px] transition-colors',
+                      active
+                        ? 'bg-gray-900 text-white font-medium shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900',
+                    ].join(' ')}
+                  >
+                    <Icon size={12} />
+                    {t(label)}
+                    <span
+                      className={[
+                        'ml-0.5 px-1 rounded text-[10px] tabular-nums',
+                        active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500',
+                      ].join(' ')}
+                    >
+                      {cnt}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <Input
+              value={keyword}
+              onChange={setKeyword}
+              prefix={<Search size={13} className='text-gray-400 ml-1' />}
+              placeholder={t('按提示词搜索…')}
+              className='!max-w-[320px]'
+              showClear
+            />
+          </div>
+        </div>
       </div>
 
-      <Spin spinning={loading}>
-        {filtered.length === 0 ? (
-          <Empty
-            title={t('暂无作品')}
-            description={t(
-              '在「图像」/「视频」Tab 完成第一次生成后，作品会自动归档到这里',
-            )}
-          />
-        ) : (
-          <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
-            {filtered.map((a) => (
-              <AssetCard key={a.id} asset={a} onDelete={handleDelete} />
-            ))}
-          </div>
-        )}
-      </Spin>
+      {/* 网格 */}
+      <div className='max-w-[1400px] mx-auto px-6 py-5'>
+        <Spin spinning={loading}>
+          {filtered.length === 0 ? (
+            <div className='py-20'>
+              <Empty
+                title={t('暂无作品')}
+                description={
+                  keyword || filter !== 'all'
+                    ? t('换个关键词或筛选条件试试')
+                    : t('到「图像」或「视频」Tab 生成第一件作品，它会自动归档到这里')
+                }
+              />
+            </div>
+          ) : (
+            <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3'>
+              {filtered.map((a) => (
+                <GalleryCard key={a.id} asset={a} onDelete={handleDelete} />
+              ))}
+            </div>
+          )}
+        </Spin>
+      </div>
     </div>
   );
 };

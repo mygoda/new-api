@@ -3,12 +3,13 @@ Copyright (C) 2025 QuantumNous
 SPDX-License-Identifier: AGPL-3.0-or-later
 */
 
-import React, { useState } from 'react';
-import { TextArea, Button, Tooltip, Typography, Modal, Tabs, TabPane, Spin, Toast } from '@douyinfe/semi-ui';
-import { Sparkles, Wand2, Tag as TagIcon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { TextArea, Button, Tooltip, Typography, Modal, Tabs, TabPane, Spin, Toast, Popover, Select } from '@douyinfe/semi-ui';
+import { Sparkles, Wand2, Tag as TagIcon, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { PROMPT_EXAMPLES } from '../../constants/creation/prompt-examples';
-import { enhancePrompt } from '../../services/creation/promptEnhance';
+import { enhancePrompt, getEnhancerModel, setEnhancerModel } from '../../services/creation/promptEnhance';
+import { loadChatModels } from '../../services/creation/modelLoader';
 import QuickTags from './QuickTags';
 
 const { Text } = Typography;
@@ -28,8 +29,24 @@ const PromptComposer = ({
   const [showEnhanced, setShowEnhanced] = useState(false);
   const [enhancedText, setEnhancedText] = useState('');
   const [usedModel, setUsedModel] = useState('');
+  const [enhancerModel, setEnhancerModelState] = useState(getEnhancerModel());
+  const [chatModels, setChatModels] = useState([]);
+  const [showEnhancerCfg, setShowEnhancerCfg] = useState(false);
   const examples = PROMPT_EXAMPLES[modality] || [];
   const len = (value || '').length;
+
+  useEffect(() => {
+    loadChatModels()
+      .then((list) => {
+        setChatModels(list || []);
+        // 首次无配置：默认选第一个 chat 模型作为兜底默认
+        if (!getEnhancerModel() && list && list.length > 0) {
+          setEnhancerModel(list[0].modelName);
+          setEnhancerModelState(list[0].modelName);
+        }
+      })
+      .catch(() => setChatModels([]));
+  }, []);
 
   // ⌘+Enter / Ctrl+Enter 提交
   const handleKeyDown = (e) => {
@@ -121,7 +138,7 @@ const PromptComposer = ({
         >
           {t('快速标签')}
         </Button>
-        <Tooltip content={t('用 Chat 模型重写提示词')}>
+        <Tooltip content={enhancerModel ? t('用 Chat 模型重写提示词') : t('请先在右侧齿轮中选择优化用的 Chat 模型')}>
           <Button
             size='small'
             theme='borderless'
@@ -132,8 +149,65 @@ const PromptComposer = ({
             className='!text-[11px] !text-gray-500 !h-6'
           >
             {t('AI 优化')}
+            {enhancerModel && (
+              <Text type='tertiary' className='!text-[10px] ml-1 !text-gray-400'>
+                · {enhancerModel}
+              </Text>
+            )}
           </Button>
         </Tooltip>
+        <Popover
+          trigger='click'
+          visible={showEnhancerCfg}
+          onVisibleChange={setShowEnhancerCfg}
+          position='bottomRight'
+          content={
+            <div className='p-3 w-72 space-y-2'>
+              <Text strong className='!text-[12px]'>
+                {t('选择「AI 优化」用的 Chat 模型')}
+              </Text>
+              <Text type='tertiary' className='!text-[11px] !block'>
+                {t('该模型用于把你的提示词重写得更具镜头语言。需为账户内可用的 Chat 模型。')}
+              </Text>
+              <Select
+                value={enhancerModel || undefined}
+                onChange={(v) => {
+                  setEnhancerModel(v);
+                  setEnhancerModelState(v);
+                  Toast.success(t('已切换为 ') + v);
+                }}
+                placeholder={t('请选择模型')}
+                style={{ width: '100%' }}
+                filter
+                showClear
+                onClear={() => {
+                  setEnhancerModel('');
+                  setEnhancerModelState('');
+                }}
+                emptyContent={
+                  <div className='p-2 text-xs text-gray-400'>
+                    {t('暂无可用 Chat 模型，请到「模型管理」启用')}
+                  </div>
+                }
+                optionList={chatModels.map((m) => ({
+                  label: m.modelName,
+                  value: m.modelName,
+                }))}
+              />
+            </div>
+          }
+        >
+          <Tooltip content={t('AI 优化设置')}>
+            <Button
+              size='small'
+              theme='borderless'
+              type='tertiary'
+              icon={<Settings2 size={12} />}
+              onClick={() => setShowEnhancerCfg((v) => !v)}
+              className='!text-gray-400 !h-6'
+            />
+          </Tooltip>
+        </Popover>
       </div>
 
       {/* 快速标签 */}

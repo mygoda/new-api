@@ -1,26 +1,28 @@
 // services/creation/promptEnhance.js
 //
 // 用账户内的 Chat 模型把用户的提示词重写得更具镜头语言、更详细。
-// 默认模型：localStorage:creation:enhancer_model || 'gpt-4o-mini'
 //
-// 不抛错：如果所有候选模型都不可用，返回 null 让调用方静默隐藏按钮。
+// 模型来源：必须由用户在前端"AI 优化"齿轮中显式配置；
+// 不再使用硬编码 fallback——避免猜错模型名导致默认走 404。
+//
+// 持久化：localStorage:creation:enhancer_model
 
 import { API } from '../../helpers/api';
 
 const STORAGE_KEY = 'creation:enhancer_model';
-const FALLBACK_MODELS = ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo', 'claude-3-5-haiku', 'glm-4-flash'];
 
 export function getEnhancerModel() {
   try {
-    return localStorage.getItem(STORAGE_KEY) || 'gpt-4o-mini';
+    return localStorage.getItem(STORAGE_KEY) || '';
   } catch {
-    return 'gpt-4o-mini';
+    return '';
   }
 }
 
 export function setEnhancerModel(name) {
   try {
-    localStorage.setItem(STORAGE_KEY, name);
+    if (name) localStorage.setItem(STORAGE_KEY, name);
+    else localStorage.removeItem(STORAGE_KEY);
   } catch {}
 }
 
@@ -32,7 +34,7 @@ Rewrite the user's prompt so it:
 - stays under 500 characters
 Return only the rewritten prompt, no explanation, no surrounding quotes.`;
 
-async function tryEnhance(model, modality, targetModel, prompt) {
+async function callChat(model, modality, targetModel, prompt) {
   const res = await API.post('/pg/chat/completions', {
     model,
     stream: false,
@@ -41,28 +43,30 @@ async function tryEnhance(model, modality, targetModel, prompt) {
       { role: 'user', content: prompt },
     ],
   });
-  // 兼容 OpenAI 标准响应
   const data = res?.data;
   const content = data?.choices?.[0]?.message?.content;
   return typeof content === 'string' ? content.trim() : null;
 }
 
-// 主入口；按优先级尝试多个模型
+// 主入口
 export async function enhancePrompt(modality, targetModel, prompt) {
-  const candidates = [getEnhancerModel(), ...FALLBACK_MODELS];
-  const seen = new Set();
-  let lastErr = null;
-  for (const m of candidates) {
-    if (!m || seen.has(m)) continue;
-    seen.add(m);
-    try {
-      const out = await tryEnhance(m, modality, targetModel, prompt);
-      if (out) {
-        return { success: true, prompt: out, modelUsed: m };
-      }
-    } catch (e) {
-      lastErr = e;
-    }
+  const model = getEnhancerModel();
+  if (!model) {
+    return {
+      success: false,
+      error: '尚未配置「AI 优化」模型，请点击 AI 优化按钮旁的齿轮选择一个 Chat 模型',
+    };
   }
-  return { success: false, error: lastErr?.message || '没有可用的 Chat 模型' };
+  try {
+    const out = await callChat(model, modality, targetModel, prompt);
+    if (out) return { success: true, prompt: out, modelUsed: model };
+    return { success: false, error: '模型返回为空，换一个 Chat 模型试试' };
+  } catch (e) {
+    const msg =
+      e?.response?.data?.error?.message ||
+      e?.response?.data?.message ||
+      e?.message ||
+      '请求失败';
+    return { success: false, error: msg };
+  }
 }
