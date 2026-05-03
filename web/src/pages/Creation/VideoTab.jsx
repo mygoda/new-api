@@ -15,6 +15,7 @@ import AssetCard from '../../components/creation/AssetCard';
 import ImageSlot from '../../components/creation/ImageSlot';
 import PresetGrid from '../../components/creation/PresetGrid';
 import CreationDebugPanel from '../../components/creation/CreationDebugPanel';
+import ModelFilterInfo from '../../components/creation/ModelFilterInfo';
 
 import { normalize, validate } from '../../services/creation/normalizer';
 import {
@@ -455,9 +456,12 @@ const VideoTab = () => {
       <aside className='w-[280px] flex-shrink-0 overflow-y-auto bg-white border-r border-gray-200/70'>
         <section className='p-4 border-b border-gray-100'>
           <div className='flex items-center justify-between mb-3'>
-            <Text strong className='!text-[13px] !text-gray-900'>
-              {t('模型')}
-            </Text>
+            <div className='flex items-center gap-1'>
+              <Text strong className='!text-[13px] !text-gray-900'>
+                {t('模型')}
+              </Text>
+              <ModelFilterInfo modality={MODALITY} hit={models.length} />
+            </div>
             {models.length > 0 && (
               <Text type='tertiary' className='!text-[11px]'>
                 {models.length} {t('个可用')}

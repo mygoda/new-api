@@ -19,6 +19,29 @@ const ENDPOINT_KEYWORDS = {
   chat: ['chat', 'chat-completions', 'completions', 'messages', 'responses'],
 };
 
+// 模型名兜底正则（endpoints/tags 都没匹配上时用）
+const NAME_FALLBACK_REGEX = {
+  image: /dall-e|midjourney|^mj-|imagen|stable-diffusion|gpt-image|seedream|jimeng-img/,
+  video: /sora|kling|seedance|jimeng-video|hailuo|vidu|veo/,
+  chat: /gpt-[0-9]|^o[0-9]|claude|gemini-(pro|flash)|qwen|glm|deepseek|moonshot|yi-|llama/,
+};
+
+// 暴露给 UI（admin "筛选规则" Popover 用）
+export function getFilterRules(modality) {
+  const reg = NAME_FALLBACK_REGEX[modality];
+  return {
+    source: 'GET /api/creation/models（status=1 已启用）',
+    modality,
+    endpointKeywords: ENDPOINT_KEYWORDS[modality] || [],
+    nameFallbackRegex: reg ? reg.source : '',
+    matchOrder: [
+      'endpoints 字段精确匹配（含 image/image-generation 等关键字）',
+      'tags 字段包含模态关键字',
+      '模型名命中模态兜底正则',
+    ],
+  };
+}
+
 let modelsCache = null;
 let lastFetchTime = 0;
 const CACHE_TTL = 60 * 1000; // 60s
@@ -74,17 +97,9 @@ function matchModality(model, modality) {
   // 2. tags 字段包含模态关键字
   if (keywords.some((k) => tags.includes(k))) return true;
 
-  // 3. 模型名包含模态特征（兜底，针对未配置 endpoints 的旧模型）
-  if (modality === 'video') {
-    if (/sora|kling|seedance|jimeng-video|hailuo|vidu|veo/.test(name)) return true;
-  }
-  if (modality === 'image') {
-    if (/dall-e|midjourney|^mj-|imagen|stable-diffusion|gpt-image|seedream|jimeng-img/.test(name)) return true;
-  }
-  if (modality === 'chat') {
-    // 仅靠模型名兜底：常见 chat 系列
-    if (/gpt-[0-9]|^o[0-9]|claude|gemini-(pro|flash)|qwen|glm|deepseek|moonshot|yi-|llama/.test(name)) return true;
-  }
+  // 3. 模型名命中兜底正则
+  const fallback = NAME_FALLBACK_REGEX[modality];
+  if (fallback && fallback.test(name)) return true;
 
   return false;
 }
@@ -117,6 +132,11 @@ export async function loadModelsForModality(modality) {
 export function clearModelsCache() {
   modelsCache = null;
   lastFetchTime = 0;
+}
+
+// 给 admin "筛选规则" Popover 用：拿到所有已加载模型（含未通过筛选的）
+export async function getAllRawModels() {
+  return await fetchModels();
 }
 
 // 加载可用 Chat 模型（供"AI 优化提示词"使用）。
