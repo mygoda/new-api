@@ -125,24 +125,7 @@ const InfoBubble = ({ asset }) => (
   </div>
 );
 
-const ActionBtn = ({ icon: Icon, tip, onClick, danger }) => (
-  <Tooltip content={tip} position='top'>
-    <button
-      type='button'
-      onClick={onClick}
-      className={[
-        'flex-1 inline-flex items-center justify-center h-6 rounded transition-colors',
-        danger
-          ? 'text-gray-500 hover:bg-red-50 hover:text-red-600'
-          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900',
-      ].join(' ')}
-    >
-      <Icon size={11} />
-    </button>
-  </Tooltip>
-);
-
-const Tile = ({ asset, onRetry, onDelete }) => {
+const Tile = ({ asset, onReplay, onRetry, onDelete }) => {
   const { t } = useTranslation();
   const [previewOpen, setPreviewOpen] = useState(false);
   const url = asset?.assetUrl;
@@ -173,7 +156,7 @@ const Tile = ({ asset, onRetry, onDelete }) => {
       {/* 图片本体 */}
       <div
         className={[
-          'relative aspect-square bg-gray-100',
+          'relative aspect-square bg-gray-100 group/media',
           status === 'success' && url ? 'cursor-zoom-in' : '',
         ].join(' ')}
         onClick={() => status === 'success' && url && setPreviewOpen(true)}
@@ -196,7 +179,7 @@ const Tile = ({ asset, onRetry, onDelete }) => {
         )}
 
         {/* 模型 + 状态徽标（不遮挡过多） */}
-        <div className='absolute top-1.5 left-1.5 right-1.5 flex items-start gap-1'>
+        <div className='absolute top-1.5 left-1.5 right-1.5 flex items-start gap-1 pointer-events-none'>
           <span className='inline-flex items-center px-1.5 py-0.5 bg-black/60 text-white text-[10px] font-medium rounded backdrop-blur-sm truncate max-w-[60%]'>
             {asset?.modelName}
           </span>
@@ -204,37 +187,160 @@ const Tile = ({ asset, onRetry, onDelete }) => {
             <StatusBadge status={status} />
           </span>
         </div>
+
+        {/* 悬浮放大按钮（与默认 AssetCard 一致） */}
+        {status === 'success' && url && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreviewOpen(true);
+            }}
+            className='absolute top-2 right-2 bg-black/55 hover:bg-black/75 backdrop-blur-sm text-white rounded p-1.5 opacity-0 group-hover/media:opacity-100 transition-opacity'
+            title={t('放大查看')}
+          >
+            <Maximize2 size={11} />
+          </button>
+        )}
       </div>
 
-      {/* 操作栏：图下方 */}
-      <div className='flex items-center px-1 py-0.5 border-t border-gray-100 bg-white'>
-        <Popover
-          trigger='click'
-          position='topLeft'
-          showArrow
-          content={<InfoBubble asset={asset} />}
-        >
-          <button
-            type='button'
-            className='flex-1 inline-flex items-center justify-center h-6 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-900'
-            title={t('详情')}
-          >
-            <Info size={11} />
-          </button>
-        </Popover>
+      {/* 操作栏：完全对齐默认 AssetCard 的样式 */}
+      <div className='px-2 py-1 border-t border-gray-100 bg-white'>
         {status === 'success' && url && (
-          <>
-            <ActionBtn icon={Maximize2} tip={t('放大')} onClick={() => setPreviewOpen(true)} />
-            <ActionBtn icon={Download} tip={t('下载')} onClick={download} />
-            <ActionBtn icon={Copy} tip={t('复制链接')} onClick={copyLink} />
-            <ActionBtn icon={Sparkles} tip={t('复制提示词与参数')} onClick={copyPromptJson} />
-          </>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-0.5'>
+              <Tooltip content={t('下载')}>
+                <Button
+                  size='small'
+                  theme='borderless'
+                  type='tertiary'
+                  icon={<Download size={13} />}
+                  onClick={download}
+                />
+              </Tooltip>
+              <Tooltip content={t('复制链接')}>
+                <Button
+                  size='small'
+                  theme='borderless'
+                  type='tertiary'
+                  icon={<Copy size={13} />}
+                  onClick={copyLink}
+                />
+              </Tooltip>
+              {onReplay && (
+                <Tooltip content={t('沿用参数再生成')}>
+                  <Button
+                    size='small'
+                    theme='borderless'
+                    type='tertiary'
+                    icon={<RotateCcw size={13} />}
+                    onClick={() => onReplay(asset)}
+                  />
+                </Tooltip>
+              )}
+              <Tooltip content={t('复制提示词与参数')}>
+                <Button
+                  size='small'
+                  theme='borderless'
+                  type='tertiary'
+                  icon={<Sparkles size={13} />}
+                  onClick={copyPromptJson}
+                />
+              </Tooltip>
+              <Popover
+                trigger='click'
+                position='topLeft'
+                showArrow
+                content={<InfoBubble asset={asset} />}
+              >
+                <Button
+                  size='small'
+                  theme='borderless'
+                  type='tertiary'
+                  icon={<Info size={13} />}
+                />
+              </Popover>
+            </div>
+            {onDelete && (
+              <Tooltip content={t('删除')}>
+                <Button
+                  size='small'
+                  theme='borderless'
+                  type='danger'
+                  icon={<Trash2 size={13} />}
+                  onClick={() => onDelete(asset)}
+                />
+              </Tooltip>
+            )}
+          </div>
         )}
-        {status === 'failed' && onRetry && (
-          <ActionBtn icon={RotateCcw} tip={t('重试此模型')} onClick={() => onRetry(asset)} />
+
+        {status === 'failed' && (
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-1'>
+              {onRetry && (
+                <Button
+                  size='small'
+                  theme='light'
+                  type='primary'
+                  icon={<RotateCcw size={13} />}
+                  onClick={() => onRetry(asset)}
+                >
+                  {t('同参重试')}
+                </Button>
+              )}
+              {onReplay && (
+                <Button
+                  size='small'
+                  theme='borderless'
+                  type='tertiary'
+                  onClick={() => onReplay(asset)}
+                >
+                  {t('换个模型')}
+                </Button>
+              )}
+              <Popover
+                trigger='click'
+                position='topLeft'
+                showArrow
+                content={<InfoBubble asset={asset} />}
+              >
+                <Button
+                  size='small'
+                  theme='borderless'
+                  type='tertiary'
+                  icon={<Info size={13} />}
+                />
+              </Popover>
+            </div>
+            {onDelete && (
+              <Tooltip content={t('删除')}>
+                <Button
+                  size='small'
+                  theme='borderless'
+                  type='danger'
+                  icon={<Trash2 size={13} />}
+                  onClick={() => onDelete(asset)}
+                />
+              </Tooltip>
+            )}
+          </div>
         )}
-        {onDelete && (
-          <ActionBtn icon={Trash2} tip={t('从批次中删除')} onClick={() => onDelete(asset)} danger />
+
+        {/* pending 时只留一个删除按钮（避免操作误触正在生成的任务） */}
+        {status !== 'success' && status !== 'failed' && (
+          <div className='flex items-center justify-end'>
+            {onDelete && (
+              <Tooltip content={t('放弃这次生成')}>
+                <Button
+                  size='small'
+                  theme='borderless'
+                  type='danger'
+                  icon={<Trash2 size={13} />}
+                  onClick={() => onDelete(asset)}
+                />
+              </Tooltip>
+            )}
+          </div>
         )}
       </div>
 
@@ -266,7 +372,7 @@ const Tile = ({ asset, onRetry, onDelete }) => {
   );
 };
 
-const BatchCompareCard = ({ batch, onRetry, onTileDelete, onDelete }) => {
+const BatchCompareCard = ({ batch, onReplay, onRetry, onTileDelete, onDelete }) => {
   const { t } = useTranslation();
   const items = batch.items || [];
   const cols =
@@ -335,7 +441,13 @@ const BatchCompareCard = ({ batch, onRetry, onTileDelete, onDelete }) => {
 
       <div className={`grid ${cols} gap-1.5`}>
         {items.map((it) => (
-          <Tile key={it.id} asset={it} onRetry={onRetry} onDelete={onTileDelete} />
+          <Tile
+            key={it.id}
+            asset={it}
+            onReplay={onReplay}
+            onRetry={onRetry}
+            onDelete={onTileDelete}
+          />
         ))}
       </div>
 

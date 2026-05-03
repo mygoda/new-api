@@ -565,6 +565,7 @@ const ImageTab = () => {
                       <div key={row.id} className='col-span-full'>
                         <BatchCompareCard
                           batch={row}
+                          onReplay={handleReplay}
                           onRetry={handleBatchRetryOne}
                           onTileDelete={(asset) => {
                             setAssets((prev) => prev.filter((a) => a.id !== asset.id));
