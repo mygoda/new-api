@@ -16,7 +16,7 @@ import ImageSlot from '../../components/creation/ImageSlot';
 import PresetGrid from '../../components/creation/PresetGrid';
 import CreationDebugPanel from '../../components/creation/CreationDebugPanel';
 
-import { normalize, validate, buildCurl } from '../../services/creation/normalizer';
+import { normalize, validate } from '../../services/creation/normalizer';
 import {
   loadConfig,
   saveConfig,
@@ -152,12 +152,12 @@ const VideoTab = () => {
         },
         schema,
       );
-      debug.setPreview(req.body, buildCurl(req));
+      debug.setPreview(req);
     } catch {
       debug.setPreview(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model, params, prompt, mode, imageFirst, imageLast]);
+  }, [schema, model, params, prompt, mode, imageFirst, imageLast]);
 
   const switchModel = useCallback((next) => {
     const nextSchema = getSchemaFor(next);
@@ -264,7 +264,7 @@ const VideoTab = () => {
     }
 
     setSubmitting(true);
-    debug.setRequest(req.body);
+    debug.setRequest(req);
     const placeholderId = genId();
     const placeholder = {
       id: placeholderId,

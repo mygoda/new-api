@@ -1,10 +1,11 @@
 // hooks/creation/useDebugState.js
 //
-// 跟踪一次提交的调试数据，喂给 playground/DebugPanel：
-//   - previewRequest  实时拼接的预览请求体（normalize 后的 body）
-//   - request         实际发出去的请求体
+// 跟踪一次提交的调试数据：
+//   - previewReq      实时拼接的预览 req 对象 ({ url, method, body })
+//   - previewRequest  预览请求体的格式化 JSON 字符串
+//   - request         实际发出去的请求体 JSON 字符串
+//   - requestReq      实际发出去的 req 对象（含 URL/method/body）
 //   - response        响应（图像同步，或 task 提交成功的返回）
-//   - curl            等价 cURL
 //   - timestamp       最后请求时间
 //   - previewTimestamp 预览更新时间
 
@@ -14,27 +15,30 @@ export function useDebugState() {
   const [showPanel, setShowPanel] = useState(false);
   const [activeTab, setActiveTab] = useState('preview');
   const [debugData, setDebugData] = useState({
+    previewReq: null,
     previewRequest: null,
     previewTimestamp: null,
+    requestReq: null,
     request: null,
     response: null,
     sseMessages: [],
     timestamp: null,
   });
 
-  const setPreview = useCallback((req, curl) => {
+  const setPreview = useCallback((req) => {
     setDebugData((prev) => ({
       ...prev,
-      previewRequest: req ? JSON.stringify(req, null, 2) : null,
+      previewReq: req || null,
+      previewRequest: req ? JSON.stringify(req.body, null, 2) : null,
       previewTimestamp: Date.now(),
-      curl: curl || prev.curl,
     }));
   }, []);
 
   const setRequest = useCallback((req) => {
     setDebugData((prev) => ({
       ...prev,
-      request: req ? JSON.stringify(req, null, 2) : null,
+      requestReq: req || null,
+      request: req ? JSON.stringify(req.body, null, 2) : null,
       timestamp: Date.now(),
     }));
   }, []);

@@ -18,7 +18,7 @@ import BatchModelPicker from '../../components/creation/BatchModelPicker';
 import PresetGrid from '../../components/creation/PresetGrid';
 import CreationDebugPanel from '../../components/creation/CreationDebugPanel';
 
-import { normalize, validate, buildCurl } from '../../services/creation/normalizer';
+import { normalize, validate } from '../../services/creation/normalizer';
 import {
   loadConfig,
   saveConfig,
@@ -137,12 +137,12 @@ const ImageTab = () => {
     }
     try {
       const req = normalize({ model, prompt, ...params }, schema);
-      debug.setPreview(req.body, buildCurl(req));
+      debug.setPreview(req);
     } catch {
       debug.setPreview(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model, params, prompt]);
+  }, [schema, model, params, prompt]);
 
   const switchModel = useCallback((next) => {
     const nextSchema = getSchemaFor(next);
@@ -231,7 +231,7 @@ const ImageTab = () => {
     }
 
     setSubmitting(true);
-    debug.setRequest(req.body);
+    debug.setRequest(req);
     const placeholderId = genId();
     const placeholder = {
       id: placeholderId,
@@ -391,6 +391,44 @@ const ImageTab = () => {
     setSubmitting(false);
   };
 
+  // 批量对比中单个模型重试：复用 batchId，重置该 placeholder 状态后重新发请求
+  const handleBatchRetryOne = useCallback(async (asset) => {
+    if (!asset?.id) return;
+    const sch = getSchemaFor(asset.modelName);
+    if (!sch) {
+      Toast.error(t('该模型缺少 schema 配置'));
+      return;
+    }
+    if (!loadActiveToken()?.key) {
+      Toast.warning(t('请先在右上角选择或创建一个 Token'));
+      return;
+    }
+    const patchReset = { status: 'pending', errorMessage: undefined, assetUrl: undefined };
+    setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, ...patchReset } : a)));
+    updateAsset(asset.id, patchReset);
+    try {
+      const unified = { model: asset.modelName, prompt: asset.prompt, ...(asset.params || {}), n: 1 };
+      const req = normalize(unified, sch);
+      const res = await API.post(req.url, req.body, { headers: tokenAuthHeader() });
+      const items = res?.data?.data || [];
+      const url = items[0]?.url || (items[0]?.b64_json ? `data:image/png;base64,${items[0].b64_json}` : '');
+      if (!url) throw new Error('upstream returned no image');
+      const patch = { status: 'success', assetUrl: url };
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, ...patch } : a)));
+      updateAsset(asset.id, patch);
+    } catch (e) {
+      const msg =
+        e?.response?.data?.error?.message ||
+        e?.response?.data?.message ||
+        e?.message ||
+        '请求失败';
+      const patch = { status: 'failed', errorMessage: msg };
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, ...patch } : a)));
+      updateAsset(asset.id, patch);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getSchemaFor]);
+
   const handleReplay = (asset) => {
     if (asset.modelName !== model) switchModel(asset.modelName);
     if (asset.params) setParams(asset.params);
@@ -527,6 +565,11 @@ const ImageTab = () => {
                       <div key={row.id} className='col-span-full'>
                         <BatchCompareCard
                           batch={row}
+                          onRetry={handleBatchRetryOne}
+                          onTileDelete={(asset) => {
+                            setAssets((prev) => prev.filter((a) => a.id !== asset.id));
+                            removeAsset(asset.id);
+                          }}
                           onDelete={() => {
                             setAssets((prev) => prev.filter((a) => a.batchId !== row.batchId));
                             (row.items || []).forEach((it) => removeAsset(it.id));
