@@ -4,9 +4,9 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Card, Button, Toast, Typography, Tooltip } from '@douyinfe/semi-ui';
+import { Button, Toast, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { Send, Code2, Sparkles } from 'lucide-react';
+import { Send, Code2 } from 'lucide-react';
 
 import ModelPicker from '../../components/creation/ModelPicker';
 import PromptComposer from '../../components/creation/PromptComposer';
@@ -72,7 +72,7 @@ const VideoTab = () => {
 
   const supportedModes = schema?.modes || ['t2v'];
 
-  // 自动选中第一个模型
+  // 自动选中 + 合并默认参数
   useEffect(() => {
     if (modelsLoading || models.length === 0) return;
     const exists = models.some((m) => m.modelName === model);
@@ -81,6 +81,22 @@ const VideoTab = () => {
       setModel(firstModel);
       const sch = getSchemaFor(firstModel);
       if (sch) setParams(defaultsFromSchema(sch));
+      return;
+    }
+    const sch = getSchemaFor(model);
+    if (sch) {
+      const defaults = defaultsFromSchema(sch);
+      setParams((prev) => {
+        let needPatch = false;
+        const next = { ...prev };
+        for (const k of Object.keys(defaults)) {
+          if (next[k] === undefined) {
+            next[k] = defaults[k];
+            needPatch = true;
+          }
+        }
+        return needPatch ? next : prev;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelsLoading, models]);
@@ -326,7 +342,7 @@ const VideoTab = () => {
   );
 
   return (
-    <div className='flex h-full overflow-hidden'>
+    <div className='flex h-full overflow-hidden bg-[#fafafa]'>
       {activeTasks.map((a) => (
         <TaskPoller
           key={a.taskId + ':' + a.id}
@@ -338,132 +354,48 @@ const VideoTab = () => {
       ))}
 
       {/* 左侧 - 设置面板 */}
-      <div className='w-80 flex-shrink-0 overflow-y-auto border-r border-gray-100 bg-white'>
-        <Card bordered={false} bodyStyle={{ padding: 16 }}>
-          <div className='space-y-5'>
-            <div>
-              <div className='flex items-center gap-2 mb-2'>
-                <Sparkles size={16} className='text-gray-500' />
-                <Text strong className='!text-sm'>
-                  {t('模型')}
-                </Text>
-                <Text type='tertiary' className='!text-xs ml-auto'>
-                  {models.length} {t('个可用')}
-                </Text>
-              </div>
-              <ModelPicker
-                models={models}
-                value={model}
-                onChange={switchModel}
-                loading={modelsLoading}
-              />
-            </div>
-            {schema && (
-              <div>
-                <div className='flex items-center gap-2 mb-2'>
-                  <Text strong className='!text-sm'>
-                    {t('生成参数')}
-                  </Text>
-                </div>
-                <ParamPanel
-                  schema={schema}
-                  params={params}
-                  onParamChange={handleParamChange}
-                />
-              </div>
+      <aside className='w-[280px] flex-shrink-0 overflow-y-auto bg-white border-r border-gray-200/70'>
+        <section className='p-4 border-b border-gray-100'>
+          <div className='flex items-center justify-between mb-3'>
+            <Text strong className='!text-[13px] !text-gray-900'>
+              {t('模型')}
+            </Text>
+            {models.length > 0 && (
+              <Text type='tertiary' className='!text-[11px]'>
+                {models.length} {t('个可用')}
+              </Text>
             )}
           </div>
-        </Card>
-      </div>
-
-      {/* 中央 - 创作画布 */}
-      <div className='flex-1 flex flex-col overflow-hidden'>
-        <div className='p-4 border-b border-gray-100 bg-white space-y-3'>
-          {/* 子模式 - Semi UI 标准按钮组风格 */}
-          {supportedModes.length > 1 && (
-            <div className='flex items-center gap-2'>
-              <Text className='!text-xs !text-gray-500'>{t('生成模式')}</Text>
-              <div className='inline-flex gap-0.5 p-0.5 bg-gray-100 rounded-md'>
-                {[
-                  { key: 't2v', label: '文生视频' },
-                  { key: 'i2v', label: '图生视频' },
-                  { key: 'keyframes', label: '首尾帧' },
-                ]
-                  .filter((m) => supportedModes.includes(m.key))
-                  .map((m) => (
-                    <button
-                      key={m.key}
-                      type='button'
-                      onClick={() => setMode(m.key)}
-                      className={[
-                        'px-3 py-1 text-xs rounded transition-colors',
-                        mode === m.key
-                          ? 'bg-white text-gray-900 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900',
-                      ].join(' ')}
-                    >
-                      {t(m.label)}
-                    </button>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {(mode === 'i2v' || mode === 'keyframes') && (
-            <div
-              className={
-                mode === 'keyframes'
-                  ? 'grid grid-cols-2 gap-3 max-w-md'
-                  : 'grid grid-cols-1 gap-3 max-w-xs'
-              }
-            >
-              <ImageSlot label='首帧' value={imageFirst} onChange={setImageFirst} />
-              {mode === 'keyframes' && (
-                <ImageSlot label='尾帧' value={imageLast} onChange={setImageLast} />
-              )}
-            </div>
-          )}
-
-          <PromptComposer
-            modality={MODALITY}
-            modelName={model}
-            value={prompt}
-            onChange={setPrompt}
-            maxLength={1000}
-            onSubmit={handleSubmit}
+          <ModelPicker
+            models={models}
+            value={model}
+            onChange={switchModel}
+            loading={modelsLoading}
           />
-          <div className='flex items-center justify-between'>
-            <Text type='tertiary' className='!text-xs'>
-              {estimate != null
-                ? t('预计消耗 {{n}} 点', { n: estimate })
-                : t('提交后按实际计费')}
-            </Text>
-            <div className='flex items-center gap-2'>
-              <Tooltip content={t('调试面板')}>
-                <Button
-                  theme={debug.showPanel ? 'solid' : 'borderless'}
-                  type='tertiary'
-                  icon={<Code2 size={14} />}
-                  onClick={debug.togglePanel}
-                />
-              </Tooltip>
-              <Button
-                theme='solid'
-                type='primary'
-                icon={<Send size={14} />}
-                loading={submitting}
-                onClick={handleSubmit}
-                disabled={!model || !prompt.trim()}
-              >
-                {t('生成视频')}
-              </Button>
-            </div>
-          </div>
-        </div>
+        </section>
 
-        <div className='flex-1 overflow-y-auto p-4 bg-gray-50'>
+        {schema && (
+          <section className='p-4'>
+            <div className='flex items-center justify-between mb-4'>
+              <Text strong className='!text-[13px] !text-gray-900'>
+                {t('生成参数')}
+              </Text>
+            </div>
+            <ParamPanel
+              schema={schema}
+              params={params}
+              onParamChange={handleParamChange}
+            />
+          </section>
+        )}
+      </aside>
+
+      {/* 中央 - 创作区 */}
+      <main className='flex-1 flex flex-col overflow-hidden'>
+        {/* 作品流 */}
+        <div className='flex-1 overflow-y-auto'>
           {videoAssets.length === 0 ? (
-            <div className='py-8'>
+            <div className='min-h-full flex items-center'>
               <PresetGrid
                 modality={MODALITY}
                 availableModels={models}
@@ -471,24 +403,121 @@ const VideoTab = () => {
               />
             </div>
           ) : (
-            <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
-              {videoAssets.map((a) => (
-                <AssetCard
-                  key={a.id}
-                  asset={a}
-                  onReplay={handleReplay}
-                  onRetry={handleRetry}
-                  onSwitchModel={handleSwitchModel}
-                  onDelete={handleDelete}
-                />
-              ))}
+            <div className='p-6'>
+              <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
+                {videoAssets.map((a) => (
+                  <AssetCard
+                    key={a.id}
+                    asset={a}
+                    onReplay={handleReplay}
+                    onRetry={handleRetry}
+                    onSwitchModel={handleSwitchModel}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
-      </div>
+
+        {/* 底部固定 - 子模式 + 图槽 + Prompt + 提交 */}
+        <div className='flex-shrink-0 px-6 pt-4 pb-5 bg-white border-t border-gray-200/70 shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.06)] space-y-3'>
+          <div className='max-w-4xl mx-auto space-y-3'>
+            {/* 子模式 */}
+            {supportedModes.length > 1 && (
+              <div className='flex items-center gap-2'>
+                <Text className='!text-[11px] !text-gray-500'>{t('生成模式')}</Text>
+                <div className='inline-flex gap-0.5 p-0.5 bg-gray-100 rounded-md'>
+                  {[
+                    { key: 't2v', label: '文生视频' },
+                    { key: 'i2v', label: '图生视频' },
+                    { key: 'keyframes', label: '首尾帧' },
+                  ]
+                    .filter((m) => supportedModes.includes(m.key))
+                    .map((m) => (
+                      <button
+                        key={m.key}
+                        type='button'
+                        onClick={() => setMode(m.key)}
+                        className={[
+                          'px-3 py-1 text-xs rounded transition-colors',
+                          mode === m.key
+                            ? 'bg-white text-gray-900 shadow-sm font-medium'
+                            : 'text-gray-600 hover:text-gray-900',
+                        ].join(' ')}
+                      >
+                        {t(m.label)}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {(mode === 'i2v' || mode === 'keyframes') && (
+              <div
+                className={
+                  mode === 'keyframes'
+                    ? 'grid grid-cols-2 gap-3 max-w-md'
+                    : 'grid grid-cols-1 gap-3 max-w-xs'
+                }
+              >
+                <ImageSlot label='首帧' value={imageFirst} onChange={setImageFirst} />
+                {mode === 'keyframes' && (
+                  <ImageSlot label='尾帧' value={imageLast} onChange={setImageLast} />
+                )}
+              </div>
+            )}
+
+            <PromptComposer
+              modality={MODALITY}
+              modelName={model}
+              value={prompt}
+              onChange={setPrompt}
+              maxLength={1000}
+              onSubmit={handleSubmit}
+            />
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                {estimate != null ? (
+                  <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600'>
+                    <span className='w-1 h-1 rounded-full bg-purple-500' />
+                    {t('预计 {{n}} 点', { n: estimate })}
+                  </span>
+                ) : (
+                  <Text type='tertiary' className='!text-[11px]'>
+                    {t('按实际生成量计费')}
+                  </Text>
+                )}
+              </div>
+              <div className='flex items-center gap-2'>
+                <Tooltip content={t('调试面板')}>
+                  <Button
+                    theme={debug.showPanel ? 'solid' : 'borderless'}
+                    type='tertiary'
+                    icon={<Code2 size={14} />}
+                    onClick={debug.togglePanel}
+                  />
+                </Tooltip>
+                <Button
+                  theme='solid'
+                  type='primary'
+                  size='large'
+                  icon={<Send size={15} />}
+                  loading={submitting}
+                  onClick={handleSubmit}
+                  disabled={!model || !prompt.trim()}
+                  className='!px-6'
+                >
+                  {t('生成视频')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
 
       {debug.showPanel && (
-        <div className='w-96 flex-shrink-0 border-l border-gray-100 bg-white overflow-hidden'>
+        <aside className='w-[400px] flex-shrink-0 border-l border-gray-200/70 bg-white overflow-hidden'>
           <DebugPanel
             debugData={debug.debugData}
             activeDebugTab={debug.activeTab}
@@ -497,7 +526,7 @@ const VideoTab = () => {
             onCloseDebugPanel={debug.togglePanel}
             customRequestMode={false}
           />
-        </div>
+        </aside>
       )}
     </div>
   );

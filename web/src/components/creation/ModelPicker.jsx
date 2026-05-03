@@ -58,10 +58,10 @@ const ModelPicker = ({ models, value, onChange, loading = false }) => {
 
   return (
     <div className='space-y-2'>
-      {/* 搜索框 - 仅当模型超过 6 个时显示 */}
+      {/* 搜索框 */}
       {models.length > 6 && (
         <Input
-          prefix={<Search size={14} className='text-gray-400 ml-2' />}
+          prefix={<Search size={13} className='text-gray-400 ml-2' />}
           placeholder={t('搜索模型')}
           value={keyword}
           onChange={setKeyword}
@@ -72,7 +72,7 @@ const ModelPicker = ({ models, value, onChange, loading = false }) => {
       )}
 
       {/* 模型列表 */}
-      <div className='space-y-1 max-h-[420px] overflow-y-auto pr-1 -mr-1'>
+      <div className='space-y-0.5 max-h-[320px] overflow-y-auto -mx-1 px-1'>
         {list.length === 0 ? (
           <div className='py-4 text-center'>
             <Text type='tertiary' size='small'>
@@ -88,51 +88,37 @@ const ModelPicker = ({ models, value, onChange, loading = false }) => {
                 type='button'
                 onClick={() => onChange?.(m.modelName)}
                 className={[
-                  'group relative w-full text-left rounded-md px-2.5 py-2 transition-colors',
+                  'group relative w-full text-left rounded-md px-2 py-1.5 transition-colors',
                   active
-                    ? 'bg-blue-50 border border-blue-200'
-                    : 'border border-transparent hover:bg-gray-50',
+                    ? 'bg-gray-900 text-white'
+                    : 'hover:bg-gray-100',
                 ].join(' ')}
               >
-                {/* 左侧选中指示条 */}
-                {active && (
-                  <span className='absolute left-0 top-2 bottom-2 w-0.5 bg-blue-500 rounded-r' />
-                )}
-
-                <div className='flex items-center gap-2 pl-1.5'>
+                <div className='flex items-center gap-2'>
                   <div className='flex-1 min-w-0'>
-                    <div className='flex items-center gap-2'>
+                    <div className='flex items-center gap-1.5'>
                       <Text
-                        className={`!text-sm truncate ${
-                          active ? '!text-blue-700 font-medium' : '!text-gray-800'
-                        }`}
+                        className={[
+                          '!text-[12.5px] truncate',
+                          active ? '!text-white !font-medium' : '!text-gray-800',
+                        ].join(' ')}
                       >
                         {m.displayName || m.modelName}
                       </Text>
-                      {m.vendor && m.vendor !== 'other' && (
-                        <Text
-                          type='tertiary'
-                          className='!text-[10px] !text-gray-400 uppercase tracking-wide flex-shrink-0'
-                        >
-                          {m.vendor}
-                        </Text>
-                      )}
                     </div>
-                    {m.description && (
+                    {m.vendor && m.vendor !== 'other' && (
                       <Text
-                        type='tertiary'
-                        className='!text-[11px] !text-gray-400 truncate block'
+                        className={[
+                          '!text-[10px] truncate block',
+                          active ? '!text-white/60' : '!text-gray-400',
+                        ].join(' ')}
                       >
-                        {m.description}
+                        {m.vendor}
                       </Text>
                     )}
                   </div>
                   {active && (
-                    <Check
-                      size={14}
-                      className='text-blue-500 flex-shrink-0'
-                      strokeWidth={2.5}
-                    />
+                    <Check size={13} className='text-white flex-shrink-0' strokeWidth={3} />
                   )}
                 </div>
               </button>

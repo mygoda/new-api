@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 import React from 'react';
 import { Typography } from '@douyinfe/semi-ui';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getPresets } from '../../constants/creation/presets';
 
@@ -33,19 +33,13 @@ const PresetGrid = ({ modality, availableModels, onApply }) => {
   };
 
   return (
-    <div className='max-w-5xl mx-auto px-4'>
-      <div className='text-center mb-6'>
-        <div className='inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 mb-3'>
-          <Sparkles size={13} className='text-blue-500' />
-          <Text className='!text-xs !text-blue-700 font-medium'>
-            {t('试试这些热门玩法')}
-          </Text>
-        </div>
-        <Title heading={5} className='!mb-1 !text-gray-800'>
-          {t('一键开始创作')}
+    <div className='max-w-5xl mx-auto px-6 py-12'>
+      <div className='text-center mb-8'>
+        <Title heading={4} className='!mb-2 !text-gray-900 !font-medium'>
+          {t('开始你的创作')}
         </Title>
-        <Text type='tertiary' className='!text-xs'>
-          {t('点击下方任意卡片，自动填入提示词与推荐参数')}
+        <Text type='tertiary' className='!text-sm'>
+          {t('点击下方任意场景，自动填入提示词与推荐参数')}
         </Text>
       </div>
 
@@ -66,36 +60,37 @@ const PresetGrid = ({ modality, availableModels, onApply }) => {
                 })
               }
               className={[
-                'group text-left rounded-lg border bg-white overflow-hidden transition-all',
+                'group text-left rounded-xl bg-white overflow-hidden transition-all duration-200',
                 disabled
-                  ? 'border-gray-200 opacity-50 cursor-not-allowed'
-                  : 'border-gray-200 hover:border-blue-400 hover:shadow-md hover:-translate-y-0.5',
+                  ? 'opacity-40 cursor-not-allowed border border-gray-200'
+                  : 'border border-gray-200 hover:border-gray-900 hover:shadow-lg hover:-translate-y-1',
               ].join(' ')}
             >
               {/* 封面 */}
               <div
-                className='aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-200 bg-cover bg-center relative'
+                className='aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-200 bg-cover bg-center relative overflow-hidden'
                 style={{ backgroundImage: `url(${preset.cover})` }}
               >
-                <div className='absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent' />
-                <div className='absolute bottom-2 left-2.5 right-2.5'>
-                  <Text strong className='!text-white !text-sm drop-shadow'>
+                <div className='absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent' />
+                <div className='absolute bottom-3 left-3 right-3'>
+                  <Text strong className='!text-white !text-base drop-shadow-sm'>
                     {preset.title}
                   </Text>
                 </div>
               </div>
 
               {/* 信息条 */}
-              <div className='px-3 py-2 flex items-center justify-between'>
-                <Text type='tertiary' className='!text-[11px] truncate'>
-                  {disabled
-                    ? t('暂无可用模型')
-                    : targetModel}
+              <div className='px-3 py-2.5 flex items-center justify-between border-t border-gray-100'>
+                <Text
+                  type='tertiary'
+                  className='!text-[11px] !text-gray-500 truncate font-mono'
+                >
+                  {disabled ? t('暂无可用模型') : targetModel}
                 </Text>
                 {!disabled && (
                   <ArrowRight
                     size={13}
-                    className='text-gray-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all flex-shrink-0'
+                    className='text-gray-300 group-hover:text-gray-900 group-hover:translate-x-0.5 transition-all flex-shrink-0'
                   />
                 )}
               </div>

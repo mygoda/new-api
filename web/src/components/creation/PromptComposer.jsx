@@ -66,67 +66,73 @@ const PromptComposer = ({
 
   return (
     <div className='space-y-2'>
-      <div className='flex items-center justify-between'>
-        <Text strong className='!text-sm'>
-          {t('提示词')}
-        </Text>
-        <div className='flex items-center gap-1'>
-          {examples.length > 0 && (
-            <Button
-              size='small'
-              theme='borderless'
-              type='tertiary'
-              icon={<Sparkles size={13} />}
-              onClick={() => setShowExamples((v) => !v)}
-            >
-              {t('示例')}
-            </Button>
-          )}
-          <Button
-            size='small'
-            theme={showTags ? 'light' : 'borderless'}
-            type={showTags ? 'primary' : 'tertiary'}
-            icon={<TagIcon size={13} />}
-            onClick={() => setShowTags((v) => !v)}
-          >
-            {t('标签')}
-          </Button>
-          <Tooltip content={t('用 Chat 模型重写提示词')}>
-            <Button
-              size='small'
-              theme='borderless'
-              type='tertiary'
-              icon={<Wand2 size={13} />}
-              loading={enhancing}
-              onClick={handleEnhance}
-            >
-              {t('AI 优化')}
-            </Button>
-          </Tooltip>
+      {/* Prompt 输入区 - 视觉中心 */}
+      <div className='relative'>
+        <Input
+          value={value}
+          onChange={onChange}
+          rows={3}
+          placeholder={t('描述你想要生成的内容…  ⌘+Enter 提交')}
+          autosize={{ minRows: 2, maxRows: 8 }}
+          className='!rounded-xl !text-[14px]'
+          style={{
+            background: '#fafafa',
+          }}
+          onKeyDown={handleKeyDown}
+        />
+        {value && value.length > 0 && (
           <Text
             type={len > maxLength ? 'danger' : 'tertiary'}
             size='small'
-            className='!text-xs ml-1 tabular-nums'
+            className='!text-[10px] tabular-nums absolute right-3 bottom-2 bg-white/80 px-1 rounded pointer-events-none'
           >
-            {len} / {maxLength}
+            {len}
           </Text>
-        </div>
+        )}
       </div>
 
-      <Input
-        value={value}
-        onChange={onChange}
-        rows={5}
-        placeholder={t('描述你想要生成的内容…  ⌘+Enter 提交')}
-        autosize={{ minRows: 4, maxRows: 12 }}
-        showClear
-        className='!rounded-lg'
-        onKeyDown={handleKeyDown}
-      />
+      {/* 工具栏：示例 / 标签 / AI 优化 */}
+      <div className='flex items-center gap-1'>
+        {examples.length > 0 && (
+          <Button
+            size='small'
+            theme='borderless'
+            type='tertiary'
+            icon={<Sparkles size={12} />}
+            onClick={() => setShowExamples((v) => !v)}
+            className='!text-[11px] !text-gray-500 !h-6'
+          >
+            {t('示例')}
+          </Button>
+        )}
+        <Button
+          size='small'
+          theme={showTags ? 'light' : 'borderless'}
+          type={showTags ? 'primary' : 'tertiary'}
+          icon={<TagIcon size={12} />}
+          onClick={() => setShowTags((v) => !v)}
+          className='!text-[11px] !h-6'
+        >
+          {t('快速标签')}
+        </Button>
+        <Tooltip content={t('用 Chat 模型重写提示词')}>
+          <Button
+            size='small'
+            theme='borderless'
+            type='tertiary'
+            icon={<Wand2 size={12} />}
+            loading={enhancing}
+            onClick={handleEnhance}
+            className='!text-[11px] !text-gray-500 !h-6'
+          >
+            {t('AI 优化')}
+          </Button>
+        </Tooltip>
+      </div>
 
       {/* 快速标签 */}
       {showTags && (
-        <div className='p-3 bg-gray-50/60 border border-gray-100 rounded-lg'>
+        <div className='p-3 bg-gray-50 border border-gray-100 rounded-lg'>
           <QuickTags modality={modality} value={value} onChange={onChange} />
         </div>
       )}

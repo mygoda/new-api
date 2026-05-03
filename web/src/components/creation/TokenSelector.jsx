@@ -31,16 +31,12 @@ const TokenSelector = ({ token, onClick }) => {
       <Tooltip content={t('点击选择或创建一个 API 令牌')}>
         <button
           onClick={onClick}
-          className='flex items-center gap-2 px-3 py-1.5 rounded-md border border-orange-300 bg-orange-50 hover:bg-orange-100 transition-colors group'
+          className='inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-orange-200 bg-orange-50 hover:bg-orange-100 transition-colors'
         >
-          <AlertTriangle size={14} className='text-orange-600' />
-          <Text className='!text-xs !text-orange-700 font-medium'>
-            {t('请选择 API 令牌')}
+          <AlertTriangle size={13} className='text-orange-600' />
+          <Text className='!text-[12px] !text-orange-700 font-medium'>
+            {t('请选择令牌')}
           </Text>
-          <ChevronDown
-            size={12}
-            className='text-orange-500 group-hover:translate-y-0.5 transition-transform'
-          />
         </button>
       </Tooltip>
     );
@@ -50,30 +46,21 @@ const TokenSelector = ({ token, onClick }) => {
     <Tooltip content={t('点击切换或重新选择 API 令牌')}>
       <button
         onClick={onClick}
-        className='flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors group'
+        className='inline-flex items-center gap-2 h-8 px-2.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors group'
       >
-        <div className='flex items-center justify-center w-5 h-5 rounded bg-gray-100 group-hover:bg-gray-200 transition-colors'>
-          <Key size={11} className='text-gray-600' />
-        </div>
+        <Key size={11} className='text-gray-500' strokeWidth={2.2} />
         <div className='flex items-center gap-1.5'>
-          <Text className='!text-[11px] !text-gray-500 uppercase tracking-wider font-medium'>
+          <Text className='!text-[10px] !text-gray-400 uppercase tracking-wider font-medium'>
             {t('令牌')}
           </Text>
-          <span className='w-px h-3 bg-gray-200' />
-          <Text className='!text-xs !text-gray-800 font-medium max-w-[120px] truncate'>
+          <Text className='!text-[12px] !text-gray-800 font-medium max-w-[120px] truncate'>
             {token.name}
           </Text>
-          <Text
-            type='tertiary'
-            className='!text-[10px] !font-mono !text-gray-400'
-          >
+          <Text type='tertiary' className='!text-[10px] !font-mono !text-gray-400 hidden sm:inline'>
             {maskedKey}
           </Text>
         </div>
-        <ChevronDown
-          size={12}
-          className='text-gray-400 group-hover:translate-y-0.5 transition-transform'
-        />
+        <ChevronDown size={11} className='text-gray-400 group-hover:translate-y-0.5 transition-transform' />
       </button>
     </Tooltip>
   );

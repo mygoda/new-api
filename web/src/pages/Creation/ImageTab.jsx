@@ -4,9 +4,9 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Card, Button, Toast, Typography, Tooltip } from '@douyinfe/semi-ui';
+import { Button, Toast, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { Send, Code2, Sparkles } from 'lucide-react';
+import { Send, Code2 } from 'lucide-react';
 
 import ModelPicker from '../../components/creation/ModelPicker';
 import PromptComposer from '../../components/creation/PromptComposer';
@@ -68,7 +68,7 @@ const ImageTab = () => {
   const [assets, setAssets] = useState(loadAssets);
   const debug = useDebugState();
 
-  // 模型加载完成后自动选中
+  // 模型加载完成后自动选中 + 合并默认参数
   useEffect(() => {
     if (modelsLoading || models.length === 0) return;
     const exists = models.some((m) => m.modelName === model);
@@ -77,6 +77,24 @@ const ImageTab = () => {
       setModel(firstModel);
       const sch = getSchemaFor(firstModel);
       if (sch) setParams(defaultsFromSchema(sch));
+      return;
+    }
+    // 已选中模型仍然要补全缺失的字段默认值（用户上次保存可能不全）
+    const sch = getSchemaFor(model);
+    if (sch) {
+      const defaults = defaultsFromSchema(sch);
+      setParams((prev) => {
+        // 只在缺失字段时补，不覆盖已有值
+        let needPatch = false;
+        const next = { ...prev };
+        for (const k of Object.keys(defaults)) {
+          if (next[k] === undefined) {
+            next[k] = defaults[k];
+            needPatch = true;
+          }
+        }
+        return needPatch ? next : prev;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelsLoading, models]);
@@ -356,7 +374,7 @@ const ImageTab = () => {
   const groupedAssets = useMemo(() => groupAssets(imageAssets), [imageAssets]);
 
   return (
-    <div className='flex h-full overflow-hidden'>
+    <div className='flex h-full overflow-hidden bg-[#fafafa]'>
       {activeTasks.map((a) => (
         <MjTaskPoller
           key={a.taskId + ':' + a.id}
@@ -367,91 +385,51 @@ const ImageTab = () => {
         />
       ))}
 
-      {/* 左侧 - 设置面板（与 Playground 风格一致） */}
-      <div className='w-80 flex-shrink-0 overflow-y-auto border-r border-gray-100 bg-white'>
-        <Card bordered={false} bodyStyle={{ padding: 16 }}>
-          <div className='space-y-5'>
-            {/* 模型选择 */}
-            <div>
-              <div className='flex items-center gap-2 mb-2'>
-                <Sparkles size={16} className='text-gray-500' />
-                <Text strong className='!text-sm'>
-                  {t('模型')}
-                </Text>
-                <Text type='tertiary' className='!text-xs ml-auto'>
-                  {models.length} {t('个可用')}
-                </Text>
-              </div>
-              <ModelPicker
-                models={models}
-                value={model}
-                onChange={switchModel}
-                loading={modelsLoading}
-              />
-            </div>
-
-            {/* 参数 */}
-            {schema && (
-              <div>
-                <div className='flex items-center gap-2 mb-2'>
-                  <Text strong className='!text-sm'>
-                    {t('生成参数')}
-                  </Text>
-                </div>
-                <ParamPanel
-                  schema={schema}
-                  params={params}
-                  onParamChange={handleParamChange}
-                />
-              </div>
+      {/* 左侧 - 设置面板 */}
+      <aside className='w-[280px] flex-shrink-0 overflow-y-auto bg-white border-r border-gray-200/70'>
+        {/* 模型区 */}
+        <section className='p-4 border-b border-gray-100'>
+          <div className='flex items-center justify-between mb-3'>
+            <Text strong className='!text-[13px] !text-gray-900'>
+              {t('模型')}
+            </Text>
+            {models.length > 0 && (
+              <Text type='tertiary' className='!text-[11px]'>
+                {models.length} {t('个可用')}
+              </Text>
             )}
           </div>
-        </Card>
-      </div>
-
-      {/* 中央 - 创作画布 */}
-      <div className='flex-1 flex flex-col overflow-hidden'>
-        <div className='p-4 border-b border-gray-100 bg-white'>
-          <PromptComposer
-            modality={MODALITY}
-            modelName={model}
-            value={prompt}
-            onChange={setPrompt}
-            maxLength={1000}
-            onSubmit={handleSubmit}
+          <ModelPicker
+            models={models}
+            value={model}
+            onChange={switchModel}
+            loading={modelsLoading}
           />
-          <div className='mt-3 flex items-center justify-between'>
-            <Text type='tertiary' className='!text-xs'>
-              {estimate != null
-                ? t('预计消耗 {{n}} 点', { n: estimate })
-                : t('提交后按实际计费')}
-            </Text>
-            <div className='flex items-center gap-2'>
-              <Tooltip content={t('调试面板')}>
-                <Button
-                  theme={debug.showPanel ? 'solid' : 'borderless'}
-                  type='tertiary'
-                  icon={<Code2 size={14} />}
-                  onClick={debug.togglePanel}
-                />
-              </Tooltip>
-              <Button
-                theme='solid'
-                type='primary'
-                icon={<Send size={14} />}
-                loading={submitting}
-                onClick={handleSubmit}
-                disabled={!model || !prompt.trim()}
-              >
-                {t('生成图像')}
-              </Button>
-            </div>
-          </div>
-        </div>
+        </section>
 
-        <div className='flex-1 overflow-y-auto p-4 bg-gray-50'>
+        {/* 参数区 */}
+        {schema && (
+          <section className='p-4'>
+            <div className='flex items-center justify-between mb-4'>
+              <Text strong className='!text-[13px] !text-gray-900'>
+                {t('生成参数')}
+              </Text>
+            </div>
+            <ParamPanel
+              schema={schema}
+              params={params}
+              onParamChange={handleParamChange}
+            />
+          </section>
+        )}
+      </aside>
+
+      {/* 中央 - 创作区 */}
+      <main className='flex-1 flex flex-col overflow-hidden'>
+        {/* 作品流（占大头） */}
+        <div className='flex-1 overflow-y-auto'>
           {imageAssets.length === 0 ? (
-            <div className='py-8'>
+            <div className='min-h-full flex items-center'>
               <PresetGrid
                 modality={MODALITY}
                 availableModels={models}
@@ -459,43 +437,93 @@ const ImageTab = () => {
               />
             </div>
           ) : (
-            <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4'>
-              {groupedAssets.map((g) => {
-                // 多图聚合：仅当全部 success + items.length > 1 时
-                const allSuccess = (g.items || []).every((it) => it.status === 'success');
-                const isMulti = (g.items || []).length > 1 && allSuccess;
-                if (isMulti) {
+            <div className='p-6'>
+              <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4'>
+                {groupedAssets.map((g) => {
+                  const allSuccess = (g.items || []).every((it) => it.status === 'success');
+                  const isMulti = (g.items || []).length > 1 && allSuccess;
+                  if (isMulti) {
+                    return (
+                      <AssetGroupCard
+                        key={g.id}
+                        group={g}
+                        onReplay={handleReplay}
+                        onUpscale={handleUpscale}
+                        onVariation={handleVariation}
+                        onDelete={handleDeleteGroup}
+                      />
+                    );
+                  }
+                  const single = g.items[0];
                   return (
-                    <AssetGroupCard
-                      key={g.id}
-                      group={g}
+                    <AssetCard
+                      key={single.id}
+                      asset={single}
                       onReplay={handleReplay}
-                      onUpscale={handleUpscale}
-                      onVariation={handleVariation}
-                      onDelete={handleDeleteGroup}
+                      onRetry={handleRetry}
+                      onSwitchModel={handleSwitchModel}
+                      onDelete={handleDelete}
                     />
                   );
-                }
-                // 单图 / 进行中 / 失败：用普通 AssetCard
-                const single = g.items[0];
-                return (
-                  <AssetCard
-                    key={single.id}
-                    asset={single}
-                    onReplay={handleReplay}
-                    onRetry={handleRetry}
-                    onSwitchModel={handleSwitchModel}
-                    onDelete={handleDelete}
-                  />
-                );
-              })}
+                })}
+              </div>
             </div>
           )}
         </div>
-      </div>
+
+        {/* 底部固定 - Prompt 输入 + 提交（仪式感） */}
+        <div className='flex-shrink-0 px-6 pt-4 pb-5 bg-white border-t border-gray-200/70 shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.06)]'>
+          <div className='max-w-4xl mx-auto'>
+            <PromptComposer
+              modality={MODALITY}
+              modelName={model}
+              value={prompt}
+              onChange={setPrompt}
+              maxLength={1000}
+              onSubmit={handleSubmit}
+            />
+            <div className='mt-3 flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                {estimate != null ? (
+                  <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600'>
+                    <span className='w-1 h-1 rounded-full bg-blue-500' />
+                    {t('预计 {{n}} 点', { n: estimate })}
+                  </span>
+                ) : (
+                  <Text type='tertiary' className='!text-[11px]'>
+                    {t('按实际生成量计费')}
+                  </Text>
+                )}
+              </div>
+              <div className='flex items-center gap-2'>
+                <Tooltip content={t('调试面板（查看请求体 / cURL）')}>
+                  <Button
+                    theme={debug.showPanel ? 'solid' : 'borderless'}
+                    type='tertiary'
+                    icon={<Code2 size={14} />}
+                    onClick={debug.togglePanel}
+                  />
+                </Tooltip>
+                <Button
+                  theme='solid'
+                  type='primary'
+                  size='large'
+                  icon={<Send size={15} />}
+                  loading={submitting}
+                  onClick={handleSubmit}
+                  disabled={!model || !prompt.trim()}
+                  className='!px-6'
+                >
+                  {t('生成图像')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
 
       {debug.showPanel && (
-        <div className='w-96 flex-shrink-0 border-l border-gray-100 bg-white overflow-hidden'>
+        <aside className='w-[400px] flex-shrink-0 border-l border-gray-200/70 bg-white overflow-hidden'>
           <DebugPanel
             debugData={debug.debugData}
             activeDebugTab={debug.activeTab}
@@ -504,7 +532,7 @@ const ImageTab = () => {
             onCloseDebugPanel={debug.togglePanel}
             customRequestMode={false}
           />
-        </div>
+        </aside>
       )}
     </div>
   );
