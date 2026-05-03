@@ -33,6 +33,7 @@ import { useDebugState } from '../../hooks/creation/useDebugState';
 import { useMjTaskPolling } from '../../hooks/creation/useMjTaskPolling';
 import { useDynamicModels } from '../../hooks/creation/useDynamicModels';
 import { groupAssets } from '../../utils/creation/groupAssets';
+import { showErrorModal } from '../../utils/creation/errorReporter';
 import { API } from '../../helpers/api';
 import { tokenAuthHeader, loadActiveToken } from '../../services/creation/tokens';
 
@@ -310,7 +311,7 @@ const ImageTab = () => {
         prev.map((a) => (a.id === placeholderId ? { ...a, ...patch } : a)),
       );
       updateAsset(placeholderId, patch);
-      Toast.error(msg);
+      showErrorModal(e, { title: t('图像生成失败') });
     } finally {
       setSubmitting(false);
     }

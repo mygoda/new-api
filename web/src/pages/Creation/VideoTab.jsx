@@ -32,6 +32,7 @@ import {
 import { useVideoTaskPolling } from '../../hooks/creation/useVideoTaskPolling';
 import { useDebugState } from '../../hooks/creation/useDebugState';
 import { useDynamicModels } from '../../hooks/creation/useDynamicModels';
+import { showErrorModal } from '../../utils/creation/errorReporter';
 import { API } from '../../helpers/api';
 import { tokenAuthHeader, loadActiveToken } from '../../services/creation/tokens';
 
@@ -312,7 +313,7 @@ const VideoTab = () => {
         prev.map((a) => (a.id === placeholderId ? { ...a, ...patch } : a)),
       );
       updateAsset(placeholderId, patch);
-      Toast.error(msg);
+      showErrorModal(e, { title: t('视频生成失败') });
     } finally {
       setSubmitting(false);
     }
