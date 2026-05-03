@@ -6,6 +6,7 @@
 import { useEffect, useRef } from 'react';
 import { API } from '../../helpers/api';
 import { mapMjStatusToUnified } from '../../services/creation/normalizer';
+import { tokenAuthHeader } from '../../services/creation/tokens';
 
 const TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -28,7 +29,9 @@ export function useMjTaskPolling(taskId, { onUpdate, onTerminal } = {}) {
     const tick = async () => {
       if (cancelledRef.current) return;
       try {
-        const res = await API.get(`/mj/task/${encodeURIComponent(taskId)}/fetch`);
+        const res = await API.get(`/mj/task/${encodeURIComponent(taskId)}/fetch`, {
+          headers: tokenAuthHeader(),
+        });
         if (cancelledRef.current) return;
         const t = res?.data?.data ?? res?.data;
         if (t && typeof t === 'object') {

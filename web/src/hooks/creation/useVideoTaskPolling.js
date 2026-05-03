@@ -8,6 +8,7 @@
 
 import { useEffect, useRef } from 'react';
 import { API } from '../../helpers/api';
+import { tokenAuthHeader } from '../../services/creation/tokens';
 
 const TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -34,6 +35,7 @@ export function useVideoTaskPolling(taskId, { onUpdate, onTerminal } = {}) {
       try {
         const res = await API.get(
           `/v1/video/generations/${encodeURIComponent(taskId)}`,
+          { headers: tokenAuthHeader() },
         );
         if (cancelledRef.current) return;
         // axios response.data 有可能是 OpenAIVideo 直接对象，也可能是 { data: {...} } wrapper

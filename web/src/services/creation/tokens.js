@@ -35,6 +35,14 @@ export function saveActiveToken(token) {
   } catch {}
 }
 
+// 用于发送给上游 relay 端点（/v1/...、/mj/...）的 Authorization 头。
+// 没有 active token 时返回空对象，由调用方决定是否阻塞用户。
+export function tokenAuthHeader() {
+  const tk = loadActiveToken();
+  if (!tk?.key) return {};
+  return { Authorization: `Bearer ${tk.key}` };
+}
+
 export async function listTokens(page = 1, size = 50) {
   const res = await API.get(`/api/token/?p=${page}&size=${size}`);
   if (!res?.data?.success) throw new Error(res?.data?.message || '加载 Token 失败');

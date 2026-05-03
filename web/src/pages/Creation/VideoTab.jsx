@@ -33,6 +33,7 @@ import { useVideoTaskPolling } from '../../hooks/creation/useVideoTaskPolling';
 import { useDebugState } from '../../hooks/creation/useDebugState';
 import { useDynamicModels } from '../../hooks/creation/useDynamicModels';
 import { API } from '../../helpers/api';
+import { tokenAuthHeader, loadActiveToken } from '../../services/creation/tokens';
 
 const { Text } = Typography;
 const MODALITY = 'video';
@@ -248,6 +249,11 @@ const VideoTab = () => {
       return;
     }
 
+    if (!loadActiveToken()?.key) {
+      Toast.warning(t('请先在右上角选择或创建一个 Token'));
+      return;
+    }
+
     let req;
     try {
       req = normalize(unified, schema);
@@ -273,7 +279,7 @@ const VideoTab = () => {
     appendAsset(placeholder);
 
     try {
-      const res = await API.post(req.url, req.body);
+      const res = await API.post(req.url, req.body, { headers: tokenAuthHeader() });
       debug.setResponse(res?.data ?? res);
       const payload = res?.data?.data ?? res?.data;
       const taskId = payload?.task_id || payload?.id;
