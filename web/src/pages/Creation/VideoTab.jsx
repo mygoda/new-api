@@ -3,7 +3,7 @@ Copyright (C) 2025 QuantumNous
 SPDX-License-Identifier: AGPL-3.0-or-later
 */
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Button, Toast, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import { Send, Code2 } from 'lucide-react';
@@ -55,6 +55,40 @@ const TaskPoller = ({ taskId, assetId, onUpdate, onTerminal }) => {
   });
   return null;
 };
+
+const TimelineItem = ({ createdAt, children }) => {
+  const d = new Date(createdAt || Date.now());
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return (
+    <div className='flex gap-3'>
+      <div className='flex flex-col items-center pt-2'>
+        <Text type='tertiary' className='!text-[10px] !text-gray-400 tabular-nums leading-none'>
+          {hh}:{mm}
+        </Text>
+        <div className='w-2 h-2 rounded-full bg-violet-300 mt-1.5 ring-4 ring-violet-50' />
+        <div className='w-px flex-1 bg-gray-200/60 mt-1' />
+      </div>
+      <div className='flex-1 min-w-0 pb-2'>{children}</div>
+    </div>
+  );
+};
+
+function formatDayLabel(d) {
+  const today = new Date();
+  const isToday =
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate();
+  const yesterday = new Date(Date.now() - 24 * 3600 * 1000);
+  const isYesterday =
+    d.getFullYear() === yesterday.getFullYear() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getDate() === yesterday.getDate();
+  if (isToday) return '今天';
+  if (isYesterday) return '昨天';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 const VideoTab = () => {
   const { t } = useTranslation();
@@ -130,6 +164,29 @@ const VideoTab = () => {
           createdAt: t.createdAt || Date.now(),
         }));
       return [...toAdd, ...prev];
+    });
+  }, []);
+
+  // 修复：卡死在 pending 且无 taskId 的同步占位符标记为 failed
+  useEffect(() => {
+    const STALE_MS = 60 * 1000;
+    setAssets((prev) => {
+      let changed = false;
+      const next = prev.map((a) => {
+        const isStuck =
+          (a.status === 'pending' || a.status === 'in_progress') &&
+          !a.taskId &&
+          Date.now() - (a.createdAt || 0) > STALE_MS;
+        if (!isStuck) return a;
+        changed = true;
+        const patch = {
+          status: 'failed',
+          errorMessage: '生成被中断（页面已切换或刷新）',
+        };
+        updateAsset(a.id, patch);
+        return { ...a, ...patch };
+      });
+      return changed ? next : prev;
     });
   }, []);
 
@@ -348,6 +405,40 @@ const VideoTab = () => {
     (a) => a.taskId && (a.status === 'in_progress' || a.status === 'queued'),
   );
 
+  // 时间轴：升序 + 按日分组
+  const timelineDays = useMemo(() => {
+    const sorted = [...videoAssets].sort(
+      (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
+    );
+    const days = [];
+    let lastKey = '';
+    for (const a of sorted) {
+      const d = new Date(a.createdAt || Date.now());
+      const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+      if (key !== lastKey) {
+        days.push({ key, date: d, items: [] });
+        lastKey = key;
+      }
+      days[days.length - 1].items.push(a);
+    }
+    return days;
+  }, [videoAssets]);
+
+  const timelineRef = useRef(null);
+  const lastCountRef = useRef(0);
+  useEffect(() => {
+    const cnt = videoAssets.length;
+    if (cnt > lastCountRef.current) {
+      const el = timelineRef.current;
+      if (el) {
+        requestAnimationFrame(() => {
+          el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+        });
+      }
+    }
+    lastCountRef.current = cnt;
+  }, [videoAssets.length]);
+
   return (
     <div className='flex h-full overflow-hidden bg-[#fafafa]'>
       {activeTasks.map((a) => (
@@ -399,8 +490,8 @@ const VideoTab = () => {
 
       {/* 中央 - 创作区 */}
       <main className='flex-1 flex flex-col overflow-hidden'>
-        {/* 作品流 */}
-        <div className='flex-1 overflow-y-auto'>
+        {/* 作品流（时间轴） */}
+        <div ref={timelineRef} className='flex-1 overflow-y-auto'>
           {videoAssets.length === 0 ? (
             <div className='min-h-full flex items-center'>
               <PresetGrid
@@ -410,19 +501,29 @@ const VideoTab = () => {
               />
             </div>
           ) : (
-            <div className='p-6'>
-              <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
-                {videoAssets.map((a) => (
-                  <AssetCard
-                    key={a.id}
-                    asset={a}
-                    onReplay={handleReplay}
-                    onRetry={handleRetry}
-                    onSwitchModel={handleSwitchModel}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
+            <div className='max-w-4xl mx-auto px-6 py-6 space-y-8'>
+              {timelineDays.map(({ key, date, items }) => (
+                <section key={key} className='space-y-3'>
+                  <div className='flex items-center gap-3 sticky top-0 z-[1] py-1 bg-[#fafafa]/85 backdrop-blur'>
+                    <div className='h-px flex-1 bg-gray-200/70' />
+                    <Text type='tertiary' className='!text-[11px] !text-gray-500'>
+                      {formatDayLabel(date)}
+                    </Text>
+                    <div className='h-px flex-1 bg-gray-200/70' />
+                  </div>
+                  {items.map((a) => (
+                    <TimelineItem key={a.id} createdAt={a.createdAt}>
+                      <AssetCard
+                        asset={a}
+                        onReplay={handleReplay}
+                        onRetry={handleRetry}
+                        onSwitchModel={handleSwitchModel}
+                        onDelete={handleDelete}
+                      />
+                    </TimelineItem>
+                  ))}
+                </section>
+              ))}
             </div>
           )}
         </div>

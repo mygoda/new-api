@@ -3,7 +3,7 @@ Copyright (C) 2025 QuantumNous
 SPDX-License-Identifier: AGPL-3.0-or-later
 */
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Button, Toast, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import { Send, Code2, Layers } from 'lucide-react';
@@ -49,6 +49,41 @@ const MjTaskPoller = ({ taskId, assetId, onUpdate, onTerminal }) => {
   });
   return null;
 };
+
+// 时间轴单条目：左侧时间标签 + 时间轴竖线 + 右侧卡片
+const TimelineItem = ({ createdAt, children }) => {
+  const d = new Date(createdAt || Date.now());
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return (
+    <div className='flex gap-3'>
+      <div className='flex flex-col items-center pt-2'>
+        <Text type='tertiary' className='!text-[10px] !text-gray-400 tabular-nums leading-none'>
+          {hh}:{mm}
+        </Text>
+        <div className='w-2 h-2 rounded-full bg-blue-300 mt-1.5 ring-4 ring-blue-50' />
+        <div className='w-px flex-1 bg-gray-200/60 mt-1' />
+      </div>
+      <div className='flex-1 min-w-0 pb-2'>{children}</div>
+    </div>
+  );
+};
+
+function formatDayLabel(d) {
+  const today = new Date();
+  const isToday =
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate();
+  const yesterday = new Date(Date.now() - 24 * 3600 * 1000);
+  const isYesterday =
+    d.getFullYear() === yesterday.getFullYear() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getDate() === yesterday.getDate();
+  if (isToday) return '今天';
+  if (isYesterday) return '昨天';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function defaultsFromSchema(schema) {
   const out = {};
@@ -123,6 +158,32 @@ const ImageTab = () => {
           createdAt: t.createdAt || Date.now(),
         }));
       return [...toAdd, ...prev];
+    });
+  }, []);
+
+  // 修复：之前批量/同步生成的占位符如果状态卡在 pending 且没有 taskId，
+  // 说明请求是同步的（一次性 HTTP），但页面被关闭/刷新导致没拿到结果。
+  // 重新打开时不应该再发请求（也不会自动发），而是把它们标记为 failed，
+  // 让用户用「同参重试」按钮显式触发。
+  useEffect(() => {
+    const STALE_MS = 60 * 1000; // 60 秒以上仍 pending 视为已中断
+    setAssets((prev) => {
+      let changed = false;
+      const next = prev.map((a) => {
+        const isStuck =
+          (a.status === 'pending' || a.status === 'in_progress') &&
+          !a.taskId &&
+          Date.now() - (a.createdAt || 0) > STALE_MS;
+        if (!isStuck) return a;
+        changed = true;
+        const patch = {
+          status: 'failed',
+          errorMessage: '生成被中断（页面已切换或刷新）',
+        };
+        updateAsset(a.id, patch);
+        return { ...a, ...patch };
+      });
+      return changed ? next : prev;
     });
   }, []);
 
@@ -493,6 +554,42 @@ const ImageTab = () => {
   const groupedAssets = useMemo(() => groupAssets(imageAssets), [imageAssets]);
   const renderRows = useMemo(() => combineWithBatches(groupedAssets), [groupedAssets]);
 
+  // 时间轴：按时间升序（最旧 → 最新），并按"日"分组
+  const timelineDays = useMemo(() => {
+    const sorted = [...renderRows].sort(
+      (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
+    );
+    const days = [];
+    let lastKey = '';
+    for (const row of sorted) {
+      const d = new Date(row.createdAt || Date.now());
+      const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+      if (key !== lastKey) {
+        days.push({ key, date: d, rows: [] });
+        lastKey = key;
+      }
+      days[days.length - 1].rows.push(row);
+    }
+    return days;
+  }, [renderRows]);
+
+  // 自动滚到底部：仅在新条目追加时（imageAssets 变多）
+  const timelineRef = useRef(null);
+  const lastCountRef = useRef(0);
+  useEffect(() => {
+    const cnt = imageAssets.length;
+    if (cnt > lastCountRef.current) {
+      const el = timelineRef.current;
+      if (el) {
+        // 下一帧 scroll 到底，等待新增 DOM 渲染
+        requestAnimationFrame(() => {
+          el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+        });
+      }
+    }
+    lastCountRef.current = cnt;
+  }, [imageAssets.length]);
+
   return (
     <div className='flex h-full overflow-hidden bg-[#fafafa]'>
       {activeTasks.map((a) => (
@@ -546,8 +643,8 @@ const ImageTab = () => {
 
       {/* 中央 - 创作区 */}
       <main className='flex-1 flex flex-col overflow-hidden'>
-        {/* 作品流（占大头） */}
-        <div className='flex-1 overflow-y-auto'>
+        {/* 作品流（时间轴：最旧在上，最新在下） */}
+        <div ref={timelineRef} className='flex-1 overflow-y-auto'>
           {imageAssets.length === 0 ? (
             <div className='min-h-full flex items-center'>
               <PresetGrid
@@ -557,12 +654,21 @@ const ImageTab = () => {
               />
             </div>
           ) : (
-            <div className='p-6'>
-              <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4'>
-                {renderRows.map((row) => {
-                  if (row.kind === 'batch') {
-                    return (
-                      <div key={row.id} className='col-span-full'>
+            <div className='max-w-4xl mx-auto px-6 py-6 space-y-8'>
+              {timelineDays.map(({ key, date, rows }) => (
+                <section key={key} className='space-y-3'>
+                  {/* 日分隔 */}
+                  <div className='flex items-center gap-3 sticky top-0 z-[1] py-1 bg-[#fafafa]/85 backdrop-blur'>
+                    <div className='h-px flex-1 bg-gray-200/70' />
+                    <Text type='tertiary' className='!text-[11px] !text-gray-500'>
+                      {formatDayLabel(date)}
+                    </Text>
+                    <div className='h-px flex-1 bg-gray-200/70' />
+                  </div>
+
+                  {rows.map((row) => (
+                    <TimelineItem key={row.id} createdAt={row.createdAt}>
+                      {row.kind === 'batch' ? (
                         <BatchCompareCard
                           batch={row}
                           onReplay={handleReplay}
@@ -576,37 +682,38 @@ const ImageTab = () => {
                             (row.items || []).forEach((it) => removeAsset(it.id));
                           }}
                         />
-                      </div>
-                    );
-                  }
-                  const g = row;
-                  const allSuccess = (g.items || []).every((it) => it.status === 'success');
-                  const isMulti = (g.items || []).length > 1 && allSuccess;
-                  if (isMulti) {
-                    return (
-                      <AssetGroupCard
-                        key={g.id}
-                        group={g}
-                        onReplay={handleReplay}
-                        onUpscale={handleUpscale}
-                        onVariation={handleVariation}
-                        onDelete={handleDeleteGroup}
-                      />
-                    );
-                  }
-                  const single = g.items[0];
-                  return (
-                    <AssetCard
-                      key={single.id}
-                      asset={single}
-                      onReplay={handleReplay}
-                      onRetry={handleRetry}
-                      onSwitchModel={handleSwitchModel}
-                      onDelete={handleDelete}
-                    />
-                  );
-                })}
-              </div>
+                      ) : (
+                        (() => {
+                          const g = row;
+                          const allSuccess = (g.items || []).every((it) => it.status === 'success');
+                          const isMulti = (g.items || []).length > 1 && allSuccess;
+                          if (isMulti) {
+                            return (
+                              <AssetGroupCard
+                                group={g}
+                                onReplay={handleReplay}
+                                onUpscale={handleUpscale}
+                                onVariation={handleVariation}
+                                onDelete={handleDeleteGroup}
+                              />
+                            );
+                          }
+                          const single = g.items[0];
+                          return (
+                            <AssetCard
+                              asset={single}
+                              onReplay={handleReplay}
+                              onRetry={handleRetry}
+                              onSwitchModel={handleSwitchModel}
+                              onDelete={handleDelete}
+                            />
+                          );
+                        })()
+                      )}
+                    </TimelineItem>
+                  ))}
+                </section>
+              ))}
             </div>
           )}
         </div>
