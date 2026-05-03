@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 */
 
 import React, { useState } from 'react';
-import { Input, Button, Tooltip, Typography, Modal, Tabs, TabPane, Spin, Toast } from '@douyinfe/semi-ui';
+import { TextArea, Button, Tooltip, Typography, Modal, Tabs, TabPane, Spin, Toast } from '@douyinfe/semi-ui';
 import { Sparkles, Wand2, Tag as TagIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { PROMPT_EXAMPLES } from '../../constants/creation/prompt-examples';
@@ -67,26 +67,32 @@ const PromptComposer = ({
   return (
     <div className='space-y-2'>
       {/* Prompt 输入区 - 视觉中心 */}
-      <div className='relative'>
-        <Input
+      <div className='relative rounded-xl border-2 border-blue-200 bg-white shadow-[0_2px_12px_rgba(37,99,235,0.08)] focus-within:border-blue-500 focus-within:shadow-[0_4px_16px_rgba(37,99,235,0.18)] transition-all'>
+        <div className='flex items-center gap-1.5 px-3 pt-2.5 pb-1'>
+          <Sparkles size={13} className='text-blue-500' />
+          <Text className='!text-[12px] !font-semibold !text-blue-600'>
+            {t('提示词')}
+          </Text>
+          <Text type='tertiary' className='!text-[10px] !text-gray-400'>
+            {t('描述你想生成的内容')}
+          </Text>
+        </div>
+        <TextArea
           value={value}
           onChange={onChange}
-          rows={3}
-          placeholder={t('描述你想要生成的内容…  ⌘+Enter 提交')}
-          autosize={{ minRows: 2, maxRows: 8 }}
-          className='!rounded-xl !text-[14px]'
-          style={{
-            background: '#fafafa',
-          }}
+          placeholder={t('例如：一只穿着宇航服的猫漂浮在星空中…   ⌘/Ctrl + Enter 提交')}
+          autosize={{ minRows: 3, maxRows: 8 }}
+          className='!text-[14px] !border-0 !shadow-none !bg-transparent prompt-composer-input'
+          style={{ background: 'transparent' }}
           onKeyDown={handleKeyDown}
         />
         {value && value.length > 0 && (
           <Text
             type={len > maxLength ? 'danger' : 'tertiary'}
             size='small'
-            className='!text-[10px] tabular-nums absolute right-3 bottom-2 bg-white/80 px-1 rounded pointer-events-none'
+            className='!text-[10px] tabular-nums absolute right-3 bottom-2 bg-white/90 px-1.5 py-0.5 rounded pointer-events-none'
           >
-            {len}
+            {len}/{maxLength}
           </Text>
         )}
       </div>

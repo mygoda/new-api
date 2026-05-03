@@ -42,10 +42,10 @@ const FieldRow = ({ field, name, value, onChange }) => {
                   type='button'
                   onClick={() => onChange(opt)}
                   className={[
-                    'px-3 py-1.5 text-xs rounded-md border transition-all',
+                    'relative px-3.5 py-1.5 text-xs rounded-md border transition-all',
                     active
-                      ? 'bg-blue-500 text-white border-blue-500 shadow-sm font-medium'
-                      : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:bg-blue-50/40',
+                      ? 'bg-blue-600 text-white border-blue-600 font-semibold shadow-[0_2px_6px_rgba(37,99,235,0.35)] ring-2 ring-blue-200 ring-offset-1 scale-[1.02]'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/60',
                   ].join(' ')}
                 >
                   {String(opt)}
