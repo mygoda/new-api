@@ -18,31 +18,24 @@ import {
   Copy,
   Maximize2,
   Trash2,
-  Loader2,
   AlertCircle,
   Sparkles,
   RotateCcw,
   Info,
 } from 'lucide-react';
 import { copyText, downloadUrl } from '../../utils/creation/clipboard';
+import { getProgressNarrative } from '../../utils/creation/progressNarrative';
 
 const { Text, Paragraph } = Typography;
 
-// 简易计时器
-function Elapsed({ from }) {
-  const [now, setNow] = useState(Date.now());
+// 简易计时器：用于触发 narrative / 进度的实时刷新
+function useTick(active, intervalMs = 1000) {
+  const [, setTick] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const sec = Math.max(0, Math.floor((now - (from || now)) / 1000));
-  const mm = String(Math.floor(sec / 60)).padStart(1, '0');
-  const ss = String(sec % 60).padStart(2, '0');
-  return (
-    <span className='tabular-nums'>
-      {mm}:{ss}
-    </span>
-  );
+    if (!active) return undefined;
+    const id = setInterval(() => setTick((t) => t + 1), intervalMs);
+    return () => clearInterval(id);
+  }, [active, intervalMs]);
 }
 
 const StatusBadge = ({ status }) => {
@@ -60,8 +53,42 @@ const StatusBadge = ({ status }) => {
     );
   return (
     <span className='inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] rounded'>
-      <Loader2 size={10} className='animate-spin' /> 生成中
+      <Sparkles size={10} className='animate-pulse' /> 生成中
     </span>
+  );
+};
+
+// 进行中的占位：复用默认 AssetCard 的"构思 / 渲染 / 润色"叙事 + 渐变背景 + 进度条
+const PendingPlaceholder = ({ asset }) => {
+  const isPending = true;
+  useTick(isPending);
+  const p = getProgressNarrative(asset);
+  return (
+    <div className='absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50/40 to-pink-50/40 flex flex-col items-center justify-center gap-2 px-3 text-center overflow-hidden'>
+      {/* 背景流光 */}
+      <div className='absolute inset-0 opacity-30 pointer-events-none'>
+        <div className='absolute -inset-x-4 top-1/2 h-24 bg-gradient-to-r from-transparent via-blue-200 to-transparent blur-2xl animate-pulse' />
+      </div>
+      <div className='relative z-10 flex flex-col items-center gap-1.5 w-full'>
+        <div className='text-2xl select-none animate-bounce' style={{ animationDuration: '2s' }}>
+          {p.icon}
+        </div>
+        <Text strong className='!text-[12px] !text-gray-800'>
+          {p.text}
+        </Text>
+        <div className='w-3/4 h-1 bg-white/80 rounded-full overflow-hidden'>
+          <div
+            className='h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-1000 ease-out'
+            style={{ width: `${p.progress}%` }}
+          />
+        </div>
+        <div className='flex items-center gap-1 text-[10px] text-gray-500'>
+          <span className='tabular-nums'>{p.progress}%</span>
+          <span className='text-gray-300'>·</span>
+          <span>{p.etaText}</span>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -165,12 +192,7 @@ const Tile = ({ asset, onRetry, onDelete }) => {
             </Text>
           </div>
         ) : (
-          <div className='w-full h-full flex flex-col items-center justify-center bg-gray-50 gap-1'>
-            <Loader2 size={22} className='text-blue-400 animate-spin' />
-            <Text type='tertiary' className='!text-[10px]'>
-              {t('生成中')} <Elapsed from={asset?.createdAt} />
-            </Text>
-          </div>
+          <PendingPlaceholder asset={asset} />
         )}
 
         {/* 模型 + 状态徽标（不遮挡过多） */}
