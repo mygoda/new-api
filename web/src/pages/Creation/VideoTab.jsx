@@ -13,6 +13,7 @@ import PromptComposer from '../../components/creation/PromptComposer';
 import ParamPanel from '../../components/creation/ParamPanel';
 import AssetCard from '../../components/creation/AssetCard';
 import ImageSlot from '../../components/creation/ImageSlot';
+import PresetGrid from '../../components/creation/PresetGrid';
 import DebugPanel from '../../components/playground/DebugPanel';
 
 import { normalize, validate, buildCurl } from '../../services/creation/normalizer';
@@ -156,6 +157,15 @@ const VideoTab = () => {
     setParams((prev) => ({ ...prev, [name]: value }));
   }, []);
 
+  const applyPreset = useCallback(({ prompt: p, model: m, params: presetParams }) => {
+    if (m && m !== model) switchModel(m);
+    setPrompt(p || '');
+    if (presetParams) {
+      setParams((prev) => ({ ...prev, ...presetParams }));
+    }
+    Toast.info(t('已为你填入推荐参数，点击「生成视频」开始 ✨'));
+  }, [model, switchModel, t]);
+
   const estimate = useMemo(() => {
     if (!schema?.pricing?.estimate) return null;
     try {
@@ -292,6 +302,19 @@ const VideoTab = () => {
     setPrompt(asset.prompt || '');
   };
 
+  const handleRetry = (asset) => {
+    if (asset.modelName !== model) switchModel(asset.modelName);
+    if (asset.params) setParams(asset.params);
+    setPrompt(asset.prompt || '');
+    setTimeout(() => handleSubmit(), 80);
+  };
+
+  const handleSwitchModel = (asset) => {
+    setPrompt(asset.prompt || '');
+    if (asset.params) setParams(asset.params);
+    Toast.info(t('请在左侧选择一个新模型，再点击「生成视频」'));
+  };
+
   const handleDelete = (asset) => {
     setAssets(removeAsset(asset.id));
     if (asset.taskId) untrackActiveTask(asset.taskId);
@@ -407,6 +430,7 @@ const VideoTab = () => {
             value={prompt}
             onChange={setPrompt}
             maxLength={1000}
+            onSubmit={handleSubmit}
           />
           <div className='flex items-center justify-between'>
             <Text type='tertiary' className='!text-xs'>
@@ -439,8 +463,12 @@ const VideoTab = () => {
 
         <div className='flex-1 overflow-y-auto p-4 bg-gray-50'>
           {videoAssets.length === 0 ? (
-            <div className='h-full flex items-center justify-center text-gray-400 text-sm'>
-              {t('还没有作品，先来生成第一段吧～')}
+            <div className='py-8'>
+              <PresetGrid
+                modality={MODALITY}
+                availableModels={models}
+                onApply={applyPreset}
+              />
             </div>
           ) : (
             <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
@@ -449,6 +477,8 @@ const VideoTab = () => {
                   key={a.id}
                   asset={a}
                   onReplay={handleReplay}
+                  onRetry={handleRetry}
+                  onSwitchModel={handleSwitchModel}
                   onDelete={handleDelete}
                 />
               ))}

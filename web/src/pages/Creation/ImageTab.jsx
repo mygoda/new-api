@@ -12,6 +12,8 @@ import ModelPicker from '../../components/creation/ModelPicker';
 import PromptComposer from '../../components/creation/PromptComposer';
 import ParamPanel from '../../components/creation/ParamPanel';
 import AssetCard from '../../components/creation/AssetCard';
+import AssetGroupCard from '../../components/creation/AssetGroupCard';
+import PresetGrid from '../../components/creation/PresetGrid';
 import DebugPanel from '../../components/playground/DebugPanel';
 
 import { normalize, validate, buildCurl } from '../../services/creation/normalizer';
@@ -30,6 +32,7 @@ import {
 import { useDebugState } from '../../hooks/creation/useDebugState';
 import { useMjTaskPolling } from '../../hooks/creation/useMjTaskPolling';
 import { useDynamicModels } from '../../hooks/creation/useDynamicModels';
+import { groupAssets } from '../../utils/creation/groupAssets';
 import { API } from '../../helpers/api';
 
 const { Text } = Typography;
@@ -121,6 +124,7 @@ const ImageTab = () => {
   const switchModel = useCallback((next) => {
     const nextSchema = getSchemaFor(next);
     if (!nextSchema) return;
+    // 保留同名字段（用户体验优化：切换模型不丢失参数）
     const filtered = {};
     for (const k of Object.keys(nextSchema.fields || {})) {
       filtered[k] =
@@ -133,6 +137,16 @@ const ImageTab = () => {
   const handleParamChange = useCallback((name, value) => {
     setParams((prev) => ({ ...prev, [name]: value }));
   }, []);
+
+  // 应用 preset：一键填入 prompt + 模型 + 参数
+  const applyPreset = useCallback(({ prompt: p, model: m, params: presetParams }) => {
+    if (m && m !== model) switchModel(m);
+    setPrompt(p || '');
+    if (presetParams) {
+      setParams((prev) => ({ ...prev, ...presetParams }));
+    }
+    Toast.info(t('已为你填入推荐参数，点击「生成图像」开始 ✨'));
+  }, [model, switchModel, t]);
 
   const estimate = useMemo(() => {
     if (!schema?.pricing?.estimate) return null;
@@ -232,8 +246,11 @@ const ImageTab = () => {
         const items = res?.data?.data || [];
         if (!items.length) throw new Error('upstream returned no data');
 
+        // 同次提交的多张图共享 groupId（用于聚合卡片）
+        const groupId = placeholderId;
         const created = items.map((it, idx) => ({
           id: genId() + '-' + idx,
+          groupId,
           modality: MODALITY,
           modelName: model,
           prompt,
@@ -281,15 +298,62 @@ const ImageTab = () => {
     setPrompt(asset.prompt || '');
   };
 
+  // 失败 → 同参重试（直接 submit，不修改任何状态）
+  const handleRetry = (asset) => {
+    if (asset.modelName !== model) switchModel(asset.modelName);
+    if (asset.params) setParams(asset.params);
+    setPrompt(asset.prompt || '');
+    // 给一个短延迟，等参数 setState 完成
+    setTimeout(() => handleSubmit(), 80);
+  };
+
+  // 失败 → 换个模型（保留 prompt 参数，让用户从模型列表挑）
+  const handleSwitchModel = (asset) => {
+    setPrompt(asset.prompt || '');
+    if (asset.params) setParams(asset.params);
+    Toast.info(t('请在左侧选择一个新模型，再点击「生成图像」'));
+  };
+
   const handleDelete = (asset) => {
     setAssets(removeAsset(asset.id));
     if (asset.taskId) untrackActiveTask(asset.taskId);
+  };
+
+  // 删除整组（多图聚合）
+  const handleDeleteGroup = (group) => {
+    if (!group?.items) return;
+    let next = assets;
+    for (const it of group.items) {
+      next = next.filter((a) => a.id !== it.id);
+      if (it.taskId) untrackActiveTask(it.taskId);
+    }
+    setAssets(next);
+    try {
+      localStorage.setItem('creation:assets:v1', JSON.stringify(next.slice(0, 1000)));
+    } catch {}
+  };
+
+  // 高质量重生成单张：把 quality 拉到 high，n=1
+  const handleUpscale = (group, idx) => {
+    if (group.modelName !== model) switchModel(group.modelName);
+    setPrompt(group.prompt || '');
+    setParams({ ...(group.params || {}), n: 1, quality: 'high' });
+    Toast.info(t('已切换到高质量模式，点击「生成图像」获取更精细版本'));
+  };
+
+  // 基于某张生成变体：保留 prompt，n=4
+  const handleVariation = (group, idx) => {
+    if (group.modelName !== model) switchModel(group.modelName);
+    setPrompt(group.prompt || '');
+    setParams({ ...(group.params || {}), n: 4 });
+    Toast.info(t('已准备好生成 4 张变体，点击「生成图像」'));
   };
 
   const imageAssets = assets.filter((a) => a.modality === MODALITY);
   const activeTasks = imageAssets.filter(
     (a) => a.taskId && (a.status === 'in_progress' || a.status === 'queued'),
   );
+  const groupedAssets = useMemo(() => groupAssets(imageAssets), [imageAssets]);
 
   return (
     <div className='flex h-full overflow-hidden'>
@@ -354,6 +418,7 @@ const ImageTab = () => {
             value={prompt}
             onChange={setPrompt}
             maxLength={1000}
+            onSubmit={handleSubmit}
           />
           <div className='mt-3 flex items-center justify-between'>
             <Text type='tertiary' className='!text-xs'>
@@ -386,19 +451,44 @@ const ImageTab = () => {
 
         <div className='flex-1 overflow-y-auto p-4 bg-gray-50'>
           {imageAssets.length === 0 ? (
-            <div className='h-full flex items-center justify-center text-gray-400 text-sm'>
-              {t('还没有作品，先来生成第一张吧～')}
+            <div className='py-8'>
+              <PresetGrid
+                modality={MODALITY}
+                availableModels={models}
+                onApply={applyPreset}
+              />
             </div>
           ) : (
             <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4'>
-              {imageAssets.map((a) => (
-                <AssetCard
-                  key={a.id}
-                  asset={a}
-                  onReplay={handleReplay}
-                  onDelete={handleDelete}
-                />
-              ))}
+              {groupedAssets.map((g) => {
+                // 多图聚合：仅当全部 success + items.length > 1 时
+                const allSuccess = (g.items || []).every((it) => it.status === 'success');
+                const isMulti = (g.items || []).length > 1 && allSuccess;
+                if (isMulti) {
+                  return (
+                    <AssetGroupCard
+                      key={g.id}
+                      group={g}
+                      onReplay={handleReplay}
+                      onUpscale={handleUpscale}
+                      onVariation={handleVariation}
+                      onDelete={handleDeleteGroup}
+                    />
+                  );
+                }
+                // 单图 / 进行中 / 失败：用普通 AssetCard
+                const single = g.items[0];
+                return (
+                  <AssetCard
+                    key={single.id}
+                    asset={single}
+                    onReplay={handleReplay}
+                    onRetry={handleRetry}
+                    onSwitchModel={handleSwitchModel}
+                    onDelete={handleDelete}
+                  />
+                );
+              })}
             </div>
           )}
         </div>

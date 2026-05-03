@@ -150,11 +150,21 @@ const TokenGuard = ({ visible, onResolved, onClose }) => {
 export default TokenGuard;
 
 // Hook：返回 [active, openGuard, GuardComponent]
+//
+// 行为优化：
+//   - 用户已有 active token → 直接通过
+//   - 没有 token → 后台静默调用 quickCreateAndActivate 创建一个默认 token
+//     不阻塞用户，仅显示一条非阻塞 Toast「已为你准备好工作环境」
+//   - 创建失败时才弹窗（兜底）
+//   - openGuard() 由头部 TokenSelector 主动调用，让高级用户切换
 export function useTokenGuard() {
+  const { t } = useTranslation();
   const [active, setActive] = useState(loadActiveToken);
   const [visible, setVisible] = useState(false);
+  const [silentCreating, setSilentCreating] = useState(false);
 
   const openGuard = () => setVisible(true);
+
   const ensureToken = () => {
     if (!active?.key) {
       openGuard();
@@ -162,6 +172,26 @@ export function useTokenGuard() {
     }
     return true;
   };
+
+  // 首次进入时静默创建
+  React.useEffect(() => {
+    if (active?.key || silentCreating) return;
+    setSilentCreating(true);
+    quickCreateAndActivate('creation-default')
+      .then((tok) => {
+        setActive(tok);
+        Toast.info({
+          content: t('已为你准备好工作环境 ✨'),
+          duration: 2,
+        });
+      })
+      .catch(() => {
+        // 静默创建失败：才弹窗让用户手动选
+        openGuard();
+      })
+      .finally(() => setSilentCreating(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const Guard = (
     <TokenGuard

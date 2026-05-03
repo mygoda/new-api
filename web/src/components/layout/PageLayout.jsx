@@ -67,6 +67,7 @@ const PageLayout = () => {
     location.pathname.includes('/console') &&
     !location.pathname.startsWith('/console/chat') &&
     !location.pathname.startsWith('/console/creation') &&
+    !location.pathname.startsWith('/creation') &&
     location.pathname !== '/console/playground';
 
   const isConsoleRoute = location.pathname.startsWith('/console');

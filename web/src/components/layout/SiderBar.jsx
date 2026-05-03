@@ -52,7 +52,7 @@ const routerMap = {
   request_logs: '/console/request-logs',
   billing: '/console/billing',
   playground: '/console/playground',
-  creation: '/console/creation',
+  creation: '/creation',
   personal: '/console/personal',
   dealer_users: '/console/dealer/users',
   dealer_billing: '/console/dealer/billing',

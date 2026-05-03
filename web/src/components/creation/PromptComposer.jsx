@@ -5,10 +5,11 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 import React, { useState } from 'react';
 import { Input, Button, Tooltip, Typography, Modal, Tabs, TabPane, Spin, Toast } from '@douyinfe/semi-ui';
-import { Sparkles, Wand2 } from 'lucide-react';
+import { Sparkles, Wand2, Tag as TagIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { PROMPT_EXAMPLES } from '../../constants/creation/prompt-examples';
 import { enhancePrompt } from '../../services/creation/promptEnhance';
+import QuickTags from './QuickTags';
 
 const { Text } = Typography;
 
@@ -18,15 +19,25 @@ const PromptComposer = ({
   value,
   onChange,
   maxLength = 1000,
+  onSubmit,
 }) => {
   const { t } = useTranslation();
   const [showExamples, setShowExamples] = useState(false);
+  const [showTags, setShowTags] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [showEnhanced, setShowEnhanced] = useState(false);
   const [enhancedText, setEnhancedText] = useState('');
   const [usedModel, setUsedModel] = useState('');
   const examples = PROMPT_EXAMPLES[modality] || [];
   const len = (value || '').length;
+
+  // ⌘+Enter / Ctrl+Enter 提交
+  const handleKeyDown = (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (value && value.trim()) onSubmit?.();
+    }
+  };
 
   const handleEnhance = async () => {
     if (!value || !value.trim()) {
@@ -71,6 +82,15 @@ const PromptComposer = ({
               {t('示例')}
             </Button>
           )}
+          <Button
+            size='small'
+            theme={showTags ? 'light' : 'borderless'}
+            type={showTags ? 'primary' : 'tertiary'}
+            icon={<TagIcon size={13} />}
+            onClick={() => setShowTags((v) => !v)}
+          >
+            {t('标签')}
+          </Button>
           <Tooltip content={t('用 Chat 模型重写提示词')}>
             <Button
               size='small'
@@ -97,11 +117,19 @@ const PromptComposer = ({
         value={value}
         onChange={onChange}
         rows={5}
-        placeholder={t('描述你想要生成的内容…')}
+        placeholder={t('描述你想要生成的内容…  ⌘+Enter 提交')}
         autosize={{ minRows: 4, maxRows: 12 }}
         showClear
         className='!rounded-lg'
+        onKeyDown={handleKeyDown}
       />
+
+      {/* 快速标签 */}
+      {showTags && (
+        <div className='p-3 bg-gray-50/60 border border-gray-100 rounded-lg'>
+          <QuickTags modality={modality} value={value} onChange={onChange} />
+        </div>
+      )}
 
       {showExamples && examples.length > 0 && (
         <div className='grid grid-cols-2 gap-2 mt-2'>

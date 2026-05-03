@@ -30,12 +30,7 @@ const Creation = () => {
   const [active, setActive] = useState(tab || 'image');
   const { active: token, openGuard, Guard } = useTokenGuard();
 
-  useEffect(() => {
-    if (!token?.key) {
-      openGuard();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // 不再首次进入弹窗：useTokenGuard 会自动后台静默创建默认 Token
 
   useEffect(() => {
     if (tab && tab !== active) setActive(tab);
@@ -43,7 +38,7 @@ const Creation = () => {
 
   const handleChange = (key) => {
     setActive(key);
-    navigate(`/console/creation/${key}`, { replace: true });
+    navigate(`/creation/${key}`, { replace: true });
   };
 
   return (
