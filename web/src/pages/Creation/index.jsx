@@ -38,11 +38,11 @@ const Creation = () => {
   };
 
   return (
-    <div className='h-full bg-[#fafafa]'>
+    <div className='bg-[#fafafa] h-[calc(100vh-66px)] mt-[60px] overflow-hidden'>
       {Guard}
       <Layout className='h-full bg-transparent flex flex-col'>
         {/* 顶部导航：左 Logo + Tab，右 Token */}
-        <div className='mt-[60px] h-12 px-5 flex items-center justify-between border-b border-gray-200/70 bg-white'>
+        <div className='h-12 px-5 flex items-center justify-between border-b border-gray-200/70 bg-white'>
           {/* 左：品牌 + Tab */}
           <div className='flex items-center gap-1'>
             {TABS.map(({ key, icon: Icon, label }) => {
