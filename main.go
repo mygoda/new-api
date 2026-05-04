@@ -113,6 +113,10 @@ func main() {
 
 	go controller.AutomaticallyTestChannels()
 
+	// Heartbeat worker for per-(channel, model) auto-recovery
+	service.RegisterHeartbeatTester(controller.HeartbeatTestChannelModel)
+	service.StartHeartbeatWorker()
+
 	// Codex credential auto-refresh check every 10 minutes, refresh when expires within 1 day
 	service.StartCodexCredentialAutoRefreshTask()
 

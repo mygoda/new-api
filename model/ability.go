@@ -269,6 +269,16 @@ func UpdateAbilityStatus(channelId int, status bool) error {
 	return DB.Model(&Ability{}).Where("channel_id = ?", channelId).Select("enabled").Update("enabled", status).Error
 }
 
+// UpdateAbilityEnabledByChannelModel toggles the enabled flag for all (group, model, channel_id) ability rows
+// matching the given channel and model — across all groups. Returns the number of rows affected.
+func UpdateAbilityEnabledByChannelModel(channelId int, modelName string, enabled bool) (int64, error) {
+	result := DB.Model(&Ability{}).
+		Where("channel_id = ? AND model = ?", channelId, modelName).
+		Select("enabled").
+		Update("enabled", enabled)
+	return result.RowsAffected, result.Error
+}
+
 func UpdateAbilityStatusByTag(tag string, status bool) error {
 	return DB.Model(&Ability{}).Where("tag = ?", tag).Select("enabled").Update("enabled", status).Error
 }

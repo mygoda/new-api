@@ -731,6 +731,29 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 	return testRequest
 }
 
+// HeartbeatTestChannelModel runs a single test against the given (channel, model). It is
+// registered as the heartbeat tester at process start (see main.go) and is the only
+// integration point service/heartbeat_worker uses to probe a downstream model.
+func HeartbeatTestChannelModel(channelId int, modelName string) (latencyMs int64, errMsg string, ok bool) {
+	channel, err := model.CacheGetChannel(channelId)
+	if err != nil {
+		channel, err = model.GetChannelById(channelId, true)
+		if err != nil {
+			return 0, fmt.Sprintf("channel %d not found: %s", channelId, err.Error()), false
+		}
+	}
+	tik := time.Now()
+	result := testChannel(channel, modelName, "", false)
+	latencyMs = time.Since(tik).Milliseconds()
+	if result.localErr != nil {
+		return latencyMs, result.localErr.Error(), false
+	}
+	if result.newAPIError != nil {
+		return latencyMs, result.newAPIError.Error(), false
+	}
+	return latencyMs, "", true
+}
+
 func TestChannel(c *gin.Context) {
 	channelId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

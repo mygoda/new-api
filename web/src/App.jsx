@@ -34,6 +34,7 @@ import PasswordResetConfirm from './components/auth/PasswordResetConfirm';
 import Channel from './pages/Channel';
 import Group from './pages/Group';
 import Ability from './pages/Ability';
+import Heartbeat from './pages/Heartbeat';
 import Token from './pages/Token';
 import Redemption from './pages/Redemption';
 import TopUp from './pages/TopUp';
@@ -162,6 +163,14 @@ function App() {
           element={
             <AdminRoute>
               <Ability />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path='/console/heartbeat'
+          element={
+            <AdminRoute>
+              <Heartbeat />
             </AdminRoute>
           }
         />

@@ -38,6 +38,9 @@ export default function SettingsMonitoring(props) {
     QuotaRemindThreshold: '',
     AutomaticDisableChannelEnabled: false,
     AutomaticEnableChannelEnabled: false,
+    AutomaticDisableChannelModelEnabled: true,
+    ChannelModelHeartbeatSuccessThreshold: '',
+    ChannelModelHeartbeatIntervalSeconds: '',
     AutomaticDisableKeywords: '',
     AutomaticDisableStatusCodes: '401',
     AutomaticRetryStatusCodes:
@@ -230,6 +233,51 @@ export default function SettingsMonitoring(props) {
                     setInputs({
                       ...inputs,
                       AutomaticEnableChannelEnabled: value,
+                    })
+                  }
+                />
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.Switch
+                  field={'AutomaticDisableChannelModelEnabled'}
+                  label={t('失败时按渠道+模型自动禁用')}
+                  size='default'
+                  checkedText='｜'
+                  uncheckedText='〇'
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      AutomaticDisableChannelModelEnabled: value,
+                    })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.InputNumber
+                  field={'ChannelModelHeartbeatSuccessThreshold'}
+                  label={t('心跳恢复成功阈值')}
+                  min={1}
+                  step={1}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      ChannelModelHeartbeatSuccessThreshold: String(value),
+                    })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.InputNumber
+                  field={'ChannelModelHeartbeatIntervalSeconds'}
+                  label={t('心跳检测间隔(秒)')}
+                  min={1}
+                  step={1}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      ChannelModelHeartbeatIntervalSeconds: String(value),
                     })
                   }
                 />

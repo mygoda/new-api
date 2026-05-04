@@ -7,6 +7,7 @@ type ChannelError struct {
 	IsMultiKey  bool   `json:"is_multi_key"`
 	AutoBan     bool   `json:"auto_ban"`
 	UsingKey    string `json:"using_key"`
+	Model       string `json:"model"`
 }
 
 func NewChannelError(channelId int, channelType int, channelName string, isMultiKey bool, usingKey string, autoBan bool) *ChannelError {
@@ -19,3 +20,12 @@ func NewChannelError(channelId int, channelType int, channelName string, isMulti
 		UsingKey:    usingKey,
 	}
 }
+
+// NewChannelErrorWithModel is the variant used by the relay path where the model name
+// is known and channel+model granular auto-disable is desired.
+func NewChannelErrorWithModel(channelId int, channelType int, channelName string, isMultiKey bool, usingKey string, autoBan bool, modelName string) *ChannelError {
+	ce := NewChannelError(channelId, channelType, channelName, isMultiKey, usingKey, autoBan)
+	ce.Model = modelName
+	return ce
+}
+

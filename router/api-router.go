@@ -260,6 +260,13 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.POST("/upstream_updates/detect_all", controller.DetectAllChannelUpstreamModelUpdates)
 			channelRoute.GET("/ability/list", controller.GetAbilityList)
 			channelRoute.PUT("/ability", controller.UpdateAbility)
+			channelRoute.GET("/heartbeat", controller.ListHeartbeats)
+			channelRoute.GET("/heartbeat/:id", controller.GetHeartbeat)
+			channelRoute.POST("/heartbeat/:id/pause", controller.PauseHeartbeat)
+			channelRoute.POST("/heartbeat/:id/resume", controller.ResumeHeartbeat)
+			channelRoute.POST("/heartbeat/:id/trigger", controller.TriggerHeartbeat)
+			channelRoute.PUT("/heartbeat/:id", controller.UpdateHeartbeat)
+			channelRoute.DELETE("/heartbeat/:id", controller.DeleteHeartbeat)
 		}
 		tokenRoute := apiRouter.Group("/token")
 		tokenRoute.Use(middleware.UserAuth())

@@ -47,6 +47,9 @@ func InitOptionMap() {
 	common.OptionMap["RegisterEnabled"] = strconv.FormatBool(common.RegisterEnabled)
 	common.OptionMap["AutomaticDisableChannelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelEnabled)
 	common.OptionMap["AutomaticEnableChannelEnabled"] = strconv.FormatBool(common.AutomaticEnableChannelEnabled)
+	common.OptionMap["AutomaticDisableChannelModelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelModelEnabled)
+	common.OptionMap["ChannelModelHeartbeatSuccessThreshold"] = strconv.Itoa(common.ChannelModelHeartbeatSuccessThreshold)
+	common.OptionMap["ChannelModelHeartbeatIntervalSeconds"] = strconv.Itoa(common.ChannelModelHeartbeatIntervalSeconds)
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
@@ -275,6 +278,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.AutomaticDisableChannelEnabled = boolValue
 		case "AutomaticEnableChannelEnabled":
 			common.AutomaticEnableChannelEnabled = boolValue
+		case "AutomaticDisableChannelModelEnabled":
+			common.AutomaticDisableChannelModelEnabled = boolValue
 		case "LogConsumeEnabled":
 			common.LogConsumeEnabled = boolValue
 		case "DisplayInCurrencyEnabled":
@@ -521,6 +526,14 @@ func updateOptionMap(key string, value string) (err error) {
 	//	common.ChatLink2 = value
 	case "ChannelDisableThreshold":
 		common.ChannelDisableThreshold, _ = strconv.ParseFloat(value, 64)
+	case "ChannelModelHeartbeatSuccessThreshold":
+		if v, err := strconv.Atoi(value); err == nil && v > 0 {
+			common.ChannelModelHeartbeatSuccessThreshold = v
+		}
+	case "ChannelModelHeartbeatIntervalSeconds":
+		if v, err := strconv.Atoi(value); err == nil && v > 0 {
+			common.ChannelModelHeartbeatIntervalSeconds = v
+		}
 	case "QuotaPerUnit":
 		common.QuotaPerUnit, _ = strconv.ParseFloat(value, 64)
 	case "SensitiveWords":

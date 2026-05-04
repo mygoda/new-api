@@ -35,6 +35,50 @@ func DisableChannel(channelError types.ChannelError, reason string) {
 	}
 }
 
+// DisableChannelModel disables a single (channel, model) pair across all groups by toggling
+// the corresponding ability rows, and creates / resets a heartbeat task that the worker will
+// poll until N consecutive successes are observed. Falls back to whole-channel disable when
+// the model is unknown or the feature is turned off.
+func DisableChannelModel(channelError types.ChannelError, reason string) {
+	if channelError.Model == "" || !common.AutomaticDisableChannelModelEnabled {
+		DisableChannel(channelError, reason)
+		return
+	}
+	if !channelError.AutoBan {
+		common.SysLog(fmt.Sprintf("通道「%s」（#%d）模型「%s」未启用自动禁用，跳过", channelError.ChannelName, channelError.ChannelId, channelError.Model))
+		return
+	}
+
+	rows, err := model.UpdateAbilityEnabledByChannelModel(channelError.ChannelId, channelError.Model, false)
+	if err != nil {
+		common.SysLog(fmt.Sprintf("禁用通道模型失败 channel=%d model=%s err=%s", channelError.ChannelId, channelError.Model, err.Error()))
+		return
+	}
+	if rows == 0 {
+		common.SysLog(fmt.Sprintf("未找到对应 ability 行,跳过 channel=%d model=%s", channelError.ChannelId, channelError.Model))
+		return
+	}
+
+	hb, err := model.UpsertHeartbeat(
+		channelError.ChannelId,
+		channelError.Model,
+		channelError.ChannelName,
+		reason,
+		common.ChannelModelHeartbeatSuccessThreshold,
+		common.ChannelModelHeartbeatIntervalSeconds,
+	)
+	if err != nil {
+		common.SysLog(fmt.Sprintf("创建心跳任务失败 channel=%d model=%s err=%s", channelError.ChannelId, channelError.Model, err.Error()))
+		return
+	}
+	model.InitChannelCache()
+
+	subject := fmt.Sprintf("通道「%s」（#%d）模型「%s」已被禁用", channelError.ChannelName, channelError.ChannelId, channelError.Model)
+	content := fmt.Sprintf("通道「%s」（#%d）模型「%s」已被自动禁用，原因：%s。已创建心跳任务 #%d，将每 %d 秒探测一次，连续 %d 次成功后自动恢复。",
+		channelError.ChannelName, channelError.ChannelId, channelError.Model, reason, hb.Id, hb.IntervalSeconds, hb.SuccessThreshold)
+	NotifyRootUser(fmt.Sprintf("channel_model_disabled_%d_%s", channelError.ChannelId, channelError.Model), subject, content)
+}
+
 func EnableChannel(channelId int, usingKey string, channelName string) {
 	success := model.UpdateChannelStatus(channelId, usingKey, common.ChannelStatusEnabled, "")
 	if success {

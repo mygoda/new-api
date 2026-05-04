@@ -106,6 +106,10 @@ var QuotaForInvitee = 0
 var ChannelDisableThreshold = 5.0
 var AutomaticDisableChannelEnabled = false
 var AutomaticEnableChannelEnabled = false
+var AutomaticDisableChannelModelEnabled = true
+var ChannelModelHeartbeatSuccessThreshold = 3
+var ChannelModelHeartbeatIntervalSeconds = 60
+var ChannelModelHeartbeatRecentResultsLimit = 20
 var QuotaRemindThreshold = 1000
 var PreConsumedQuota = 500
 
