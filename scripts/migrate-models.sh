@@ -86,6 +86,18 @@ migrate_mysql() {
     else
         info "MySQL: context_length 已是 VARCHAR 类型，跳过"
     fi
+
+    # 新增 creation_target 列（控制创作中心可见性）
+    info "MySQL: 检查并新增 models.creation_target 列 ..."
+    local ct_check="SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='models' AND COLUMN_NAME='creation_target';"
+    local ct_exists
+    ct_exists=$(run_in_service mysql sh -c "mysql -uroot -p123456 -N -B new-api -e \"$ct_check\"" 2>/dev/null || echo 0)
+    if [ "${ct_exists:-0}" = "0" ]; then
+        run_in_service mysql sh -c "mysql -uroot -p123456 new-api -e \"ALTER TABLE \\\`models\\\` ADD COLUMN \\\`creation_target\\\` VARCHAR(64) NOT NULL DEFAULT '';\""
+        info "MySQL: creation_target 列已新增"
+    else
+        info "MySQL: creation_target 列已存在，跳过"
+    fi
 }
 
 migrate_postgres() {
@@ -106,6 +118,11 @@ migrate_postgres() {
     else
         info "PostgreSQL: context_length 已是 VARCHAR 类型，跳过"
     fi
+
+    # 新增 creation_target 列
+    info "PostgreSQL: 检查并新增 models.creation_target 列 ..."
+    run_in_service postgres psql -U root -d new-api -c "ALTER TABLE models ADD COLUMN IF NOT EXISTS creation_target VARCHAR(64) NOT NULL DEFAULT '';"
+    info "PostgreSQL: creation_target 迁移完成（或列已存在）"
 }
 
 migrate_sqlite() {
@@ -127,6 +144,16 @@ migrate_sqlite() {
         info "SQLite: 列已新增"
     else
         info "SQLite: 列已存在，跳过"
+    fi
+
+    # 新增 creation_target 列
+    local ct_exists
+    ct_exists=$(run_in_service new-api sh -c "sqlite3 $db_path \"SELECT COUNT(*) FROM pragma_table_info('models') WHERE name='creation_target';\"" | tr -d '[:space:]')
+    if [ "${ct_exists:-0}" = "0" ]; then
+        run_in_service new-api sh -c "sqlite3 $db_path \"ALTER TABLE models ADD COLUMN creation_target VARCHAR(64) NOT NULL DEFAULT '';\""
+        info "SQLite: creation_target 列已新增"
+    else
+        info "SQLite: creation_target 列已存在，跳过"
     fi
 }
 

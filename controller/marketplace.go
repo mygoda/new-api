@@ -181,6 +181,7 @@ type CreationModelInfo struct {
 	VendorName      string   `json:"vendor_name,omitempty"`
 	Endpoints       []string `json:"endpoints,omitempty"`        // 模型管理表中显式配置的 endpoints
 	Capabilities    []string `json:"capabilities,omitempty"`     // 能力标签（vision / function-call 等）
+	CreationTarget  string   `json:"creation_target,omitempty"`  // 创作中心可见性：""/none/image/video/image,video
 }
 
 // GetCreationModels 公开接口：返回模型管理（model_meta 表）中已启用的模型列表
@@ -208,14 +209,15 @@ func GetCreationModels(c *gin.Context) {
 	list := make([]CreationModelInfo, 0, len(models))
 	for _, m := range models {
 		info := CreationModelInfo{
-			ModelName:    m.ModelName,
-			Description:  m.Description,
-			Icon:         m.Icon,
-			Tags:         m.Tags,
-			VendorID:     m.VendorID,
-			VendorName:   vendorMap[m.VendorID],
-			Endpoints:    splitEndpoints(m.Endpoints),
-			Capabilities: splitCapabilities(m.Capabilities),
+			ModelName:      m.ModelName,
+			Description:    m.Description,
+			Icon:           m.Icon,
+			Tags:           m.Tags,
+			VendorID:       m.VendorID,
+			VendorName:     vendorMap[m.VendorID],
+			Endpoints:      splitEndpoints(m.Endpoints),
+			Capabilities:   splitCapabilities(m.Capabilities),
+			CreationTarget: m.CreationTarget,
 		}
 		list = append(list, info)
 	}

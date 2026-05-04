@@ -86,7 +86,8 @@ const Bubble = ({ rules, total, hit }) => (
     </div>
 
     <Text type='tertiary' className='!text-[10px] !block !leading-relaxed'>
-      在「模型管理」给模型配置 endpoints / tags 字段后会立刻生效；缓存 60s。
+      💡 提示：在「模型管理」编辑模型时新增的「创作中心可见性」字段（creation_target）拥有最高优先级，
+      可显式覆盖以下自动检测规则。配置后 60s 内创作中心刷新生效。
     </Text>
   </div>
 );

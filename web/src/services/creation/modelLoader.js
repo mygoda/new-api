@@ -43,6 +43,7 @@ export function getFilterRules(modality) {
     capabilityKeywords: CAPABILITY_KEYWORDS[modality] || [],
     nameFallbackRegex: reg ? reg.source : '',
     matchOrder: [
+      'creation_target 显式配置（管理员在「模型管理」中设置，最高优先）',
       'endpoints 字段精确匹配（含 image/image-generation 等关键字）',
       'capabilities 字段命中（multimodal/image-generation 等）',
       'tags 字段包含模态关键字',
@@ -95,6 +96,18 @@ function detectVendor(model) {
 
 // 判断模型是否支持目标模态
 function matchModality(model, modality) {
+  // 0. 「模型管理」里显式配置的 creation_target 拥有最高优先级
+  //    - "none"             → 强制不显示
+  //    - "image"/"video"    → 仅显示在对应 tab
+  //    - "image,video"      → 在多个 tab 显示
+  //    - ""（空）           → 走自动检测（兼容老数据）
+  const explicit = (model.creation_target || '').trim().toLowerCase();
+  if (explicit) {
+    if (explicit === 'none') return false;
+    const targets = explicit.split(/[,\s]+/).filter(Boolean);
+    return targets.includes(modality);
+  }
+
   const keywords = ENDPOINT_KEYWORDS[modality] || [];
   const capKeys = CAPABILITY_KEYWORDS[modality] || [];
   const endpoints = (model.endpoints || []).map((e) => e.toLowerCase());

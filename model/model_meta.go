@@ -84,6 +84,12 @@ type Model struct {
 	Capabilities    string        `json:"capabilities,omitempty" gorm:"type:varchar(255);default:''"`
 	KnowledgeCutoff string        `json:"knowledge_cutoff,omitempty" gorm:"type:varchar(32);default:''"`
 	LongDescription string        `json:"long_description,omitempty" gorm:"type:text"`
+	// 创作中心可见性（显式覆盖 endpoints/capabilities/tags/name 自动检测）
+	//   ""               -> auto，按 capabilities/endpoints/tags/name 自动判断
+	//   "none"           -> 不在创作中心展示
+	//   "image"/"video"  -> 仅在对应 tab 展示
+	//   "image,video"    -> 两个 tab 都展示
+	CreationTarget  string        `json:"creation_target" gorm:"type:varchar(64);default:''"`
 	Status       int            `json:"status" gorm:"default:1"`
 	SyncOfficial int            `json:"sync_official" gorm:"default:1"`
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`

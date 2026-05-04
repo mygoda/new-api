@@ -153,6 +153,7 @@ const EditModelModal = (props) => {
     knowledge_cutoff: '',
     long_description: '',
     endpoints: '',
+    creation_target: '',
     name_rule: props.editingModel?.model_name ? 0 : undefined, // 通过未配置模型过来的固定为精确匹配
     status: true,
     sync_official: true,
@@ -546,6 +547,24 @@ const EditModelModal = (props) => {
                         { value: 'caching', label: t('缓存') },
                         { value: 'image_generation', label: t('图像生成') },
                         { value: 'computer_use', label: t('电脑操作') },
+                      ]}
+                    />
+                  </Col>
+                  <Col span={24}>
+                    <Form.Select
+                      field='creation_target'
+                      label={t('创作中心可见性')}
+                      placeholder={t('自动判断（按 capabilities/endpoints/名称）')}
+                      style={{ width: '100%' }}
+                      extraText={t(
+                        '显式控制本模型是否在「创作中心」出现以及出现在哪些 tab；留空表示按规则自动判断',
+                      )}
+                      optionList={[
+                        { value: '', label: t('自动判断（默认）') },
+                        { value: 'none', label: t('不在创作中心显示') },
+                        { value: 'image', label: t('仅显示在「图像」') },
+                        { value: 'video', label: t('仅显示在「视频」') },
+                        { value: 'image,video', label: t('图像 + 视频') },
                       ]}
                     />
                   </Col>
