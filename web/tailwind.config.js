@@ -19,6 +19,10 @@ For commercial licensing, please contact support@quantumnous.com
 
 export default {
   content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
+  // 项目通过 ThemeContext 给 <html> 加 class="dark" 切换主题，
+  // 默认的 'media' 策略会让 OS 暗色偏好直接触发 dark: 变体，
+  // 与 Semi UI 主题不同步，造成 header 等组件背景错位。
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
