@@ -104,9 +104,10 @@ const FieldRow = ({ field, name, value, onChange }) => {
             min={field.min}
             max={field.max}
             value={value ?? field.default}
+            placeholder={field.default !== undefined ? String(field.default) : ''}
             onChange={onChange}
             style={{ width: '100%' }}
-            className='!rounded-md'
+            className='!rounded-md !border !border-gray-300'
             size='small'
           />
         );
@@ -119,7 +120,7 @@ const FieldRow = ({ field, name, value, onChange }) => {
               onChange={onChange}
               min={-1}
               style={{ flex: 1 }}
-              className='!rounded-md'
+              className='!rounded-md !border !border-gray-300'
               size='small'
               placeholder='-1 表示随机'
             />
@@ -207,7 +208,7 @@ const ParamPanel = ({ schema, params, onParamChange }) => {
         {isAdvanced ? (
           <div className='flex items-center gap-2'>
             <div className='h-px flex-1 bg-gray-200' />
-            <Text type='tertiary' className='!text-[10px] !text-gray-400 uppercase tracking-wider'>
+            <Text type='tertiary' className='!text-[10px] !text-gray-500 uppercase tracking-wider'>
               {title}
             </Text>
             <div className='h-px flex-1 bg-gray-200' />

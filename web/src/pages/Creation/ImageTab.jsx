@@ -59,7 +59,7 @@ const TimelineItem = ({ createdAt, children }) => {
   return (
     <div className='flex gap-3'>
       <div className='flex flex-col items-center pt-2'>
-        <Text type='tertiary' className='!text-[10px] !text-gray-400 tabular-nums leading-none'>
+        <Text type='tertiary' className='!text-[10px] !text-gray-500 tabular-nums leading-none'>
           {hh}:{mm}
         </Text>
         <div className='w-2 h-2 rounded-full bg-blue-300 mt-1.5 ring-4 ring-blue-50' />

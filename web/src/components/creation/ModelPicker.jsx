@@ -110,7 +110,7 @@ const ModelPicker = ({ models, value, onChange, loading = false }) => {
                       <Text
                         className={[
                           '!text-[10px] truncate block',
-                          active ? '!text-white/60' : '!text-gray-400',
+                          active ? '!text-white/70' : '!text-gray-500',
                         ].join(' ')}
                       >
                         {m.vendor}

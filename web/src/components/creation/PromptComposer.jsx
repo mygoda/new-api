@@ -90,7 +90,7 @@ const PromptComposer = ({
           <Text className='!text-[12px] !font-semibold !text-blue-600'>
             {t('提示词')}
           </Text>
-          <Text type='tertiary' className='!text-[10px] !text-gray-400'>
+          <Text type='tertiary' className='!text-[10px] !text-gray-500'>
             {t('描述你想生成的内容')}
           </Text>
         </div>
@@ -123,7 +123,7 @@ const PromptComposer = ({
             type='tertiary'
             icon={<Sparkles size={12} />}
             onClick={() => setShowExamples((v) => !v)}
-            className='!text-[11px] !text-gray-500 !h-6'
+            className='!text-[11px] !text-gray-700 !h-6'
           >
             {t('示例')}
           </Button>
@@ -134,7 +134,7 @@ const PromptComposer = ({
           type={showTags ? 'primary' : 'tertiary'}
           icon={<TagIcon size={12} />}
           onClick={() => setShowTags((v) => !v)}
-          className='!text-[11px] !h-6'
+          className='!text-[11px] !text-gray-700 !h-6'
         >
           {t('快速标签')}
         </Button>
@@ -146,11 +146,11 @@ const PromptComposer = ({
             icon={<Wand2 size={12} />}
             loading={enhancing}
             onClick={handleEnhance}
-            className='!text-[11px] !text-gray-500 !h-6'
+            className='!text-[11px] !text-gray-700 !h-6'
           >
             {t('AI 优化')}
             {enhancerModel && (
-              <Text type='tertiary' className='!text-[10px] ml-1 !text-gray-400'>
+              <Text type='tertiary' className='!text-[10px] ml-1 !text-gray-500'>
                 · {enhancerModel}
               </Text>
             )}
@@ -204,7 +204,7 @@ const PromptComposer = ({
               type='tertiary'
               icon={<Settings2 size={12} />}
               onClick={() => setShowEnhancerCfg((v) => !v)}
-              className='!text-gray-400 !h-6'
+              className='!text-gray-600 !h-6'
             />
           </Tooltip>
         </Popover>

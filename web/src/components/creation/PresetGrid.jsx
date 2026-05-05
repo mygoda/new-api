@@ -90,7 +90,7 @@ const PresetGrid = ({ modality, availableModels, onApply }) => {
                 {!disabled && (
                   <ArrowRight
                     size={13}
-                    className='text-gray-300 group-hover:text-gray-900 group-hover:translate-x-0.5 transition-all flex-shrink-0'
+                    className='text-gray-500 group-hover:text-gray-900 group-hover:translate-x-0.5 transition-all flex-shrink-0'
                   />
                 )}
               </div>
