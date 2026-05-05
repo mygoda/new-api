@@ -25,6 +25,7 @@ import SettingsSidebarModulesAdmin from '../../pages/Setting/Operation/SettingsS
 import SettingsSensitiveWords from '../../pages/Setting/Operation/SettingsSensitiveWords';
 import SettingsLog from '../../pages/Setting/Operation/SettingsLog';
 import SettingsMonitoring from '../../pages/Setting/Operation/SettingsMonitoring';
+import SettingsHome from '../../pages/Setting/Operation/SettingsHome';
 import SettingsCreditLimit from '../../pages/Setting/Operation/SettingsCreditLimit';
 import SettingsCheckin from '../../pages/Setting/Operation/SettingsCheckin';
 import SettingsChannelAffinity from '../../pages/Setting/Operation/SettingsChannelAffinity';
@@ -87,6 +88,12 @@ const OperationSetting = () => {
     FeishuAlertRelay5xxThreshold: 0,
     FeishuAlertHeartbeatFailureLimit: 0,
     AutomaticDisableKeywords: '',
+
+    /* 首页配置 */
+    HomeStatsSLA: '',
+    HomeTestimonials: '',
+    HomeFAQ: '',
+    HomeFooter: '',
     AutomaticDisableStatusCodes: '401',
     AutomaticRetryStatusCodes:
       '100-199,300-399,401-407,409-499,500-503,505-523,525-599',
@@ -162,6 +169,10 @@ const OperationSetting = () => {
         {/* 监控设置 */}
         <Card style={{ marginTop: '10px' }}>
           <SettingsMonitoring options={inputs} refresh={onRefresh} />
+        </Card>
+        {/* 首页配置 */}
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsHome options={inputs} refresh={onRefresh} />
         </Card>
         {/* 额度设置 */}
         <Card style={{ marginTop: '10px' }}>

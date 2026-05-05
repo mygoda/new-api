@@ -62,6 +62,10 @@ func InitOptionMap() {
 	common.OptionMap["FeishuAlertRelay5xxWindowSeconds"] = strconv.Itoa(common.FeishuAlertRelay5xxWindowSeconds)
 	common.OptionMap["FeishuAlertRelay5xxThreshold"] = strconv.Itoa(common.FeishuAlertRelay5xxThreshold)
 	common.OptionMap["FeishuAlertHeartbeatFailureLimit"] = strconv.Itoa(common.FeishuAlertHeartbeatFailureLimit)
+	common.OptionMap["HomeStatsSLA"] = common.HomeStatsSLA
+	common.OptionMap["HomeTestimonials"] = defaultHomeTestimonialsJSON()
+	common.OptionMap["HomeFAQ"] = defaultHomeFAQJSON()
+	common.OptionMap["HomeFooter"] = defaultHomeFooterJSON()
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
@@ -581,6 +585,14 @@ func updateOptionMap(key string, value string) (err error) {
 		if v, err := strconv.Atoi(value); err == nil && v > 0 {
 			common.FeishuAlertHeartbeatFailureLimit = v
 		}
+	case "HomeStatsSLA":
+		common.HomeStatsSLA = value
+	case "HomeTestimonials":
+		common.HomeTestimonials = value
+	case "HomeFAQ":
+		common.HomeFAQ = value
+	case "HomeFooter":
+		common.HomeFooter = value
 	case "QuotaPerUnit":
 		common.QuotaPerUnit, _ = strconv.ParseFloat(value, 64)
 	case "SensitiveWords":

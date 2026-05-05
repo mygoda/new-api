@@ -125,6 +125,12 @@ var FeishuAlertEventMask = "" // 逗号分隔启用的 kind;空=全部启用
 var FeishuAlertRelay5xxWindowSeconds = 60
 var FeishuAlertRelay5xxThreshold = 10
 var FeishuAlertHeartbeatFailureLimit = 30
+
+// 首页配置 — 全部走 option,前后台可视化编辑
+var HomeStatsSLA = "99.95"
+var HomeTestimonials = "" // JSON array
+var HomeFAQ = ""          // JSON array
+var HomeFooter = ""       // JSON object
 var QuotaRemindThreshold = 1000
 var PreConsumedQuota = 500
 

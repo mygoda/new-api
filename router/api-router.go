@@ -31,6 +31,7 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/about", controller.GetAbout)
 		//apiRouter.GET("/midjourney", controller.GetMidjourney)
 		apiRouter.GET("/home_page_content", controller.GetHomePageContent)
+		apiRouter.GET("/home/dashboard", controller.GetHomeDashboard)
 		apiRouter.GET("/pricing", middleware.TryUserAuth(), controller.GetPricing)
 		apiRouter.GET("/models/public", controller.GetPublicModels)
 		apiRouter.GET("/marketplace/models", controller.GetMarketplaceModels)

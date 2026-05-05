@@ -98,6 +98,18 @@ migrate_mysql() {
     else
         info "MySQL: creation_target 列已存在，跳过"
     fi
+
+    # 新增 home_priority 列（首页推荐优先级）
+    info "MySQL: 检查并新增 models.home_priority 列 ..."
+    local hp_check="SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='models' AND COLUMN_NAME='home_priority';"
+    local hp_exists
+    hp_exists=$(run_in_service mysql sh -c "mysql -uroot -p123456 -N -B new-api -e \"$hp_check\"" 2>/dev/null || echo 0)
+    if [ "${hp_exists:-0}" = "0" ]; then
+        run_in_service mysql sh -c "mysql -uroot -p123456 new-api -e \"ALTER TABLE \\\`models\\\` ADD COLUMN \\\`home_priority\\\` BIGINT NOT NULL DEFAULT 0, ADD INDEX idx_models_home_priority (home_priority);\""
+        info "MySQL: home_priority 列已新增"
+    else
+        info "MySQL: home_priority 列已存在，跳过"
+    fi
 }
 
 migrate_postgres() {
@@ -123,6 +135,12 @@ migrate_postgres() {
     info "PostgreSQL: 检查并新增 models.creation_target 列 ..."
     run_in_service postgres psql -U root -d new-api -c "ALTER TABLE models ADD COLUMN IF NOT EXISTS creation_target VARCHAR(64) NOT NULL DEFAULT '';"
     info "PostgreSQL: creation_target 迁移完成（或列已存在）"
+
+    # 新增 home_priority 列
+    info "PostgreSQL: 检查并新增 models.home_priority 列 ..."
+    run_in_service postgres psql -U root -d new-api -c "ALTER TABLE models ADD COLUMN IF NOT EXISTS home_priority BIGINT NOT NULL DEFAULT 0;"
+    run_in_service postgres psql -U root -d new-api -c "CREATE INDEX IF NOT EXISTS idx_models_home_priority ON models (home_priority);"
+    info "PostgreSQL: home_priority 迁移完成（或列已存在）"
 }
 
 migrate_sqlite() {
