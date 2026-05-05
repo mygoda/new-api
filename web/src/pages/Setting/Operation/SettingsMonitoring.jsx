@@ -116,7 +116,19 @@ export default function SettingsMonitoring(props) {
     const currentInputs = {};
     for (let key in props.options) {
       if (Object.keys(inputs).includes(key)) {
-        currentInputs[key] = props.options[key];
+        let v = props.options[key];
+        // 服务端 Option 一律以字符串形式下发，但 Semi UI Form.Switch / InputNumber
+        // 严格按 boolean / number 判定渲染状态。根据初始 state 类型把字符串
+        // 归一化回原始类型，否则会出现 Switch 视觉与实际值脱节、保存时 compareObjects
+        // 因为类型不一致而误判为「未修改」。
+        const defaultType = typeof inputs[key];
+        if (defaultType === 'boolean') {
+          v = v === true || v === 'true';
+        } else if (defaultType === 'number' && typeof v === 'string' && v !== '') {
+          const n = Number(v);
+          if (!Number.isNaN(n)) v = n;
+        }
+        currentInputs[key] = v;
       }
     }
     setInputs(currentInputs);
