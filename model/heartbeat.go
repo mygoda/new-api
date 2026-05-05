@@ -24,8 +24,9 @@ type ChannelModelHeartbeat struct {
 	Status           int    `json:"status" gorm:"not null;default:1;index"`
 	SuccessThreshold int    `json:"success_threshold" gorm:"not null;default:3"`
 	IntervalSeconds  int    `json:"interval_seconds" gorm:"not null;default:60"`
-	SuccessCount     int    `json:"success_count" gorm:"not null;default:0"`
-	TotalAttempts    int    `json:"total_attempts" gorm:"not null;default:0"`
+	SuccessCount         int    `json:"success_count" gorm:"not null;default:0"`
+	ConsecutiveFailures  int    `json:"consecutive_failures" gorm:"not null;default:0"`
+	TotalAttempts        int    `json:"total_attempts" gorm:"not null;default:0"`
 	LastTestAt       int64  `json:"last_test_at" gorm:"bigint;default:0"`
 	NextTestAt       int64  `json:"next_test_at" gorm:"bigint;default:0;index"`
 	LastError        string `json:"last_error" gorm:"type:text"`
@@ -72,12 +73,13 @@ func UpsertHeartbeat(channelId int, modelName, channelName, reason string, defau
 		return &hb, DB.Create(&hb).Error
 	}
 	updates := map[string]interface{}{
-		"status":         HeartbeatStatusRunning,
-		"success_count":  0,
-		"channel_name":   channelName,
-		"disable_reason": truncate(reason, 2000),
-		"next_test_at":   now + int64(hb.IntervalSeconds),
-		"updated_at":     now,
+		"status":               HeartbeatStatusRunning,
+		"success_count":        0,
+		"consecutive_failures": 0,
+		"channel_name":         channelName,
+		"disable_reason":       truncate(reason, 2000),
+		"next_test_at":         now + int64(hb.IntervalSeconds),
+		"updated_at":           now,
 	}
 	if err := DB.Model(&hb).Updates(updates).Error; err != nil {
 		return nil, err
@@ -152,9 +154,10 @@ func PauseHeartbeat(id int64) error {
 func ResumeHeartbeat(id int64) error {
 	now := common.GetTimestamp()
 	return DB.Model(&ChannelModelHeartbeat{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"status":       HeartbeatStatusRunning,
-		"next_test_at": now,
-		"updated_at":   now,
+		"status":               HeartbeatStatusRunning,
+		"consecutive_failures": 0,
+		"next_test_at":         now,
+		"updated_at":           now,
 	}).Error
 }
 
@@ -198,12 +201,22 @@ func DeleteHeartbeat(id int64) error {
 	return DB.Delete(&ChannelModelHeartbeat{}, id).Error
 }
 
-// RecordHeartbeatResult appends a single test result, updates counters and schedules the next run.
-// If recovered (success_count >= success_threshold) returns recovered=true.
-func RecordHeartbeatResult(id int64, success bool, latencyMs int64, errMsg string, recentLimit int) (recovered bool, err error) {
+// HeartbeatRecordOutcome describes what happened in RecordHeartbeatResult so callers
+// can react (typically: send recovery / failure alerts).
+type HeartbeatRecordOutcome struct {
+	Recovered          bool // success_count just crossed threshold → ability re-enabled
+	FailedTerminated   bool // consecutive_failures crossed limit → worker stops polling
+	ConsecutiveFails   int  // current consecutive failure count after this update
+}
+
+// RecordHeartbeatResult appends a single test result, updates counters and schedules
+// the next run. failureLimit > 0 caps consecutive failures: when reached, the task is
+// flipped to failed_terminated so the worker stops polling. Pass 0 to disable the cap.
+func RecordHeartbeatResult(id int64, success bool, latencyMs int64, errMsg string, recentLimit int, failureLimit int) (HeartbeatRecordOutcome, error) {
+	out := HeartbeatRecordOutcome{}
 	hb, err := GetHeartbeatById(id)
 	if err != nil {
-		return false, err
+		return out, err
 	}
 	now := common.GetTimestamp()
 
@@ -228,22 +241,31 @@ func RecordHeartbeatResult(id int64, success bool, latencyMs int64, errMsg strin
 	if success {
 		newCount := hb.SuccessCount + 1
 		updates["success_count"] = newCount
+		updates["consecutive_failures"] = 0
 		updates["last_error"] = ""
 		if newCount >= hb.SuccessThreshold {
 			updates["status"] = HeartbeatStatusRecovered
-			recovered = true
+			out.Recovered = true
 		} else {
 			updates["next_test_at"] = now + int64(hb.IntervalSeconds)
 		}
 	} else {
+		newFails := hb.ConsecutiveFailures + 1
 		updates["success_count"] = 0
+		updates["consecutive_failures"] = newFails
 		updates["last_error"] = truncate(errMsg, 2000)
-		updates["next_test_at"] = now + int64(hb.IntervalSeconds)
+		out.ConsecutiveFails = newFails
+		if failureLimit > 0 && newFails >= failureLimit {
+			updates["status"] = HeartbeatStatusFailedTerminated
+			out.FailedTerminated = true
+		} else {
+			updates["next_test_at"] = now + int64(hb.IntervalSeconds)
+		}
 	}
 	if err := DB.Model(&ChannelModelHeartbeat{}).Where("id = ?", id).Updates(updates).Error; err != nil {
-		return false, err
+		return out, err
 	}
-	return recovered, nil
+	return out, nil
 }
 
 func decodeRecentResults(s string) []HeartbeatResult {

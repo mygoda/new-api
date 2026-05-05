@@ -50,6 +50,18 @@ func InitOptionMap() {
 	common.OptionMap["AutomaticDisableChannelModelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelModelEnabled)
 	common.OptionMap["ChannelModelHeartbeatSuccessThreshold"] = strconv.Itoa(common.ChannelModelHeartbeatSuccessThreshold)
 	common.OptionMap["ChannelModelHeartbeatIntervalSeconds"] = strconv.Itoa(common.ChannelModelHeartbeatIntervalSeconds)
+	common.OptionMap["FeishuAlertEnabled"] = strconv.FormatBool(common.FeishuAlertEnabled)
+	common.OptionMap["FeishuAlertWebhookUrl"] = common.FeishuAlertWebhookUrl
+	common.OptionMap["FeishuAlertSignSecret"] = common.FeishuAlertSignSecret
+	common.OptionMap["FeishuAlertAppId"] = common.FeishuAlertAppId
+	common.OptionMap["FeishuAlertAppSecret"] = common.FeishuAlertAppSecret
+	common.OptionMap["FeishuAlertReceiveId"] = common.FeishuAlertReceiveId
+	common.OptionMap["FeishuAlertReceiveIdType"] = common.FeishuAlertReceiveIdType
+	common.OptionMap["FeishuAlertDedupSeconds"] = strconv.Itoa(common.FeishuAlertDedupSeconds)
+	common.OptionMap["FeishuAlertEventMask"] = common.FeishuAlertEventMask
+	common.OptionMap["FeishuAlertRelay5xxWindowSeconds"] = strconv.Itoa(common.FeishuAlertRelay5xxWindowSeconds)
+	common.OptionMap["FeishuAlertRelay5xxThreshold"] = strconv.Itoa(common.FeishuAlertRelay5xxThreshold)
+	common.OptionMap["FeishuAlertHeartbeatFailureLimit"] = strconv.Itoa(common.FeishuAlertHeartbeatFailureLimit)
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
@@ -280,6 +292,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.AutomaticEnableChannelEnabled = boolValue
 		case "AutomaticDisableChannelModelEnabled":
 			common.AutomaticDisableChannelModelEnabled = boolValue
+		case "FeishuAlertEnabled":
+			common.FeishuAlertEnabled = boolValue
 		case "LogConsumeEnabled":
 			common.LogConsumeEnabled = boolValue
 		case "DisplayInCurrencyEnabled":
@@ -533,6 +547,39 @@ func updateOptionMap(key string, value string) (err error) {
 	case "ChannelModelHeartbeatIntervalSeconds":
 		if v, err := strconv.Atoi(value); err == nil && v > 0 {
 			common.ChannelModelHeartbeatIntervalSeconds = v
+		}
+	case "FeishuAlertWebhookUrl":
+		common.FeishuAlertWebhookUrl = value
+	case "FeishuAlertSignSecret":
+		common.FeishuAlertSignSecret = value
+	case "FeishuAlertAppId":
+		common.FeishuAlertAppId = value
+	case "FeishuAlertAppSecret":
+		common.FeishuAlertAppSecret = value
+	case "FeishuAlertReceiveId":
+		common.FeishuAlertReceiveId = value
+	case "FeishuAlertReceiveIdType":
+		if value == "" {
+			value = "chat_id"
+		}
+		common.FeishuAlertReceiveIdType = value
+	case "FeishuAlertDedupSeconds":
+		if v, err := strconv.Atoi(value); err == nil && v >= 0 {
+			common.FeishuAlertDedupSeconds = v
+		}
+	case "FeishuAlertEventMask":
+		common.FeishuAlertEventMask = value
+	case "FeishuAlertRelay5xxWindowSeconds":
+		if v, err := strconv.Atoi(value); err == nil && v > 0 {
+			common.FeishuAlertRelay5xxWindowSeconds = v
+		}
+	case "FeishuAlertRelay5xxThreshold":
+		if v, err := strconv.Atoi(value); err == nil && v > 0 {
+			common.FeishuAlertRelay5xxThreshold = v
+		}
+	case "FeishuAlertHeartbeatFailureLimit":
+		if v, err := strconv.Atoi(value); err == nil && v > 0 {
+			common.FeishuAlertHeartbeatFailureLimit = v
 		}
 	case "QuotaPerUnit":
 		common.QuotaPerUnit, _ = strconv.ParseFloat(value, 64)

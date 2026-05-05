@@ -110,6 +110,21 @@ var AutomaticDisableChannelModelEnabled = true
 var ChannelModelHeartbeatSuccessThreshold = 3
 var ChannelModelHeartbeatIntervalSeconds = 60
 var ChannelModelHeartbeatRecentResultsLimit = 20
+
+// Feishu (Lark) 告警机器人 — 系统级全局配置
+var FeishuAlertEnabled = false
+var FeishuAlertWebhookUrl = ""
+var FeishuAlertSignSecret = ""
+// 应用机器人(ak/sk)模式;与 webhook 互不冲突,同时配置则同一告警两条都发
+var FeishuAlertAppId = ""
+var FeishuAlertAppSecret = ""
+var FeishuAlertReceiveId = ""           // 接收方 ID,典型为群 chat_id (oc_xxx)
+var FeishuAlertReceiveIdType = "chat_id" // chat_id / open_id / user_id / email / union_id
+var FeishuAlertDedupSeconds = 120
+var FeishuAlertEventMask = "" // 逗号分隔启用的 kind;空=全部启用
+var FeishuAlertRelay5xxWindowSeconds = 60
+var FeishuAlertRelay5xxThreshold = 10
+var FeishuAlertHeartbeatFailureLimit = 30
 var QuotaRemindThreshold = 1000
 var PreConsumedQuota = 500
 

@@ -166,6 +166,23 @@ func main() {
 	server := gin.New()
 	server.Use(gin.CustomRecovery(func(c *gin.Context, err any) {
 		common.SysLog(fmt.Sprintf("panic detected: %v", err))
+		path := ""
+		method := ""
+		if c.Request != nil && c.Request.URL != nil {
+			path = c.Request.URL.Path
+			method = c.Request.Method
+		}
+		service.SendFeishuAlert(service.AlertEvent{
+			Kind:  service.AlertKindPanic,
+			Level: service.AlertLevelCritical,
+			Title: "HTTP 请求 panic",
+			Fields: []service.AlertField{
+				{Label: "Method", Value: method, Short: true},
+				{Label: "Path", Value: path, Short: true},
+				{Label: "Error", Value: fmt.Sprintf("%v", err), Short: false},
+			},
+			DedupKey: fmt.Sprintf("http:%s:%s", method, path),
+		})
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
 				"message": fmt.Sprintf("Panic detected, error: %v. Please submit a issue here: https://github.com/Calcium-Ion/new-api", err),

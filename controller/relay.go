@@ -365,6 +365,13 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		})
 	}
 
+	// 5xx 滑动窗口计数,命中阈值后异步发飞书告警
+	if err.StatusCode >= 500 {
+		gopool.Go(func() {
+			service.RecordRelay5xx(channelError.ChannelId, channelError.ChannelName, channelError.Model, err.StatusCode, err.Error())
+		})
+	}
+
 	if constant.ErrorLogEnabled && types.IsRecordErrorLog(err) {
 		// 保存错误日志到mysql中
 		userId := c.GetInt("id")

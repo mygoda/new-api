@@ -32,6 +32,16 @@ func DisableChannel(channelError types.ChannelError, reason string) {
 		subject := fmt.Sprintf("通道「%s」（#%d）已被禁用", channelError.ChannelName, channelError.ChannelId)
 		content := fmt.Sprintf("通道「%s」（#%d）已被禁用，原因：%s", channelError.ChannelName, channelError.ChannelId, reason)
 		NotifyRootUser(formatNotifyType(channelError.ChannelId, common.ChannelStatusAutoDisabled), subject, content)
+		SendFeishuAlert(AlertEvent{
+			Kind:  AlertKindChannelDisable,
+			Level: AlertLevelCritical,
+			Title: subject,
+			Fields: []AlertField{
+				{Label: "渠道", Value: fmt.Sprintf("#%d %s", channelError.ChannelId, channelError.ChannelName), Short: true},
+				{Label: "原因", Value: reason, Short: false},
+			},
+			DedupKey: fmt.Sprintf("%d", channelError.ChannelId),
+		})
 	}
 }
 
@@ -77,6 +87,18 @@ func DisableChannelModel(channelError types.ChannelError, reason string) {
 	content := fmt.Sprintf("通道「%s」（#%d）模型「%s」已被自动禁用，原因：%s。已创建心跳任务 #%d，将每 %d 秒探测一次，连续 %d 次成功后自动恢复。",
 		channelError.ChannelName, channelError.ChannelId, channelError.Model, reason, hb.Id, hb.IntervalSeconds, hb.SuccessThreshold)
 	NotifyRootUser(fmt.Sprintf("channel_model_disabled_%d_%s", channelError.ChannelId, channelError.Model), subject, content)
+	SendFeishuAlert(AlertEvent{
+		Kind:  AlertKindChannelModelDisable,
+		Level: AlertLevelWarning,
+		Title: subject,
+		Fields: []AlertField{
+			{Label: "渠道", Value: fmt.Sprintf("#%d %s", channelError.ChannelId, channelError.ChannelName), Short: true},
+			{Label: "模型", Value: channelError.Model, Short: true},
+			{Label: "原因", Value: reason, Short: false},
+			{Label: "心跳任务", Value: fmt.Sprintf("#%d 每 %ds 探测一次，连续 %d 次成功自动恢复", hb.Id, hb.IntervalSeconds, hb.SuccessThreshold), Short: false},
+		},
+		DedupKey: fmt.Sprintf("%d:%s", channelError.ChannelId, channelError.Model),
+	})
 }
 
 func EnableChannel(channelId int, usingKey string, channelName string) {
@@ -85,6 +107,15 @@ func EnableChannel(channelId int, usingKey string, channelName string) {
 		subject := fmt.Sprintf("通道「%s」（#%d）已被启用", channelName, channelId)
 		content := fmt.Sprintf("通道「%s」（#%d）已被启用", channelName, channelId)
 		NotifyRootUser(formatNotifyType(channelId, common.ChannelStatusEnabled), subject, content)
+		SendFeishuAlert(AlertEvent{
+			Kind:  AlertKindChannelRecover,
+			Level: AlertLevelInfo,
+			Title: subject,
+			Fields: []AlertField{
+				{Label: "渠道", Value: fmt.Sprintf("#%d %s", channelId, channelName), Short: true},
+			},
+			DedupKey: fmt.Sprintf("%d", channelId),
+		})
 	}
 }
 

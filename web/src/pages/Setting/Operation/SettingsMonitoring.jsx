@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Button, Col, Form, Row, Spin } from '@douyinfe/semi-ui';
+import { Button, Col, Form, Row, Spin, Toast } from '@douyinfe/semi-ui';
 import {
   compareObjects,
   API,
@@ -41,6 +41,18 @@ export default function SettingsMonitoring(props) {
     AutomaticDisableChannelModelEnabled: true,
     ChannelModelHeartbeatSuccessThreshold: '',
     ChannelModelHeartbeatIntervalSeconds: '',
+    FeishuAlertEnabled: false,
+    FeishuAlertWebhookUrl: '',
+    FeishuAlertSignSecret: '',
+    FeishuAlertAppId: '',
+    FeishuAlertAppSecret: '',
+    FeishuAlertReceiveId: '',
+    FeishuAlertReceiveIdType: 'chat_id',
+    FeishuAlertDedupSeconds: 120,
+    FeishuAlertEventMask: '',
+    FeishuAlertRelay5xxWindowSeconds: 60,
+    FeishuAlertRelay5xxThreshold: 10,
+    FeishuAlertHeartbeatFailureLimit: 30,
     AutomaticDisableKeywords: '',
     AutomaticDisableStatusCodes: '401',
     AutomaticRetryStatusCodes:
@@ -110,6 +122,26 @@ export default function SettingsMonitoring(props) {
       .finally(() => {
         setLoading(false);
       });
+  }
+
+  async function onTestFeishu() {
+    if (!inputs.FeishuAlertWebhookUrl) {
+      return showError(t('请先填写并保存 飞书 Webhook URL 后再测试'));
+    }
+    setLoading(true);
+    try {
+      const res = await API.post('/api/option/test/feishu');
+      const { success, message } = res.data;
+      if (success) {
+        Toast.success(message || t('已发送测试消息'));
+      } else {
+        Toast.error(message || t('测试失败'));
+      }
+    } catch (e) {
+      Toast.error(t('测试失败'));
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -336,6 +368,206 @@ export default function SettingsMonitoring(props) {
                   }
                 />
               </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={24}>
+                <div className='text-base font-medium mt-4 mb-2'>
+                  {t('飞书告警机器人')}
+                </div>
+                <div className='text-xs text-gray-500 mb-2'>
+                  {t('Webhook 与 App 模式可同时配置，配置任意一个即生效；两个都填则同一告警同时发到两边。')}
+                </div>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={6} lg={6} xl={6}>
+                <Form.Switch
+                  field={'FeishuAlertEnabled'}
+                  label={t('启用飞书告警')}
+                  size='default'
+                  checkedText='｜'
+                  uncheckedText='〇'
+                  onChange={(value) =>
+                    setInputs({ ...inputs, FeishuAlertEnabled: value })
+                  }
+                />
+              </Col>
+            </Row>
+
+            {/* —— Webhook 模式 —— */}
+            <Row gutter={16}>
+              <Col span={24}>
+                <div className='text-sm font-medium mt-2 mb-1'>{t('① 自定义机器人 Webhook')}</div>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col xs={24} sm={24} md={18} lg={18} xl={18}>
+                <Form.Input
+                  field={'FeishuAlertWebhookUrl'}
+                  label={t('Webhook URL')}
+                  placeholder='https://open.feishu.cn/open-apis/bot/v2/hook/...'
+                  onChange={(value) =>
+                    setInputs({ ...inputs, FeishuAlertWebhookUrl: value })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={24} md={6} lg={6} xl={6}>
+                <Form.Input
+                  field={'FeishuAlertSignSecret'}
+                  label={t('加签 Secret (可选)')}
+                  placeholder={t('留空则不启用加签')}
+                  mode='password'
+                  onChange={(value) =>
+                    setInputs({ ...inputs, FeishuAlertSignSecret: value })
+                  }
+                />
+              </Col>
+            </Row>
+
+            {/* —— App (ak/sk) 模式 —— */}
+            <Row gutter={16}>
+              <Col span={24}>
+                <div className='text-sm font-medium mt-3 mb-1'>{t('② 应用机器人 (App ID / App Secret)')}</div>
+                <div className='text-xs text-gray-500 mb-2'>
+                  {t('需要先在飞书开放平台创建自建应用，把它加进目标群，并开启 im:message:send_as_bot 权限。')}
+                </div>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.Input
+                  field={'FeishuAlertAppId'}
+                  label={t('App ID')}
+                  placeholder='cli_xxxxxxxxxxxx'
+                  onChange={(value) =>
+                    setInputs({ ...inputs, FeishuAlertAppId: value })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.Input
+                  field={'FeishuAlertAppSecret'}
+                  label={t('App Secret')}
+                  mode='password'
+                  placeholder={t('保存后不再回显')}
+                  onChange={(value) =>
+                    setInputs({ ...inputs, FeishuAlertAppSecret: value })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={12} md={4} lg={4} xl={4}>
+                <Form.Select
+                  field={'FeishuAlertReceiveIdType'}
+                  label={t('接收者类型')}
+                  optionList={[
+                    { value: 'chat_id', label: 'chat_id' },
+                    { value: 'open_id', label: 'open_id' },
+                    { value: 'user_id', label: 'user_id' },
+                    { value: 'union_id', label: 'union_id' },
+                    { value: 'email', label: 'email' },
+                  ]}
+                  onChange={(value) =>
+                    setInputs({ ...inputs, FeishuAlertReceiveIdType: value })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={12} md={4} lg={4} xl={4}>
+                <Form.Input
+                  field={'FeishuAlertReceiveId'}
+                  label={t('Receive ID')}
+                  placeholder='oc_xxxxxxxx'
+                  onChange={(value) =>
+                    setInputs({ ...inputs, FeishuAlertReceiveId: value })
+                  }
+                />
+              </Col>
+            </Row>
+
+            {/* —— 通用参数 —— */}
+            <Row gutter={16}>
+              <Col span={24}>
+                <div className='text-sm font-medium mt-3 mb-1'>{t('③ 通用参数')}</div>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={6} lg={6} xl={6}>
+                <Form.InputNumber
+                  field={'FeishuAlertDedupSeconds'}
+                  label={t('去重窗口(秒)')}
+                  min={0}
+                  step={10}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      FeishuAlertDedupSeconds: String(value),
+                    })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={12} md={6} lg={6} xl={6}>
+                <Form.InputNumber
+                  field={'FeishuAlertHeartbeatFailureLimit'}
+                  label={t('心跳连续失败终止次数')}
+                  min={1}
+                  step={1}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      FeishuAlertHeartbeatFailureLimit: String(value),
+                    })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={12} md={6} lg={6} xl={6}>
+                <Form.InputNumber
+                  field={'FeishuAlertRelay5xxWindowSeconds'}
+                  label={t('Relay 5xx 窗口(秒)')}
+                  min={1}
+                  step={10}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      FeishuAlertRelay5xxWindowSeconds: String(value),
+                    })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={12} md={6} lg={6} xl={6}>
+                <Form.InputNumber
+                  field={'FeishuAlertRelay5xxThreshold'}
+                  label={t('Relay 5xx 阈值')}
+                  min={1}
+                  step={1}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      FeishuAlertRelay5xxThreshold: String(value),
+                    })
+                  }
+                />
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col xs={24}>
+                <Form.Input
+                  field={'FeishuAlertEventMask'}
+                  label={t('启用事件 (逗号分隔，留空表示全部)')}
+                  placeholder='channel_disable,channel_model_disable,channel_recover,heartbeat_failed,relay_5xx,panic'
+                  onChange={(value) =>
+                    setInputs({ ...inputs, FeishuAlertEventMask: value })
+                  }
+                />
+              </Col>
+            </Row>
+            <Row>
+              <Button
+                size='default'
+                type='secondary'
+                onClick={onTestFeishu}
+                style={{ marginRight: 8 }}
+              >
+                {t('发送测试卡片')}
+              </Button>
             </Row>
             <Row>
               <Button size='default' onClick={onSubmit}>
