@@ -62,10 +62,15 @@ func InitOptionMap() {
 	common.OptionMap["FeishuAlertRelay5xxWindowSeconds"] = strconv.Itoa(common.FeishuAlertRelay5xxWindowSeconds)
 	common.OptionMap["FeishuAlertRelay5xxThreshold"] = strconv.Itoa(common.FeishuAlertRelay5xxThreshold)
 	common.OptionMap["FeishuAlertHeartbeatFailureLimit"] = strconv.Itoa(common.FeishuAlertHeartbeatFailureLimit)
+	// 首页 4 个 option 的默认值。先写入 common.X 变量,再镜像到 OptionMap。
+	// 这样 service 层读 common.X 即可拿到默认值;DB 有覆盖时由 loadOptionsFromDatabase 改 common.X。
+	common.HomeTestimonials = defaultHomeTestimonialsJSON()
+	common.HomeFAQ = defaultHomeFAQJSON()
+	common.HomeFooter = defaultHomeFooterJSON()
 	common.OptionMap["HomeStatsSLA"] = common.HomeStatsSLA
-	common.OptionMap["HomeTestimonials"] = defaultHomeTestimonialsJSON()
-	common.OptionMap["HomeFAQ"] = defaultHomeFAQJSON()
-	common.OptionMap["HomeFooter"] = defaultHomeFooterJSON()
+	common.OptionMap["HomeTestimonials"] = common.HomeTestimonials
+	common.OptionMap["HomeFAQ"] = common.HomeFAQ
+	common.OptionMap["HomeFooter"] = common.HomeFooter
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
