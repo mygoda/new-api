@@ -90,6 +90,9 @@ type Model struct {
 	//   "image"/"video"  -> 仅在对应 tab 展示
 	//   "image,video"    -> 两个 tab 都展示
 	CreationTarget  string        `json:"creation_target" gorm:"type:varchar(64);default:''"`
+	// 首页推荐优先级。0 = 不推荐(natural order),数字越大越靠前。
+	// 用于 /api/home/dashboard 筛选「能力 Tabs」中每个 capability 的精选模型。
+	HomePriority int            `json:"home_priority" gorm:"default:0;index"`
 	Status       int            `json:"status" gorm:"default:1"`
 	SyncOfficial int            `json:"sync_official" gorm:"default:1"`
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
@@ -139,7 +142,7 @@ func (mi *Model) Update() error {
 	mi.UpdatedTime = common.GetTimestamp()
 	// 使用 Select 强制更新所有字段，包括零值
 	return DB.Model(&Model{}).Where("id = ?", mi.Id).
-		Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "context_length", "max_output_tokens", "capabilities", "knowledge_cutoff", "long_description", "status", "sync_official", "name_rule", "updated_time").
+		Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "context_length", "max_output_tokens", "capabilities", "knowledge_cutoff", "long_description", "creation_target", "home_priority", "status", "sync_official", "name_rule", "updated_time").
 		Updates(mi).Error
 }
 

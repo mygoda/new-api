@@ -154,6 +154,7 @@ const EditModelModal = (props) => {
     long_description: '',
     endpoints: '',
     creation_target: '',
+    home_priority: 0,
     name_rule: props.editingModel?.model_name ? 0 : undefined, // 通过未配置模型过来的固定为精确匹配
     status: true,
     sync_official: true,
@@ -566,6 +567,19 @@ const EditModelModal = (props) => {
                         { value: 'video', label: t('仅显示在「视频」') },
                         { value: 'image,video', label: t('图像 + 视频') },
                       ]}
+                    />
+                  </Col>
+                  <Col span={24}>
+                    <Form.InputNumber
+                      field='home_priority'
+                      label={t('首页推荐优先级')}
+                      placeholder='0'
+                      min={0}
+                      step={1}
+                      style={{ width: '100%' }}
+                      extraText={t(
+                        '0 = 不推荐(自然顺序);数字越大,在首页「能力 Tabs」越靠前。每个能力(对话/图像/视频/代码/音频/向量) 各取前 6 个。',
+                      )}
                     />
                   </Col>
                   <Col span={24}>
