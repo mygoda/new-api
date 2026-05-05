@@ -71,6 +71,9 @@ const OperationSetting = () => {
     QuotaRemindThreshold: 0,
     AutomaticDisableChannelEnabled: false,
     AutomaticEnableChannelEnabled: false,
+    AutomaticDisableChannelModelEnabled: false,
+    ChannelModelHeartbeatSuccessThreshold: 0,
+    ChannelModelHeartbeatIntervalSeconds: 0,
     AutomaticDisableKeywords: '',
     AutomaticDisableStatusCodes: '401',
     AutomaticRetryStatusCodes:
