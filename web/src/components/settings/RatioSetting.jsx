@@ -27,6 +27,7 @@ import ModelSettingsVisualEditor from '../../pages/Setting/Ratio/ModelSettingsVi
 import ModelRatioNotSetEditor from '../../pages/Setting/Ratio/ModelRationNotSetEditor';
 import UpstreamRatioSync from '../../pages/Setting/Ratio/UpstreamRatioSync';
 import CurrencySettings from '../../pages/Setting/Ratio/CurrencySettings';
+import SeedanceConditionalSettings from '../../pages/Setting/Ratio/SeedanceConditionalSettings';
 
 import { API, showError, toBoolean } from '../../helpers';
 
@@ -51,6 +52,7 @@ const RatioSetting = () => {
     ExposeRatioEnabled: false,
     UserUsableGroups: '',
     'group_ratio_setting.group_special_usable_group': '',
+    SeedanceConditionalRatios: '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -118,6 +120,9 @@ const RatioSetting = () => {
           </Tabs.TabPane>
           <Tabs.TabPane tab={t('汇率设置')} itemKey='currency'>
             <CurrencySettings options={inputs} refresh={onRefresh} />
+          </Tabs.TabPane>
+          <Tabs.TabPane tab={t('Seedance 条件分价')} itemKey='seedance_conditional'>
+            <SeedanceConditionalSettings options={inputs} refresh={onRefresh} />
           </Tabs.TabPane>
         </Tabs>
       </Card>

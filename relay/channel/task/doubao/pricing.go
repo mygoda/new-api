@@ -36,41 +36,64 @@ type SeedanceConditions struct {
 
 // computeSeedanceMultipliers 返回相对「主流基准」的 OtherRatios 乘子映射。
 // 命中条件时返回乘子;不命中保持空 map(基础价)。
+//
+// 各条件的 multiplier 数值与启用状态从 admin 后台 SeedanceConditionalRatios
+// option 读取,允许 admin 在「价格配置」UI 勾选/编辑;option 缺失或某条规则
+// 缺失时回退到 PDF 文档对应的硬编码默认值。
 func computeSeedanceMultipliers(c SeedanceConditions) map[string]float64 {
 	out := map[string]float64{}
+	if !common.SeedanceConditionalEnabled() {
+		return out
+	}
 	name := strings.ToLower(c.Model)
 
 	switch {
 	case strings.Contains(name, "seedance-1-5-pro"):
 		// 基础 = 有声 720p (16 RMB/M)
-		if !c.GenerateAudio {
-			out["audio"] = 8.0 / 16.0 // 0.5
+		// 优先命中"组合规则"(draft + silent),没启用再降级到单条
+		if c.Draft && !c.GenerateAudio {
+			if r, ok := common.SeedanceConditionalRatio("seedance-1-5-pro", "draft_silent"); ok {
+				out["mode"] = r
+				return out
+			}
+			// 组合未启用:看子条件
 		}
-		if c.Draft {
-			// Draft 折算系数:有声 0.6, 无声 0.7
-			if c.GenerateAudio {
-				out["draft"] = 0.6
-			} else {
-				out["draft"] = 0.7
+		if c.Draft && c.GenerateAudio {
+			if r, ok := common.SeedanceConditionalRatio("seedance-1-5-pro", "draft_audio"); ok {
+				out["mode"] = r
+				return out
+			}
+		}
+		// 单条件
+		if !c.GenerateAudio {
+			if r, ok := common.SeedanceConditionalRatio("seedance-1-5-pro", "silent"); ok {
+				out["audio"] = r
 			}
 		}
 
 	case strings.Contains(name, "seedance-2-0-fast"):
 		// 基础 = 720p 输入不含视频 (37 RMB/M)
 		if c.HasVideoInput {
-			out["mode"] = 22.0 / 37.0 // 0.595
+			if r, ok := common.SeedanceConditionalRatio("seedance-2-0-fast", "with_video"); ok {
+				out["mode"] = r
+			}
 		}
-		// 1080p 不支持,这里不设乘子(若用户传了 1080p,后端会上游报错)
 
 	case strings.Contains(name, "seedance-2-0"):
 		// 基础 = 720p 输入不含视频 (46 RMB/M)
+		key := ""
 		switch {
 		case c.Resolution == "1080p" && c.HasVideoInput:
-			out["mode"] = 31.0 / 46.0 // 0.674
+			key = "1080p_with_video"
 		case c.Resolution == "1080p":
-			out["mode"] = 51.0 / 46.0 // 1.109
+			key = "1080p_no_video"
 		case c.HasVideoInput:
-			out["mode"] = 28.0 / 46.0 // 0.609
+			key = "720p_with_video"
+		}
+		if key != "" {
+			if r, ok := common.SeedanceConditionalRatio("seedance-2-0", key); ok {
+				out["mode"] = r
+			}
 		}
 	}
 

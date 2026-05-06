@@ -25,12 +25,12 @@ func TestSeedanceMultipliers(t *testing.T) {
 		{
 			name: "1.5 pro 有声 + draft",
 			c:    SeedanceConditions{Model: "doubao-seedance-1-5-pro-251215", GenerateAudio: true, Draft: true},
-			want: map[string]float64{"draft": 0.6},
+			want: map[string]float64{"mode": 0.6},
 		},
 		{
 			name: "1.5 pro 无声 + draft",
 			c:    SeedanceConditions{Model: "doubao-seedance-1-5-pro-251215", GenerateAudio: false, Draft: true},
-			want: map[string]float64{"audio": 0.5, "draft": 0.7},
+			want: map[string]float64{"mode": 0.35},
 		},
 
 		// ─── Seedance 2.0 ──────────────────────────────────────────────
@@ -42,17 +42,17 @@ func TestSeedanceMultipliers(t *testing.T) {
 		{
 			name: "2.0 1080p 输入不含视频",
 			c:    SeedanceConditions{Model: "doubao-seedance-2-0-260128", Resolution: "1080p"},
-			want: map[string]float64{"mode": 51.0 / 46.0},
+			want: map[string]float64{"mode": 1.109},
 		},
 		{
 			name: "2.0 720p 输入含视频",
 			c:    SeedanceConditions{Model: "doubao-seedance-2-0-260128", Resolution: "720p", HasVideoInput: true},
-			want: map[string]float64{"mode": 28.0 / 46.0},
+			want: map[string]float64{"mode": 0.609},
 		},
 		{
 			name: "2.0 1080p 输入含视频",
 			c:    SeedanceConditions{Model: "doubao-seedance-2-0-260128", Resolution: "1080p", HasVideoInput: true},
-			want: map[string]float64{"mode": 31.0 / 46.0},
+			want: map[string]float64{"mode": 0.674},
 		},
 
 		// ─── Seedance 2.0 fast ─────────────────────────────────────────
@@ -64,7 +64,7 @@ func TestSeedanceMultipliers(t *testing.T) {
 		{
 			name: "2.0 fast 输入含视频",
 			c:    SeedanceConditions{Model: "doubao-seedance-2-0-fast-260128", HasVideoInput: true},
-			want: map[string]float64{"mode": 22.0 / 37.0},
+			want: map[string]float64{"mode": 0.595},
 		},
 
 		// ─── 非 Seedance 模型 ──────────────────────────────────────────

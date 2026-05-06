@@ -62,6 +62,9 @@ func InitOptionMap() {
 	common.OptionMap["FeishuAlertRelay5xxWindowSeconds"] = strconv.Itoa(common.FeishuAlertRelay5xxWindowSeconds)
 	common.OptionMap["FeishuAlertRelay5xxThreshold"] = strconv.Itoa(common.FeishuAlertRelay5xxThreshold)
 	common.OptionMap["FeishuAlertHeartbeatFailureLimit"] = strconv.Itoa(common.FeishuAlertHeartbeatFailureLimit)
+	// Seedance 视频条件分价配置(JSON,admin 可在「价格配置」可视化编辑)
+	common.OptionMap["SeedanceConditionalRatios"] = common.SeedanceConditionalDefaultJSON()
+	common.SetSeedanceConditionalRatios(common.OptionMap["SeedanceConditionalRatios"])
 	// 首页 4 个 option 的默认值。先写入 common.X 变量,再镜像到 OptionMap。
 	// 这样 service 层读 common.X 即可拿到默认值;DB 有覆盖时由 loadOptionsFromDatabase 改 common.X。
 	common.HomeTestimonials = defaultHomeTestimonialsJSON()
@@ -612,6 +615,8 @@ func updateOptionMap(key string, value string) (err error) {
 		if v, err := strconv.Atoi(value); err == nil && v > 0 {
 			common.FeishuAlertHeartbeatFailureLimit = v
 		}
+	case "SeedanceConditionalRatios":
+		common.SetSeedanceConditionalRatios(value)
 	case "HomeStatsSLA":
 		common.HomeStatsSLA = value
 	case "HomeTestimonials":
