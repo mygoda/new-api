@@ -27,7 +27,6 @@ import RehypeKatex from 'rehype-katex';
 import RemarkGfm from 'remark-gfm';
 import RehypeHighlight from 'rehype-highlight';
 import { useRef, useState, useEffect, useMemo } from 'react';
-import mermaid from 'mermaid';
 import React from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 import clsx from 'clsx';
@@ -36,11 +35,23 @@ import { copy, rehypeSplitWordsIntoSpans } from '../../../helpers';
 import { IconCopy } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'default',
-  securityLevel: 'loose',
-});
+// mermaid 包及其传递依赖(dagre / cytoscape / d3 ...)~500KB gzip,只有真正
+// 渲染 mermaid 代码块时才加载,避免打到含 MarkdownRenderer 的任何 chunk 里。
+let mermaidPromise = null;
+function loadMermaid() {
+  if (!mermaidPromise) {
+    mermaidPromise = import('mermaid').then((mod) => {
+      const m = mod.default || mod;
+      m.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'loose',
+      });
+      return m;
+    });
+  }
+  return mermaidPromise;
+}
 
 export function Mermaid(props) {
   const ref = useRef(null);
@@ -48,15 +59,23 @@ export function Mermaid(props) {
 
   useEffect(() => {
     if (props.code && ref.current) {
-      mermaid
-        .run({
-          nodes: [ref.current],
-          suppressErrors: true,
+      let cancelled = false;
+      loadMermaid()
+        .then((m) => {
+          if (cancelled || !ref.current) return;
+          return m.run({
+            nodes: [ref.current],
+            suppressErrors: true,
+          });
         })
         .catch((e) => {
+          if (cancelled) return;
           setHasError(true);
-          console.error('[Mermaid] ', e.message);
+          console.error('[Mermaid] ', e?.message || e);
         });
+      return () => {
+        cancelled = true;
+      };
     }
   }, [props.code]);
 

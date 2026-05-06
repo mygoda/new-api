@@ -509,7 +509,16 @@ do_up() {
 #   - 任何一步失败都只 warn,不阻断部署
 do_warmup() {
     local local_url="http://localhost:${PORT}"
-    local target="${WARMUP_URL:-$local_url}"
+    local target="${WARMUP_URL:-}"
+
+    # deploy.sh 默认不 source .env;这里专门读取 WARMUP_URL,避免影响其他变量。
+    if [ -z "$target" ] && [ -f "${SCRIPT_DIR}/.env" ]; then
+        target="$(grep -E '^[[:space:]]*WARMUP_URL[[:space:]]*=' "${SCRIPT_DIR}/.env" \
+            | head -1 \
+            | sed -E 's/^[[:space:]]*WARMUP_URL[[:space:]]*=[[:space:]]*//; s/^"(.*)"$/\1/; s/^'\''(.*)'\''$/\1/' \
+            || true)"
+    fi
+    target="${target:-$local_url}"
 
     info "等待应用就绪 (最多 30s) ..."
     local ready=0
@@ -528,7 +537,8 @@ do_warmup() {
 
     info "预热静态资源: ${target}"
     local html
-    html="$(curl -sf -m 5 -H 'Accept-Encoding: gzip,br' "${target}/" 2>/dev/null || true)"
+    # --compressed 让 curl 自己解 gzip/br,避免 grep 命中 null byte
+    html="$(curl -sf -m 5 --compressed "${target}/" 2>/dev/null || true)"
     if [ -z "$html" ]; then
         warn "无法获取首页 HTML(${target}/),跳过预热"
         return 0
@@ -542,7 +552,7 @@ do_warmup() {
 
     local count=0 fail=0 a
     for a in $assets; do
-        if curl -sf -m 10 -o /dev/null -H 'Accept-Encoding: gzip,br' "${target}${a}"; then
+        if curl -sf -m 10 -o /dev/null --compressed "${target}${a}"; then
             count=$((count + 1))
         else
             fail=$((fail + 1))

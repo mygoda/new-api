@@ -83,9 +83,12 @@ export default defineConfig({
             'react-i18next',
             'i18next-browser-languagedetector',
           ],
-          // 仅在 markdown 渲染场景(playground / docs / pricing card)需要的重型依赖,
-          // 单独成 chunk,首页 / admin 列表页都不会触发下载。
-          mermaid: ['mermaid'],
+          // 仅在 markdown 渲染场景需要的重型依赖,单独成 chunk 让首页 / admin
+          // 列表页都不会触发下载。
+          //   - mermaid: 不再列入 manualChunks —— MarkdownRenderer 已改用 dynamic
+          //     import,Rollup 会自然产出独立 lazy chunk;若强制 manualChunks
+          //     反而会把 mermaid 与其它 dagre/lodash 共享依赖打到一起,被 entry
+          //     的某条静态路径反向拉起,导致首屏 modulepreload 多一份 ~150KB gzip。
           katex: ['katex'],
           markdown: [
             'react-markdown',
