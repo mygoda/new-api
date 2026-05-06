@@ -54,7 +54,11 @@ export function getFilterRules(modality) {
 
 let modelsCache = null;
 let lastFetchTime = 0;
-const CACHE_TTL = 60 * 1000; // 60s
+// 缓存:用户在管理后台改 creation_target / status 后,期望尽快在创作中心生效。
+// 之前 60s 太长 — 用户切回 tab 看到旧列表会以为「设置没生效」。缩到 15s,
+// 同时 ImageTab / VideoTab 在 mount 时会主动调 clearModelsCache(),所以
+// 切 tab 一定能拿最新数据。
+const CACHE_TTL = 15 * 1000;
 
 async function fetchModels() {
   const now = Date.now();
