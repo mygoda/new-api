@@ -34,23 +34,38 @@ const ratioToSize = (ratio, resolution) => {
 };
 
 function toOpenAIImage(p, schema) {
+  // 火山方舟 Seedream 5.0/4.5/4.0 不支持 n、不支持 seed(只 3.0 支持)。
+  // 数量由 sequential_image_generation + max_images 控制。
+  const isDoubaoSeedream = /seedream/.test((p.model || '').toLowerCase());
+  const isSeedream3 = /seedream-3/.test((p.model || '').toLowerCase());
+
   const body = stripUndefined({
     model: p.model,
     prompt: p.prompt,
-    n: p.n ?? 1,
+    n: !isDoubaoSeedream ? (p.n ?? 1) : undefined, // doubao seedream 不传 n
     size: p.size,
     quality: p.quality,
     style: p.style,
-    // doubao Seedream 系列扩展字段(火山方舟官方支持)
-    seed: p.seed != null && p.seed >= 0 ? p.seed : undefined,
+    // seed 仅 3.0-t2i 支持;其它 doubao seedream 跳过
+    seed:
+      p.seed != null && p.seed >= 0 && (!isDoubaoSeedream || isSeedream3)
+        ? p.seed
+        : undefined,
     watermark: typeof p.watermark === 'boolean' ? p.watermark : undefined,
-    sequential_image_generation: p.sequential_image_generation,
+    sequential_image_generation:
+      p.sequential_image_generation === 'auto' || p.sequential_image_generation === 'disabled'
+        ? p.sequential_image_generation
+        : undefined,
     sequential_image_generation_options:
-      p.sequential_image_generation === 'on' && p.max_images
+      p.sequential_image_generation === 'auto' && p.max_images
         ? { max_images: p.max_images }
         : undefined,
     optimize_prompt_options:
-      p.optimize_prompt_mode ? { mode: p.optimize_prompt_mode } : undefined,
+      p.optimize_prompt_mode && (p.optimize_prompt_mode === 'standard' || p.optimize_prompt_mode === 'fast')
+        ? { mode: p.optimize_prompt_mode }
+        : undefined,
+    // 仅 5.0 lite 支持自定义;其它模型即便传也无害(被忽略)
+    output_format: p.output_format ? p.output_format : undefined,
   });
   // 有上传图 → 走 edits 接口
   if (p.image_first) {
@@ -146,8 +161,10 @@ function toOpenAIVideo(p, schema) {
       p.camera_preset === 'fixed' ? true :
       p.camerafixed === true ? true :
       p.camerafixed === false ? false : undefined,
-    generate_audio: p.generate_audio,
-    watermark: p.watermark,
+    generate_audio: typeof p.generate_audio === 'boolean' ? p.generate_audio : undefined,
+    watermark: typeof p.watermark === 'boolean' ? p.watermark : undefined,
+    return_last_frame: typeof p.return_last_frame === 'boolean' ? p.return_last_frame : undefined,
+    service_tier: p.service_tier && p.service_tier !== 'default' ? p.service_tier : undefined,
     prompt_optimizer: p.prompt_optimizer,
     fast_pretreatment: p.fast_pretreatment,
     image_last: p.image_last,

@@ -129,67 +129,38 @@ export const IMAGE_MODELS = [
     protocol: 'openai-image',
     endpoint: '/v1/images/generations',
     fields: {
+      // 火山官方 size 支持两种方式不可混用:简化档 (2K/3K/4K) 或具体像素值
+      // 简化档下,模型按 prompt 自动判定宽高比;像素直接指定
       size: {
-        type: FIELD.segmented,
-        // 火山官方 Seedream 5.0 lite 支持比例 + 像素两套
+        type: FIELD.select,
         options: [
-          'auto',
-          '1:1',
-          '2:3',
-          '3:2',
-          '3:4',
-          '4:3',
-          '4:5',
-          '5:4',
-          '9:16',
-          '16:9',
-          '21:9',
+          '2K',
+          '3K',
+          '4K',
           '2048x2048',
           '2560x1440',
+          '3072x3072',
           '4096x4096',
         ],
-        default: 'auto',
+        default: '2K',
         group: PARAM_GROUP.basic,
-        label: '尺寸 / 比例',
-        help: '可填写比例(自动选分辨率)或具体像素。最高支持 4096x4096。',
-      },
-      n: {
-        type: FIELD.number,
-        min: 1,
-        max: 15,
-        default: 1,
-        group: PARAM_GROUP.basic,
-        label: '生成数量',
-        help: '1-15。参考图数量 + 生成数量 ≤ 15。',
+        label: '尺寸 / 分辨率档',
+        help: '推荐用 2K/3K/4K 简档,模型按 prompt 自动选最佳宽高比;或直接填像素(总像素 [368w, 1.7kw],宽高比 [1/16,16])。',
       },
       watermark: {
         type: FIELD.switch,
-        default: false,
-        group: PARAM_GROUP.advanced,
-        label: '添加水印',
-      },
-      seed: {
-        type: FIELD.seed,
-        default: -1,
-        group: PARAM_GROUP.advanced,
-        label: '随机种子',
-        help: '-1 = 随机;固定数值可复现同样的图。',
-      },
-      optimize_prompt_mode: {
-        type: FIELD.select,
-        options: ['', 'auto', 'creative'],
-        default: '',
-        group: PARAM_GROUP.advanced,
-        label: '提示词优化',
-        help: '空 = 关闭;auto = 平衡;creative = 倾向创意扩写。',
+        default: true,
+        group: PARAM_GROUP.basic,
+        label: '添加 AI 生成水印',
+        help: '官方默认 true。商用建议关闭。仅在右下角加「AI 生成」字样,不遮挡主体。',
       },
       sequential_image_generation: {
         type: FIELD.segmented,
-        options: ['off', 'auto', 'on'],
-        default: 'off',
+        options: ['disabled', 'auto'],
+        default: 'disabled',
         group: PARAM_GROUP.advanced,
         label: '组图生成',
-        help: '产生具有连贯主体/风格的多张图(如分镜)。开启后请配合「最大图数」。',
+        help: 'disabled = 单图;auto = 由模型决定生成几张,产生主体/风格连贯的一组图(如分镜)。需配合「最大图数」。',
       },
       max_images: {
         type: FIELD.number,
@@ -197,13 +168,32 @@ export const IMAGE_MODELS = [
         max: 15,
         default: 4,
         group: PARAM_GROUP.advanced,
-        label: '组图最大图数',
-        help: '仅在「组图生成」开启时生效。',
+        label: '最大图数',
+        help: '仅当组图 = auto 时生效。参考图数量 + 生成数量 ≤ 15。',
+      },
+      optimize_prompt_mode: {
+        type: FIELD.select,
+        options: ['', 'standard', 'fast'],
+        default: '',
+        group: PARAM_GROUP.advanced,
+        label: '提示词优化',
+        help: '空 = API 默认(standard);standard = 质量更高,慢一点;fast = 更快(5.0 lite 不支持 fast)。',
+      },
+      output_format: {
+        type: FIELD.segmented,
+        options: ['', 'jpeg', 'png'],
+        default: '',
+        group: PARAM_GROUP.advanced,
+        label: '输出格式',
+        help: '仅 5.0 lite 支持自定义。空 = API 默认(jpeg);其他模型固定 jpeg。',
       },
     },
     pricing: {
       unit: '张',
-      estimate: ({ n = 1 }) => Math.round(n * 25), // 占位估算
+      estimate: ({ sequential_image_generation = 'disabled', max_images = 1 }) => {
+        const n = sequential_image_generation === 'auto' ? Math.min(max_images, 15) : 1;
+        return n * 25;
+      },
     },
   },
   {
@@ -307,57 +297,54 @@ export const VIDEO_MODELS = [
     fields: {
       duration: {
         type: FIELD.segmented,
-        options: [5, 10],
+        // 官方 Seedance 1.0 pro / pro-fast / 1.0 lite 支持 [2, 12] 秒任意整数
+        options: [3, 5, 8, 10, 12],
         default: 5,
         group: PARAM_GROUP.basic,
         label: '时长（秒）',
+        help: 'Seedance 1.0 系列支持 2-12 秒,常用 5/8/10。',
       },
       ratio: {
         type: FIELD.ratio,
-        options: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+        options: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', 'adaptive'],
         default: '16:9',
         group: PARAM_GROUP.basic,
         label: '宽高比',
+        help: 'adaptive = 由模型按 prompt / 输入图自动选最合适的比例(图生视频场景默认值)。',
       },
       resolution: {
         type: FIELD.segmented,
         options: ['480p', '720p', '1080p'],
-        default: '720p',
+        default: '1080p',
         group: PARAM_GROUP.basic,
         label: '分辨率',
+        help: '官方 1.0 pro / pro-fast 默认 1080p。',
       },
       camerafixed: {
         type: FIELD.switch,
         default: false,
         group: PARAM_GROUP.advanced,
-        label: '锁定镜头(camerafixed)',
-        help: '开启后整段视频画面镜头保持稳定,不做主动运镜。适合产品展示、对话场景。',
+        label: '锁定镜头',
+        help: '开启后整段视频画面镜头保持稳定。注意:参考图场景与 Seedance 2.0 不支持此项。',
       },
       watermark: {
         type: FIELD.switch,
         default: false,
         group: PARAM_GROUP.advanced,
         label: '添加水印',
-        help: '是否在视频右下角添加官方水印。商用建议关闭。',
-      },
-      negative_prompt: {
-        type: FIELD.textarea,
-        default: '',
-        group: PARAM_GROUP.advanced,
-        label: '负向提示词',
-        help: '描述不希望出现的内容,以逗号分隔。例如:模糊、低质量、变形手指。',
+        help: '默认不加。商用建议关闭。',
       },
       seed: {
         type: FIELD.seed,
         default: -1,
         group: PARAM_GROUP.advanced,
         label: '随机种子',
-        help: '-1 表示每次随机;固定数值用于复现同样的视频。',
+        help: '-1 = 每次随机;固定值可近似复现(不保证 100% 一致)。',
       },
     },
     pricing: {
       unit: '秒',
-      estimate: ({ duration = 5, resolution = '720p' }) =>
+      estimate: ({ duration = 5, resolution = '1080p' }) =>
         Math.round(duration * (resolution === '1080p' ? 80 : 40)),
     },
   },
@@ -373,38 +360,50 @@ export const VIDEO_MODELS = [
     fields: {
       duration: {
         type: FIELD.segmented,
+        // Seedance 2.0 支持 [4, 15] 秒任意整数,或 -1 智能选
         options: [5, 8, 11, 15],
         default: 5,
         group: PARAM_GROUP.basic,
         label: '时长（秒）',
+        help: 'Seedance 2.0 范围 4-15 秒。-1 让模型自适应。',
       },
       ratio: {
         type: FIELD.ratio,
-        options: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
-        default: '16:9',
+        options: ['adaptive', '16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+        default: 'adaptive',
         group: PARAM_GROUP.basic,
         label: '宽高比',
+        help: 'Seedance 2.0 默认 adaptive,由模型按输入(prompt / 图 / 视频)自动选最合适比例。',
       },
       resolution: {
         type: FIELD.segmented,
-        options: ['720p', '1080p'],
-        default: '1080p',
+        options: ['480p', '720p', '1080p'],
+        default: '720p',
         group: PARAM_GROUP.basic,
         label: '分辨率',
+        help: 'Seedance 2.0 默认 720p。注意:Seedance 2.0 fast 不支持 1080p。',
       },
       generate_audio: {
         type: FIELD.switch,
-        default: false,
+        default: true,
         group: PARAM_GROUP.basic,
         label: '生成原生音频',
-        help: 'Seedance 2.0 独有:同时生成与画面同步的音效与语音。会增加耗时与计费。',
+        help: 'Seedance 2.0 / 1.5 pro 独有。开启后模型按 prompt/画面合成同步的人声、音效、配乐(对白请加双引号)。',
       },
-      camerafixed: {
+      return_last_frame: {
         type: FIELD.switch,
         default: false,
         group: PARAM_GROUP.advanced,
-        label: '锁定镜头(camerafixed)',
-        help: '开启后整段视频画面镜头保持稳定。',
+        label: '返回尾帧图',
+        help: '开启后查询接口可拿到本视频的尾帧 PNG,可作为下一段视频的首帧,实现长视频拼接。',
+      },
+      service_tier: {
+        type: FIELD.segmented,
+        options: ['default', 'flex'],
+        default: 'default',
+        group: PARAM_GROUP.advanced,
+        label: '服务等级',
+        help: 'default = 在线推理(快);flex = 离线推理(慢但价格 50%)。Seedance 2.0 不支持 flex。',
       },
       watermark: {
         type: FIELD.switch,
@@ -412,24 +411,21 @@ export const VIDEO_MODELS = [
         group: PARAM_GROUP.advanced,
         label: '添加水印',
       },
-      negative_prompt: {
-        type: FIELD.textarea,
-        default: '',
-        group: PARAM_GROUP.advanced,
-        label: '负向提示词',
-      },
       seed: {
         type: FIELD.seed,
         default: -1,
         group: PARAM_GROUP.advanced,
         label: '随机种子',
+        help: '-1 = 随机。范围 [-1, 2^32-1]。',
       },
     },
     pricing: {
       unit: '秒',
-      estimate: ({ duration = 5, resolution = '1080p', generate_audio = false }) => {
+      estimate: ({ duration = 5, resolution = '720p', generate_audio = true, service_tier = 'default' }) => {
         const base = resolution === '1080p' ? 100 : 50;
-        return Math.round(duration * base * (generate_audio ? 1.3 : 1));
+        const audioMul = generate_audio ? 1.3 : 1;
+        const tierMul = service_tier === 'flex' ? 0.5 : 1;
+        return Math.round(duration * base * audioMul * tierMul);
       },
     },
   },
