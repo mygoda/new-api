@@ -71,6 +71,7 @@ const Creation = lazy(() => import('./pages/Creation'));
 const Subscription = lazy(() => import('./pages/Subscription'));
 const DealerUsers = lazy(() => import('./pages/Dealer/Users'));
 const DealerBilling = lazy(() => import('./pages/Dealer/Billing'));
+const ContactSales = lazy(() => import('./pages/ContactSales'));
 
 // Wrap a lazy element with Suspense + key for transition-aware fallbacks.
 const lazyRoute = (element, key) => (
@@ -298,6 +299,10 @@ function App() {
         <Route
           path='/privacy-policy'
           element={lazyRoute(<PrivacyPolicy />, location.pathname)}
+        />
+        <Route
+          path='/contact-sales'
+          element={lazyRoute(<ContactSales />, location.pathname)}
         />
         <Route
           path='/console/chat/:id?'
