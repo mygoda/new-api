@@ -383,7 +383,19 @@ func ModelPrice2JSONString() string {
 }
 
 func UpdateModelPriceByJSONString(jsonStr string) error {
-	return types.LoadFromJsonStringWithCallback(modelPriceMap, jsonStr, InvalidateExposedDataCache)
+	if err := types.LoadFromJsonStringWithCallback(modelPriceMap, jsonStr, InvalidateExposedDataCache); err != nil {
+		return err
+	}
+	// 回填新版本新增的默认价:DB 上的 ModelPrice JSON 是用户首次保存时的快照,
+	// 后续版本新增的默认 entry 不在 DB 里,LoadFromJsonString reset map 后会丢。
+	// 这里把 default 中存在、当前 map 没有的 key 补回,保证升级时新模型默认价立即生效;
+	// 用户已在 admin UI 改过的 entry 会以 DB 值为准(已存在,不覆盖)。
+	for k, v := range defaultModelPrice {
+		if _, exists := modelPriceMap.Get(k); !exists {
+			modelPriceMap.Set(k, v)
+		}
+	}
+	return nil
 }
 
 // GetModelPrice 返回模型的价格，如果模型不存在则返回-1，false
@@ -413,7 +425,17 @@ func GetModelPrice(name string, printErr bool) (float64, bool) {
 }
 
 func UpdateModelRatioByJSONString(jsonStr string) error {
-	return types.LoadFromJsonStringWithCallback(modelRatioMap, jsonStr, InvalidateExposedDataCache)
+	if err := types.LoadFromJsonStringWithCallback(modelRatioMap, jsonStr, InvalidateExposedDataCache); err != nil {
+		return err
+	}
+	// 同 UpdateModelPriceByJSONString:回填新版本新增的默认 ratio,避免升级时
+	// 新增模型(如 doubao seedance / seedream)默认值被 DB 旧快照盖掉。
+	for k, v := range defaultModelRatio {
+		if _, exists := modelRatioMap.Get(k); !exists {
+			modelRatioMap.Set(k, v)
+		}
+	}
+	return nil
 }
 
 // 处理带有思考预算的模型名称，方便统一定价
