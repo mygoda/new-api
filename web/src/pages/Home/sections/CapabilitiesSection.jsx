@@ -91,7 +91,6 @@ export default function CapabilitiesSection({ featured }) {
 
 function ModelCard({ rank, model, onTry }) {
   const { t } = useTranslation();
-  const price = model.price_per_1k;
   return (
     <div className='hover-card bg-white border border-slate-200 rounded-2xl p-5'>
       <div className='flex items-start justify-between mb-3'>
@@ -108,17 +107,7 @@ function ModelCard({ rank, model, onTry }) {
       {model.description && (
         <p className='text-sm text-slate-500 leading-relaxed line-clamp-2'>{model.description}</p>
       )}
-      <div className='flex items-center justify-between mt-4 pt-4 border-t border-slate-100'>
-        <div className='text-sm font-semibold tabular-nums'>
-          {price > 0 ? (
-            <>
-              ¥{price.toFixed(price < 0.01 ? 4 : 3)}
-              <span className='text-xs text-slate-500 font-normal'> / 1K tokens</span>
-            </>
-          ) : (
-            <span className='text-xs text-slate-400 font-normal'>{t('询价')}</span>
-          )}
-        </div>
+      <div className='flex items-center justify-end mt-4 pt-4 border-t border-slate-100'>
         <button
           onClick={onTry}
           className='text-xs px-3 py-1 bg-slate-900 text-white rounded-full hover:bg-slate-800'
