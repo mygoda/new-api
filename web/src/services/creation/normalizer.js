@@ -41,6 +41,16 @@ function toOpenAIImage(p, schema) {
     size: p.size,
     quality: p.quality,
     style: p.style,
+    // doubao Seedream 系列扩展字段(火山方舟官方支持)
+    seed: p.seed != null && p.seed >= 0 ? p.seed : undefined,
+    watermark: typeof p.watermark === 'boolean' ? p.watermark : undefined,
+    sequential_image_generation: p.sequential_image_generation,
+    sequential_image_generation_options:
+      p.sequential_image_generation === 'on' && p.max_images
+        ? { max_images: p.max_images }
+        : undefined,
+    optimize_prompt_options:
+      p.optimize_prompt_mode ? { mode: p.optimize_prompt_mode } : undefined,
   });
   // 有上传图 → 走 edits 接口
   if (p.image_first) {
@@ -131,7 +141,11 @@ function toOpenAIVideo(p, schema) {
     cfg_scale: p.cfg_scale,
     mode: p.mode_quality,
     motion_strength: p.motion_strength,
-    camera_fixed: p.camera_preset === 'fixed' ? true : undefined,
+    // 兼容两种字段名:camera_fixed (旧, 来自 camera_preset=fixed) 与 camerafixed (新, 直接 schema 字段)
+    camera_fixed:
+      p.camera_preset === 'fixed' ? true :
+      p.camerafixed === true ? true :
+      p.camerafixed === false ? false : undefined,
     generate_audio: p.generate_audio,
     watermark: p.watermark,
     prompt_optimizer: p.prompt_optimizer,

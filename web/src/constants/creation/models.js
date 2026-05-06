@@ -121,6 +121,92 @@ export const IMAGE_MODELS = [
     },
   },
   {
+    modelName: 'doubao-seedream-5-0-260128',
+    displayName: 'Doubao Seedream 5.0',
+    vendor: 'doubao',
+    icon: '/logo.png',
+    modality: 'image',
+    protocol: 'openai-image',
+    endpoint: '/v1/images/generations',
+    fields: {
+      size: {
+        type: FIELD.segmented,
+        // 火山官方 Seedream 5.0 lite 支持比例 + 像素两套
+        options: [
+          'auto',
+          '1:1',
+          '2:3',
+          '3:2',
+          '3:4',
+          '4:3',
+          '4:5',
+          '5:4',
+          '9:16',
+          '16:9',
+          '21:9',
+          '2048x2048',
+          '2560x1440',
+          '4096x4096',
+        ],
+        default: 'auto',
+        group: PARAM_GROUP.basic,
+        label: '尺寸 / 比例',
+        help: '可填写比例(自动选分辨率)或具体像素。最高支持 4096x4096。',
+      },
+      n: {
+        type: FIELD.number,
+        min: 1,
+        max: 15,
+        default: 1,
+        group: PARAM_GROUP.basic,
+        label: '生成数量',
+        help: '1-15。参考图数量 + 生成数量 ≤ 15。',
+      },
+      watermark: {
+        type: FIELD.switch,
+        default: false,
+        group: PARAM_GROUP.advanced,
+        label: '添加水印',
+      },
+      seed: {
+        type: FIELD.seed,
+        default: -1,
+        group: PARAM_GROUP.advanced,
+        label: '随机种子',
+        help: '-1 = 随机;固定数值可复现同样的图。',
+      },
+      optimize_prompt_mode: {
+        type: FIELD.select,
+        options: ['', 'auto', 'creative'],
+        default: '',
+        group: PARAM_GROUP.advanced,
+        label: '提示词优化',
+        help: '空 = 关闭;auto = 平衡;creative = 倾向创意扩写。',
+      },
+      sequential_image_generation: {
+        type: FIELD.segmented,
+        options: ['off', 'auto', 'on'],
+        default: 'off',
+        group: PARAM_GROUP.advanced,
+        label: '组图生成',
+        help: '产生具有连贯主体/风格的多张图(如分镜)。开启后请配合「最大图数」。',
+      },
+      max_images: {
+        type: FIELD.number,
+        min: 1,
+        max: 15,
+        default: 4,
+        group: PARAM_GROUP.advanced,
+        label: '组图最大图数',
+        help: '仅在「组图生成」开启时生效。',
+      },
+    },
+    pricing: {
+      unit: '张',
+      estimate: ({ n = 1 }) => Math.round(n * 25), // 占位估算
+    },
+  },
+  {
     modelName: 'midjourney',
     displayName: 'Midjourney',
     vendor: 'midjourney',
@@ -228,7 +314,73 @@ export const VIDEO_MODELS = [
       },
       ratio: {
         type: FIELD.ratio,
-        options: ['16:9', '9:16', '1:1'],
+        options: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+        default: '16:9',
+        group: PARAM_GROUP.basic,
+        label: '宽高比',
+      },
+      resolution: {
+        type: FIELD.segmented,
+        options: ['480p', '720p', '1080p'],
+        default: '720p',
+        group: PARAM_GROUP.basic,
+        label: '分辨率',
+      },
+      camerafixed: {
+        type: FIELD.switch,
+        default: false,
+        group: PARAM_GROUP.advanced,
+        label: '锁定镜头(camerafixed)',
+        help: '开启后整段视频画面镜头保持稳定,不做主动运镜。适合产品展示、对话场景。',
+      },
+      watermark: {
+        type: FIELD.switch,
+        default: false,
+        group: PARAM_GROUP.advanced,
+        label: '添加水印',
+        help: '是否在视频右下角添加官方水印。商用建议关闭。',
+      },
+      negative_prompt: {
+        type: FIELD.textarea,
+        default: '',
+        group: PARAM_GROUP.advanced,
+        label: '负向提示词',
+        help: '描述不希望出现的内容,以逗号分隔。例如:模糊、低质量、变形手指。',
+      },
+      seed: {
+        type: FIELD.seed,
+        default: -1,
+        group: PARAM_GROUP.advanced,
+        label: '随机种子',
+        help: '-1 表示每次随机;固定数值用于复现同样的视频。',
+      },
+    },
+    pricing: {
+      unit: '秒',
+      estimate: ({ duration = 5, resolution = '720p' }) =>
+        Math.round(duration * (resolution === '1080p' ? 80 : 40)),
+    },
+  },
+  {
+    modelName: 'doubao-seedance-2-0-260128',
+    displayName: 'Doubao Seedance 2.0',
+    vendor: 'doubao',
+    icon: '/logo.png',
+    modality: 'video',
+    protocol: 'openai-video',
+    endpoint: '/v1/video/generations',
+    modes: ['t2v', 'i2v'],
+    fields: {
+      duration: {
+        type: FIELD.segmented,
+        options: [5, 8, 11, 15],
+        default: 5,
+        group: PARAM_GROUP.basic,
+        label: '时长（秒）',
+      },
+      ratio: {
+        type: FIELD.ratio,
+        options: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
         default: '16:9',
         group: PARAM_GROUP.basic,
         label: '宽高比',
@@ -236,9 +388,35 @@ export const VIDEO_MODELS = [
       resolution: {
         type: FIELD.segmented,
         options: ['720p', '1080p'],
-        default: '720p',
+        default: '1080p',
         group: PARAM_GROUP.basic,
         label: '分辨率',
+      },
+      generate_audio: {
+        type: FIELD.switch,
+        default: false,
+        group: PARAM_GROUP.basic,
+        label: '生成原生音频',
+        help: 'Seedance 2.0 独有:同时生成与画面同步的音效与语音。会增加耗时与计费。',
+      },
+      camerafixed: {
+        type: FIELD.switch,
+        default: false,
+        group: PARAM_GROUP.advanced,
+        label: '锁定镜头(camerafixed)',
+        help: '开启后整段视频画面镜头保持稳定。',
+      },
+      watermark: {
+        type: FIELD.switch,
+        default: false,
+        group: PARAM_GROUP.advanced,
+        label: '添加水印',
+      },
+      negative_prompt: {
+        type: FIELD.textarea,
+        default: '',
+        group: PARAM_GROUP.advanced,
+        label: '负向提示词',
       },
       seed: {
         type: FIELD.seed,
@@ -249,8 +427,10 @@ export const VIDEO_MODELS = [
     },
     pricing: {
       unit: '秒',
-      estimate: ({ duration = 5, resolution = '720p' }) =>
-        Math.round(duration * (resolution === '1080p' ? 80 : 40)),
+      estimate: ({ duration = 5, resolution = '1080p', generate_audio = false }) => {
+        const base = resolution === '1080p' ? 100 : 50;
+        return Math.round(duration * base * (generate_audio ? 1.3 : 1));
+      },
     },
   },
   {
@@ -346,6 +526,10 @@ export function inferModelSchema(modelInfo) {
       const mj = IMAGE_MODELS.find((m) => m.modelName === 'midjourney');
       return mj ? { ...mj, modelName, displayName: modelName } : null;
     }
+    if (vendor === 'doubao' || /seedream|seededit/.test(lowerName)) {
+      const tpl = IMAGE_MODELS.find((m) => m.modelName === 'doubao-seedream-5-0-260128');
+      return tpl ? { ...tpl, modelName, displayName: modelName } : null;
+    }
     if (vendor === 'openai' || /gpt|dall-e/.test(lowerName)) {
       const tpl = IMAGE_MODELS.find((m) => m.modelName === 'gpt-image-1');
       return tpl ? { ...tpl, modelName, displayName: modelName } : null;
@@ -385,7 +569,13 @@ export function inferModelSchema(modelInfo) {
       return tpl ? { ...tpl, modelName, displayName: modelName } : null;
     }
     if (vendor === 'doubao' || /seedance|doubao/.test(lowerName)) {
-      const tpl = VIDEO_MODELS.find((m) => m.modelName === 'doubao-seedance-1-0-pro-250528');
+      // Seedance 2.0 与 1.x 参数集略有差异(2.0 多 generate_audio,duration 选项更细)
+      // 按版本号匹配,默认走 1.0 pro
+      const isV2 = /seedance-2|2-0-260128|2-0-fast/.test(lowerName);
+      const targetName = isV2
+        ? 'doubao-seedance-2-0-260128'
+        : 'doubao-seedance-1-0-pro-250528';
+      const tpl = VIDEO_MODELS.find((m) => m.modelName === targetName);
       return tpl ? { ...tpl, modelName, displayName: modelName } : null;
     }
     if (vendor === 'openai' || /sora/.test(lowerName)) {
