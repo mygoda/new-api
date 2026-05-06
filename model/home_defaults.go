@@ -59,9 +59,9 @@ func defaultHomeFooterJSON() string {
     {
       "title": "产品",
       "links": [
-        { "text": "模型广场", "url": "/models" },
+        { "text": "模型广场", "url": "/marketplace" },
         { "text": "创作中心", "url": "/creation" },
-        { "text": "Playground", "url": "/playground" },
+        { "text": "Playground", "url": "/console/playground" },
         { "text": "价格", "url": "/pricing" }
       ]
     },
@@ -69,18 +69,16 @@ func defaultHomeFooterJSON() string {
       "title": "开发者",
       "links": [
         { "text": "文档", "url": "/docs" },
-        { "text": "API 参考", "url": "/docs/api" },
-        { "text": "SDK", "url": "/docs/sdk" },
-        { "text": "状态页", "url": "/status" }
+        { "text": "控制台", "url": "/console" },
+        { "text": "GitHub", "url": "https://github.com/QuantumNous/new-api" }
       ]
     },
     {
       "title": "公司",
       "links": [
         { "text": "关于我们", "url": "/about" },
-        { "text": "联系商务", "url": "/contact" },
-        { "text": "服务条款", "url": "/terms" },
-        { "text": "隐私政策", "url": "/privacy" }
+        { "text": "用户协议", "url": "/user-agreement" },
+        { "text": "隐私政策", "url": "/privacy-policy" }
       ]
     }
   ],

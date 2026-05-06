@@ -70,7 +70,7 @@ export default function CapabilitiesSection({ featured }) {
                 key={m.model_name}
                 rank={idx + 1}
                 model={m}
-                onTry={() => navigate(`/playground?model=${encodeURIComponent(m.model_name)}`)}
+                onTry={() => navigate(`/console/playground?model=${encodeURIComponent(m.model_name)}`)}
               />
             ))}
           </div>

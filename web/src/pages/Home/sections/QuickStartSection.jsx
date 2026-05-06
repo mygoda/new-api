@@ -68,7 +68,7 @@ const client = new OpenAI({
               </li>
             </ol>
             <Link
-              to='/docs/clients'
+              to='/docs'
               className='block text-center text-sm font-medium text-indigo-600 hover:underline'
             >
               {t('查看客户端配置指南 →')}
