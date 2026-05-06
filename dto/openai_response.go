@@ -239,6 +239,12 @@ type Usage struct {
 
 	// OpenRouter Params
 	Cost any `json:"cost,omitempty"`
+
+	// 火山方舟 Seedream 系列(以及其它兼容 OpenAI 图像协议的厂商)
+	// 在响应里通过 usage.generated_images 表示「实际生成的图片张数」。
+	// 组图 (sequential_image_generation=auto) 时可能 1-15 张不等,
+	// 计费按真实张数走,不按请求里的 n 走。
+	GeneratedImages int `json:"generated_images,omitempty"`
 }
 
 type OpenAIVideoResponse struct {
