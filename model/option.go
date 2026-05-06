@@ -217,6 +217,28 @@ func LoadOptionsFromDatabase() {
 			common.SysLog("failed to update option map: " + err.Error())
 		}
 	}
+	// 把 ratio/price 类配置从内存 map 重 marshal 回 OptionMap。
+	// 原因:UpdateXxxByJSONString 内部会先把 DB JSON load 进 map,再回填新版本
+	// 默认 entry(避免升级时新模型默认值丢失);但 updateOptionMap 仅把 DB 原始
+	// 字符串塞进 OptionMap,不感知回填。这里统一刷一次,让 admin UI 能看到
+	// backfill 后的完整列表。
+	syncRatioMapsToOptionMap()
+}
+
+// syncRatioMapsToOptionMap 让 OptionMap 与内存 ratio_setting map 保持一致。
+// 启动期由 LoadOptionsFromDatabase 调用;不持有 OptionMap 锁,因为各 marshaler
+// 内部已加各自的 RWMutex,且 OptionMap 写入用原子 set。
+func syncRatioMapsToOptionMap() {
+	common.OptionMapRWMutex.Lock()
+	defer common.OptionMapRWMutex.Unlock()
+	common.OptionMap["ModelRatio"] = ratio_setting.ModelRatio2JSONString()
+	common.OptionMap["ModelPrice"] = ratio_setting.ModelPrice2JSONString()
+	common.OptionMap["CompletionRatio"] = ratio_setting.CompletionRatio2JSONString()
+	common.OptionMap["CacheRatio"] = ratio_setting.CacheRatio2JSONString()
+	common.OptionMap["CreateCacheRatio"] = ratio_setting.CreateCacheRatio2JSONString()
+	common.OptionMap["ImageRatio"] = ratio_setting.ImageRatio2JSONString()
+	common.OptionMap["AudioRatio"] = ratio_setting.AudioRatio2JSONString()
+	common.OptionMap["AudioCompletionRatio"] = ratio_setting.AudioCompletionRatio2JSONString()
 }
 
 func SyncOptions(frequency int) {
