@@ -173,6 +173,10 @@ function toOpenAIVideo(p, schema) {
     aspect_ratio: p.aspect_ratio,
     resolution: p.resolution,
     ratio: p.ratio,
+    // doubao adapter 通过 UnmarshalMetadata 读取这两个字段;TaskSubmitReq 顶层
+    // 没有 seed 字段,只放顶层会丢。这里冗余下发保证 adapter 能拿到。
+    seed: p.seed != null && p.seed >= 0 ? p.seed : undefined,
+    duration: p.duration != null ? p.duration : undefined,
   });
 
   // 镜头控制（Kling 专属，后端 kling adapter 取 metadata.camera_control 或在 metadata 中合并）

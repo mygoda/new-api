@@ -238,9 +238,15 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 		}
 	}
 
+	// 先把 metadata 里的字段塞进 r,再用顶层字段做兜底覆盖。
+	// 兜底原因:前端 normalizer 在 body 顶层有 duration / seed,而历史上这些没进
+	// metadata,旧版 adapter 因此漏掉这两个字段。fall back 保证两端都能用。
 	metadata := req.Metadata
 	if err := taskcommon.UnmarshalMetadata(metadata, &r); err != nil {
 		return nil, errors.Wrap(err, "unmarshal metadata failed")
+	}
+	if req.Duration != 0 && r.Duration == 0 {
+		r.Duration = dto.IntValue(req.Duration)
 	}
 
 	return &r, nil
