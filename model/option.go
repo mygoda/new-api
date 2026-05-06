@@ -62,9 +62,11 @@ func InitOptionMap() {
 	common.OptionMap["FeishuAlertRelay5xxWindowSeconds"] = strconv.Itoa(common.FeishuAlertRelay5xxWindowSeconds)
 	common.OptionMap["FeishuAlertRelay5xxThreshold"] = strconv.Itoa(common.FeishuAlertRelay5xxThreshold)
 	common.OptionMap["FeishuAlertHeartbeatFailureLimit"] = strconv.Itoa(common.FeishuAlertHeartbeatFailureLimit)
-	// Seedance 视频条件分价配置(JSON,admin 可在「价格配置」可视化编辑)
-	common.OptionMap["SeedanceConditionalRatios"] = common.SeedanceConditionalDefaultJSON()
-	common.SetSeedanceConditionalRatios(common.OptionMap["SeedanceConditionalRatios"])
+	// 通用模型条件分价配置(JSON,admin 在「价格配置」UI 编辑)
+	// family 由各 adapter 通过 common.RegisterConditionalRatioFamily 在 init() 注册,
+	// 默认 JSON 此时已经包含所有已注册族(import 链触发了各 register.go)。
+	common.OptionMap["ConditionalRatios"] = common.ConditionalRatioDefaultJSON()
+	common.SetConditionalRatios(common.OptionMap["ConditionalRatios"])
 	// 首页 4 个 option 的默认值。先写入 common.X 变量,再镜像到 OptionMap。
 	// 这样 service 层读 common.X 即可拿到默认值;DB 有覆盖时由 loadOptionsFromDatabase 改 common.X。
 	common.HomeTestimonials = defaultHomeTestimonialsJSON()
@@ -220,12 +222,43 @@ func LoadOptionsFromDatabase() {
 			common.SysLog("failed to update option map: " + err.Error())
 		}
 	}
+	// 老 SeedanceConditionalRatios option 一次性迁移到通用 ConditionalRatios
+	migrateLegacyConditionalRatios()
 	// 把 ratio/price 类配置从内存 map 重 marshal 回 OptionMap。
 	// 原因:UpdateXxxByJSONString 内部会先把 DB JSON load 进 map,再回填新版本
 	// 默认 entry(避免升级时新模型默认值丢失);但 updateOptionMap 仅把 DB 原始
 	// 字符串塞进 OptionMap,不感知回填。这里统一刷一次,让 admin UI 能看到
 	// backfill 后的完整列表。
 	syncRatioMapsToOptionMap()
+}
+
+// migrateLegacyConditionalRatios 把老的 SeedanceConditionalRatios option 一次性
+// 搬到新的通用 ConditionalRatios option。schema 完全兼容,直接搬 JSON 字符串即可。
+// 操作幂等:迁移完成后老 option 写空,下次启动 / sync 时不再触发。
+func migrateLegacyConditionalRatios() {
+	legacyKey := "SeedanceConditionalRatios"
+	var legacy Option
+	if err := DB.First(&legacy, Option{Key: legacyKey}).Error; err != nil {
+		return // 没有老配置,跳过
+	}
+	if legacy.Value == "" {
+		return // 已经迁移过(被清空)
+	}
+	common.OptionMapRWMutex.RLock()
+	cur := common.OptionMap["ConditionalRatios"]
+	common.OptionMapRWMutex.RUnlock()
+	// 仅当目标为空或仍是注册表默认值时,把 legacy 搬过去——避免覆盖 admin 已经写过的 ConditionalRatios
+	if cur == "" || cur == common.ConditionalRatioDefaultJSON() {
+		if err := UpdateOption("ConditionalRatios", legacy.Value); err != nil {
+			common.SysLog("migrate ConditionalRatios failed: " + err.Error())
+			return
+		}
+		common.SysLog("migrated SeedanceConditionalRatios -> ConditionalRatios")
+	}
+	// 无论是否覆盖目标,都清空 legacy(写空保留行),避免后续重复触发
+	if err := UpdateOption(legacyKey, ""); err != nil {
+		common.SysLog("clear SeedanceConditionalRatios failed: " + err.Error())
+	}
 }
 
 // syncRatioMapsToOptionMap 让 OptionMap 与内存 ratio_setting map 保持一致。
@@ -615,8 +648,8 @@ func updateOptionMap(key string, value string) (err error) {
 		if v, err := strconv.Atoi(value); err == nil && v > 0 {
 			common.FeishuAlertHeartbeatFailureLimit = v
 		}
-	case "SeedanceConditionalRatios":
-		common.SetSeedanceConditionalRatios(value)
+	case "ConditionalRatios":
+		common.SetConditionalRatios(value)
 	case "HomeStatsSLA":
 		common.HomeStatsSLA = value
 	case "HomeTestimonials":

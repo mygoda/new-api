@@ -126,11 +126,12 @@ var FeishuAlertRelay5xxWindowSeconds = 60
 var FeishuAlertRelay5xxThreshold = 10
 var FeishuAlertHeartbeatFailureLimit = 30
 
-// SeedanceConditionalRatios — Seedance 视频条件分价配置(JSON 字符串)。
-// admin 在「价格配置」UI 可视化编辑每个条件的 enabled / multiplier。
-// 默认值由 InitOptionMap 写入,Schema:
-//   {"enabled":true,"models":{"seedance-1-5-pro":{"silent":{"enabled":true,"multiplier":0.5},...},...}}
-var SeedanceConditionalRatios = ""
+// ConditionalRatios — 通用「模型条件分价」配置(JSON 字符串)。
+// admin 在「价格配置」UI 编辑每个 family/condition 的 enabled / multiplier。
+// 默认值由 InitOptionMap 从 ConditionalRatio 注册表生成,Schema:
+//   {"enabled":true,"models":{"<familyKey>":{"<condKey>":{"enabled":true,"multiplier":0.5},...},...}}
+// 各 family 由 task adapter 在 init() 中通过 RegisterConditionalRatioFamily 注册。
+var ConditionalRatios = ""
 
 // 首页配置 — 全部走 option,前后台可视化编辑
 var HomeStatsSLA = "99.95"
