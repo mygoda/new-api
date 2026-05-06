@@ -95,6 +95,24 @@ type TaskAdaptor struct {
 	baseURL     string
 }
 
+// AdjustBillingOnSubmit 在任务提交后,根据上游请求体里的条件参数(generate_audio /
+// draft / resolution / 输入是否含视频)返回乘子,框架会写入 BillingContext.OtherRatios
+// 并据此重算预扣额度。
+//
+// 仅 Seedance 系列生效;其它 doubao 任务模型(若未来有)走 BaseBilling 默认空实现。
+func (a *TaskAdaptor) AdjustBillingOnSubmit(info *relaycommon.RelayInfo, taskData []byte) map[string]float64 {
+	return computeSeedanceFromTaskBody(info.OriginModelName, taskData)
+}
+
+// AdjustBillingOnComplete 在任务到达终态时调用。Seedance 模型走条件分价路径:
+// 用 totalTokens × baseRatio × ∏OtherRatios × groupRatio 计算实际应扣额度,
+// 让框架的差额结算 (settleTaskBillingOnComplete) 自动补扣或退还。
+//
+// 返回 0 时框架回退到 RecalculateTaskQuotaByTokens(不会应用 OtherRatios)。
+func (a *TaskAdaptor) AdjustBillingOnComplete(task *model.Task, taskInfo *relaycommon.TaskInfo) int {
+	return settleSeedanceQuota(task, taskInfo)
+}
+
 func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 	a.ChannelType = info.ChannelType
 	a.baseURL = info.ChannelBaseUrl
