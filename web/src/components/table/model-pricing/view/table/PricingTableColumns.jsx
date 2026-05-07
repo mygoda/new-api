@@ -230,11 +230,29 @@ export const getPricingTableColumns = ({
     title: t('模型名称'),
     dataIndex: 'model_name',
     render: (text, record, index) => {
-      return renderModelTag(text, {
+      const tag = renderModelTag(text, {
         onClick: () => {
           copyText(text);
         },
       });
+      const cp = record?.conditional_pricing;
+      const hasConditional =
+        cp && Array.isArray(cp.conditions) && cp.conditions.length > 0;
+      if (!hasConditional) return tag;
+      return (
+        <span className='inline-flex items-center gap-1.5 flex-wrap'>
+          {tag}
+          <Tooltip
+            content={t(
+              '同模型不同条件下单价不同(分辨率/Draft/输入是否含视频等),点击行查看详情',
+            )}
+          >
+            <Tag size='small' color='violet' shape='circle'>
+              {t('条件分价')}
+            </Tag>
+          </Tooltip>
+        </span>
+      );
     },
     onFilter: (value, record) =>
       record.model_name.toLowerCase().includes(value.toLowerCase()),

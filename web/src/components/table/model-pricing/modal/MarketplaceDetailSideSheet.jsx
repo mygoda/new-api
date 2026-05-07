@@ -28,6 +28,7 @@ import ModelEndpoints from './components/ModelEndpoints';
 import {
   ModelCapabilities,
   ModelPricingSummary,
+  ModelConditionalPricing,
   ModelSpecifications,
   ModelLongDescription,
 } from './components/MarketplaceCards';
@@ -89,6 +90,7 @@ const MarketplaceDetailSideSheet = ({
               t={t}
             />
             <ModelPricingSummary modelData={modelData} t={t} />
+            <ModelConditionalPricing modelData={modelData} t={t} />
             <ModelSpecifications modelData={modelData} t={t} />
             <ModelLongDescription
               longDescription={modelData.long_description}

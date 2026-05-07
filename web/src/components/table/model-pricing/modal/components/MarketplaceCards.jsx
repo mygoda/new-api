@@ -188,6 +188,125 @@ const PriceCell = ({ label, value, unit }) => (
   </div>
 );
 
+// === 条件分价卡(仅命中已注册 family 且启用时由后端 conditional_pricing 字段下发)===
+//
+// 展示同一模型在不同条件下的折合单价 + 相对基准的折扣百分比。
+// 客户能直观看到"我用 720p 含视频会便宜 39%,用 1080p 不含视频会贵 11%"。
+const ModelConditionalPricing = ({ modelData, t }) => {
+  const cp = modelData?.conditional_pricing;
+  if (!cp || !Array.isArray(cp.conditions) || cp.conditions.length === 0) {
+    return null;
+  }
+  const isPerRequest = modelData?.quota_type === 1;
+  const baseRatio = modelData?.model_ratio || 0;
+  const basePrice = modelData?.model_price || 0;
+  const perMillion = 2.0;
+
+  // 计算折合单价(按 token 计费用 ratio × 2$/1M;按次用 model_price)
+  const effectivePrice = (mul, enabled) => {
+    if (!enabled || !mul || mul <= 0) return null;
+    if (isPerRequest) {
+      if (basePrice <= 0) return null;
+      return basePrice * mul;
+    }
+    if (baseRatio <= 0) return null;
+    return baseRatio * mul * perMillion;
+  };
+
+  // 相对基准的百分比变化(>0 贵了,<0 便宜了)
+  const deltaPct = (mul) => Math.round((mul - 1) * 100);
+
+  return (
+    <Card className='!rounded-2xl shadow-sm border-0 mb-6'>
+      <div className='flex items-center mb-4'>
+        <Avatar size='small' color='violet' className='mr-2 shadow-md'>
+          <IconActivity size={16} />
+        </Avatar>
+        <div>
+          <Text className='text-lg font-medium'>{t('条件分价')}</Text>
+          <div className='text-xs text-gray-600'>
+            {cp.base_hint || t('单价随请求条件浮动,以下为各条件下的折合参考价')}
+          </div>
+        </div>
+      </div>
+
+      <div className='space-y-2'>
+        {cp.conditions.map((c) => {
+          const eff = effectivePrice(c.multiplier, c.enabled);
+          const pct = c.enabled ? deltaPct(c.multiplier) : null;
+          return (
+            <div
+              key={c.key}
+              className={`flex items-start justify-between gap-3 p-3 rounded-xl border ${
+                c.enabled
+                  ? 'border-slate-200 bg-white'
+                  : 'border-slate-100 bg-slate-50/60 opacity-60'
+              }`}
+            >
+              <div className='flex-1 min-w-0'>
+                <div className='flex items-center gap-2 flex-wrap'>
+                  <span className='text-sm font-medium text-slate-900'>
+                    {c.label || c.key}
+                  </span>
+                  {!c.enabled && (
+                    <Tag size='small' color='grey' shape='circle'>
+                      {t('已停用')}
+                    </Tag>
+                  )}
+                  {c.enabled && pct !== null && pct < 0 && (
+                    <Tag size='small' color='green' shape='circle'>
+                      {`-${Math.abs(pct)}%`}
+                    </Tag>
+                  )}
+                  {c.enabled && pct !== null && pct > 0 && (
+                    <Tag size='small' color='orange' shape='circle'>
+                      {`+${pct}%`}
+                    </Tag>
+                  )}
+                </div>
+                {c.match && (
+                  <div className='text-xs text-slate-500 mt-1'>
+                    {t('匹配条件')}: {c.match}
+                  </div>
+                )}
+                {c.hint && (
+                  <div className='text-xs text-slate-400 mt-0.5'>{c.hint}</div>
+                )}
+              </div>
+
+              <div className='text-right flex-shrink-0'>
+                {eff != null ? (
+                  <>
+                    <div className='text-base font-bold text-orange-500'>
+                      {formatPrice(eff)}
+                    </div>
+                    <div className='text-[10px] text-slate-400'>
+                      {isPerRequest ? `/ ${t('次')}` : '/1M'}
+                    </div>
+                  </>
+                ) : (
+                  <div className='text-xs text-slate-400'>{t('走基准价')}</div>
+                )}
+                {c.enabled && c.multiplier > 0 && (
+                  <div className='text-[10px] text-slate-400 mt-0.5'>
+                    × {c.multiplier.toFixed(3)}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className='mt-3 text-[11px] text-slate-400 leading-relaxed'>
+        {t(
+          '说明:基准价见上方「定价摘要」。折合参考价 = 基准价 × 该条件乘子,实际扣费以账单为准。',
+        )}
+      </div>
+    </Card>
+  );
+};
+
 // === 规格参数卡 ===
 const SpecRow = ({ label, value, last }) => (
   <div
@@ -277,6 +396,7 @@ const ModelLongDescription = ({ longDescription, t }) => {
 export {
   ModelCapabilities,
   ModelPricingSummary,
+  ModelConditionalPricing,
   ModelSpecifications,
   ModelLongDescription,
 };
