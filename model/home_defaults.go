@@ -59,9 +59,9 @@ func defaultHomeFooterJSON() string {
     {
       "title": "产品",
       "links": [
-        { "text": "模型广场", "url": "/models" },
+        { "text": "模型广场", "url": "/marketplace" },
         { "text": "创作中心", "url": "/creation" },
-        { "text": "Playground", "url": "/playground" },
+        { "text": "Playground", "url": "/console/playground" },
         { "text": "价格", "url": "/pricing" }
       ]
     },
@@ -69,21 +69,62 @@ func defaultHomeFooterJSON() string {
       "title": "开发者",
       "links": [
         { "text": "文档", "url": "/docs" },
-        { "text": "API 参考", "url": "/docs/api" },
-        { "text": "SDK", "url": "/docs/sdk" },
-        { "text": "状态页", "url": "/status" }
+        { "text": "控制台", "url": "/console" },
+        { "text": "GitHub", "url": "https://github.com/QuantumNous/new-api" }
       ]
     },
     {
       "title": "公司",
       "links": [
         { "text": "关于我们", "url": "/about" },
-        { "text": "联系商务", "url": "/contact" },
-        { "text": "服务条款", "url": "/terms" },
-        { "text": "隐私政策", "url": "/privacy" }
+        { "text": "用户协议", "url": "/user-agreement" },
+        { "text": "隐私政策", "url": "/privacy-policy" }
       ]
     }
   ],
   "copyright": "© 2026 QuantumNous"
 }`
+}
+
+// defaultHomePricingDealsJSON 返回首页主推优惠模型的默认配置。
+// admin 可在「运营设置 → 首页配置 → 价格优惠」表单中覆盖。
+//
+// 字段:
+//   model:          模型展示名(对应模型表里的 model_name 或自定义文案)
+//   vendor:         厂商徽章("OpenAI" / "Anthropic" / ...)
+//   official_price: 官方公开价(数字,展示用)
+//   our_price:      我方价(数字,可能等于实际计费价,也可能是限时活动价)
+//   unit:           计价单位文案("美元/M tokens (输入)" / "元/M tokens" / "元/张")
+//   tagline:        可选副标题/徽章文案("限时" / "热门" / "本月主推")
+//   highlight:      是否突出展示(中间一张设 true 视觉更醒目)
+func defaultHomePricingDealsJSON() string {
+	return `[
+  {
+    "model": "GPT-4o",
+    "vendor": "OpenAI",
+    "official_price": 5.00,
+    "our_price": 2.50,
+    "unit": "美元/M tokens (输入)",
+    "tagline": "对标官方",
+    "highlight": false
+  },
+  {
+    "model": "Claude Sonnet 4",
+    "vendor": "Anthropic",
+    "official_price": 3.00,
+    "our_price": 1.50,
+    "unit": "美元/M tokens (输入)",
+    "tagline": "本月主推",
+    "highlight": true
+  },
+  {
+    "model": "DeepSeek-V3",
+    "vendor": "DeepSeek",
+    "official_price": 2.00,
+    "our_price": 1.00,
+    "unit": "元/M tokens (输入)",
+    "tagline": "国内首选",
+    "highlight": false
+  }
+]`
 }

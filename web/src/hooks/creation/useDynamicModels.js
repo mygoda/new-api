@@ -8,7 +8,7 @@
 //   - 通过 inferModelSchema 为每个模型推导参数 schema
 
 import { useEffect, useState, useMemo } from 'react';
-import { loadModelsForModality } from '../../services/creation/modelLoader';
+import { loadModelsForModality, clearModelsCache } from '../../services/creation/modelLoader';
 import { inferModelSchema } from '../../constants/creation/models';
 
 export function useDynamicModels(modality) {
@@ -20,6 +20,10 @@ export function useDynamicModels(modality) {
     let cancelled = false;
     setLoading(true);
     setError(null);
+
+    // 用户切到创作中心 tab 时主动清缓存,确保拿到最新的 creation_target 等设置。
+    // 否则 admin 改完后,即便强刷页面,还会命中 in-memory 缓存最长 15 秒。
+    clearModelsCache();
 
     loadModelsForModality(modality)
       .then((list) => {

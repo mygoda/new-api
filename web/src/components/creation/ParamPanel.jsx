@@ -14,7 +14,7 @@ import {
   Button,
   Tooltip,
 } from '@douyinfe/semi-ui';
-import { Dices } from 'lucide-react';
+import { Dices, HelpCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { FIELD } from '../../constants/creation/models';
 import CameraControl from './CameraControl';
@@ -170,9 +170,16 @@ const FieldRow = ({ field, name, value, onChange }) => {
     return (
       <div className='space-y-1.5'>
         {field.type !== 'camera' && (
-          <Text className='!text-[11px] !text-gray-500 !leading-none'>
-            {label}
-          </Text>
+          <div className='flex items-center gap-1'>
+            <Text className='!text-[11px] !text-gray-500 !leading-none'>
+              {label}
+            </Text>
+            {field.help && (
+              <Tooltip content={t(field.help)}>
+                <HelpCircle size={11} className='text-gray-400 cursor-help' />
+              </Tooltip>
+            )}
+          </div>
         )}
         {renderControl()}
       </div>
@@ -182,9 +189,14 @@ const FieldRow = ({ field, name, value, onChange }) => {
   // 行内布局：label 在左，控件在右
   return (
     <div className='flex items-center gap-3'>
-      <Text className='!text-[11px] !text-gray-500 flex-shrink-0 w-16'>
-        {label}
-      </Text>
+      <div className='flex items-center gap-1 flex-shrink-0 w-16'>
+        <Text className='!text-[11px] !text-gray-500'>{label}</Text>
+        {field.help && (
+          <Tooltip content={t(field.help)}>
+            <HelpCircle size={11} className='text-gray-400 cursor-help' />
+          </Tooltip>
+        )}
+      </div>
       <div className='flex-1 min-w-0'>{renderControl()}</div>
     </div>
   );

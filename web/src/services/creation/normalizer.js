@@ -34,13 +34,38 @@ const ratioToSize = (ratio, resolution) => {
 };
 
 function toOpenAIImage(p, schema) {
+  // 火山方舟 Seedream 5.0/4.5/4.0 不支持 n、不支持 seed(只 3.0 支持)。
+  // 数量由 sequential_image_generation + max_images 控制。
+  const isDoubaoSeedream = /seedream/.test((p.model || '').toLowerCase());
+  const isSeedream3 = /seedream-3/.test((p.model || '').toLowerCase());
+
   const body = stripUndefined({
     model: p.model,
     prompt: p.prompt,
-    n: p.n ?? 1,
+    n: !isDoubaoSeedream ? (p.n ?? 1) : undefined, // doubao seedream 不传 n
     size: p.size,
     quality: p.quality,
     style: p.style,
+    // seed 仅 3.0-t2i 支持;其它 doubao seedream 跳过
+    seed:
+      p.seed != null && p.seed >= 0 && (!isDoubaoSeedream || isSeedream3)
+        ? p.seed
+        : undefined,
+    watermark: typeof p.watermark === 'boolean' ? p.watermark : undefined,
+    sequential_image_generation:
+      p.sequential_image_generation === 'auto' || p.sequential_image_generation === 'disabled'
+        ? p.sequential_image_generation
+        : undefined,
+    sequential_image_generation_options:
+      p.sequential_image_generation === 'auto' && p.max_images
+        ? { max_images: p.max_images }
+        : undefined,
+    optimize_prompt_options:
+      p.optimize_prompt_mode && (p.optimize_prompt_mode === 'standard' || p.optimize_prompt_mode === 'fast')
+        ? { mode: p.optimize_prompt_mode }
+        : undefined,
+    // 仅 5.0 lite 支持自定义;其它模型即便传也无害(被忽略)
+    output_format: p.output_format ? p.output_format : undefined,
   });
   // 有上传图 → 走 edits 接口
   if (p.image_first) {
@@ -131,9 +156,15 @@ function toOpenAIVideo(p, schema) {
     cfg_scale: p.cfg_scale,
     mode: p.mode_quality,
     motion_strength: p.motion_strength,
-    camera_fixed: p.camera_preset === 'fixed' ? true : undefined,
-    generate_audio: p.generate_audio,
-    watermark: p.watermark,
+    // 兼容两种字段名:camera_fixed (旧, 来自 camera_preset=fixed) 与 camerafixed (新, 直接 schema 字段)
+    camera_fixed:
+      p.camera_preset === 'fixed' ? true :
+      p.camerafixed === true ? true :
+      p.camerafixed === false ? false : undefined,
+    generate_audio: typeof p.generate_audio === 'boolean' ? p.generate_audio : undefined,
+    watermark: typeof p.watermark === 'boolean' ? p.watermark : undefined,
+    return_last_frame: typeof p.return_last_frame === 'boolean' ? p.return_last_frame : undefined,
+    service_tier: p.service_tier && p.service_tier !== 'default' ? p.service_tier : undefined,
     prompt_optimizer: p.prompt_optimizer,
     fast_pretreatment: p.fast_pretreatment,
     image_last: p.image_last,
@@ -142,6 +173,10 @@ function toOpenAIVideo(p, schema) {
     aspect_ratio: p.aspect_ratio,
     resolution: p.resolution,
     ratio: p.ratio,
+    // doubao adapter 通过 UnmarshalMetadata 读取这两个字段;TaskSubmitReq 顶层
+    // 没有 seed 字段,只放顶层会丢。这里冗余下发保证 adapter 能拿到。
+    seed: p.seed != null && p.seed >= 0 ? p.seed : undefined,
+    duration: p.duration != null ? p.duration : undefined,
   });
 
   // 镜头控制（Kling 专属，后端 kling adapter 取 metadata.camera_control 或在 metadata 中合并）

@@ -110,6 +110,18 @@ migrate_mysql() {
     else
         info "MySQL: home_priority 列已存在，跳过"
     fi
+
+    # 新增 video_input_ratio 列(输入含视频时的乘子,0=禁用)
+    info "MySQL: 检查并新增 models.video_input_ratio 列 ..."
+    local vir_check="SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='models' AND COLUMN_NAME='video_input_ratio';"
+    local vir_exists
+    vir_exists=$(run_in_service mysql sh -c "mysql -uroot -p123456 -N -B new-api -e \"$vir_check\"" 2>/dev/null || echo 0)
+    if [ "${vir_exists:-0}" = "0" ]; then
+        run_in_service mysql sh -c "mysql -uroot -p123456 new-api -e \"ALTER TABLE \\\`models\\\` ADD COLUMN \\\`video_input_ratio\\\` DOUBLE NOT NULL DEFAULT 0;\""
+        info "MySQL: video_input_ratio 列已新增"
+    else
+        info "MySQL: video_input_ratio 列已存在，跳过"
+    fi
 }
 
 migrate_postgres() {

@@ -274,6 +274,19 @@ var defaultModelRatio = map[string]float64{
 	"deepseek-ai/DeepSeek-R1":                 0.8,
 	"deepseek-ai/DeepSeek-V3-0324":            0.8,
 	"deepseek-ai/DeepSeek-V3.1":               0.8,
+
+	// 火山方舟 Seedance 视频模型 — 按 token 计费,token 数 = 时长 × 宽 × 高 × 帧率/1024
+	// 由上游 usage.completion_tokens 字段返回。换算系数:1 ratio = $2/M tokens。
+	// 价格基于火山方舟官方文档(在线推理常规),按 RMB/M token ÷ 7.2(汇率) ÷ 2 反算。
+	// 部分模型按"输入是否含视频/有声/无声/分辨率"分价,这里取主流场景(输入不含视频
+	// 720p/有声),admin 可在「模型管理」覆盖单价或新加 model 名走条件分价。
+	"doubao-seedance-1-0-pro-250528":      1.04, // 15 RMB/M
+	"doubao-seedance-1-0-pro-fast-251015": 0.29, // 4.20 RMB/M
+	"doubao-seedance-1-0-lite-t2v-250428": 0.69, // 10 RMB/M
+	"doubao-seedance-1-0-lite-i2v-250428": 0.69, // 10 RMB/M
+	"doubao-seedance-1-5-pro-251215":      1.11, // 16 RMB/M(有声为基准)
+	"doubao-seedance-2-0-260128":          3.19, // 46 RMB/M(720p/输入不含视频)
+	"doubao-seedance-2-0-fast-260128":     2.57, // 37 RMB/M
 }
 
 var defaultModelPrice = map[string]float64{
@@ -308,6 +321,15 @@ var defaultModelPrice = map[string]float64{
 	"veo-3.0-fast-generate-001":      0.15,
 	"veo-3.1-generate-preview":       0.4,
 	"veo-3.1-fast-generate-preview":  0.15,
+
+	// 火山方舟 Seedream 图像模型 — 按张固定价(USD)。
+	// 组图 (sequential_image_generation=auto) 时由 image_handler 通过
+	// usage.generated_images 自动放大 OtherRatios["n"]。
+	// 价格基于火山方舟官方文档,按 RMB/张 ÷ 7.2 反算到 USD。
+	"doubao-seedream-5-0-260128": 0.031, // 0.22 RMB/张
+	"doubao-seedream-4-5-251128": 0.035, // 0.25 RMB/张
+	"doubao-seedream-4-0-250828": 0.028, // 0.20 RMB/张
+	"doubao-seedream-3-0-t2i":    0.036, // 0.259 RMB/张
 }
 
 var defaultAudioRatio = map[string]float64{
@@ -361,7 +383,19 @@ func ModelPrice2JSONString() string {
 }
 
 func UpdateModelPriceByJSONString(jsonStr string) error {
-	return types.LoadFromJsonStringWithCallback(modelPriceMap, jsonStr, InvalidateExposedDataCache)
+	if err := types.LoadFromJsonStringWithCallback(modelPriceMap, jsonStr, InvalidateExposedDataCache); err != nil {
+		return err
+	}
+	// 回填新版本新增的默认价:DB 上的 ModelPrice JSON 是用户首次保存时的快照,
+	// 后续版本新增的默认 entry 不在 DB 里,LoadFromJsonString reset map 后会丢。
+	// 这里把 default 中存在、当前 map 没有的 key 补回,保证升级时新模型默认价立即生效;
+	// 用户已在 admin UI 改过的 entry 会以 DB 值为准(已存在,不覆盖)。
+	for k, v := range defaultModelPrice {
+		if _, exists := modelPriceMap.Get(k); !exists {
+			modelPriceMap.Set(k, v)
+		}
+	}
+	return nil
 }
 
 // GetModelPrice 返回模型的价格，如果模型不存在则返回-1，false
@@ -391,7 +425,17 @@ func GetModelPrice(name string, printErr bool) (float64, bool) {
 }
 
 func UpdateModelRatioByJSONString(jsonStr string) error {
-	return types.LoadFromJsonStringWithCallback(modelRatioMap, jsonStr, InvalidateExposedDataCache)
+	if err := types.LoadFromJsonStringWithCallback(modelRatioMap, jsonStr, InvalidateExposedDataCache); err != nil {
+		return err
+	}
+	// 同 UpdateModelPriceByJSONString:回填新版本新增的默认 ratio,避免升级时
+	// 新增模型(如 doubao seedance / seedream)默认值被 DB 旧快照盖掉。
+	for k, v := range defaultModelRatio {
+		if _, exists := modelRatioMap.Get(k); !exists {
+			modelRatioMap.Set(k, v)
+		}
+	}
+	return nil
 }
 
 // 处理带有思考预算的模型名称，方便统一定价

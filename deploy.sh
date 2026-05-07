@@ -497,6 +497,76 @@ do_up() {
     info "========================================="
 }
 
+# do_warmup —— 部署完成后给 CDN / 反向代理预热 HTML + 主要静态资源,
+# 避免代码升级 hash 变更后第一个真实用户触发 MISS 回源,卡几秒首屏。
+#
+# 行为:
+#   - 先 poll http://localhost:${PORT}/api/status,等服务自身就绪
+#   - 再用 ${WARMUP_URL} (默认 http://localhost:${PORT}) 拉首页,
+#     从 HTML 里抓 /assets/*.js + *.css,逐个 curl 预热缓存
+#   - WARMUP_URL 一般指向公网 CDN(如 https://www.lovemaas.cn),才能真正命中边缘节点;
+#     未设时默认 localhost,只能把宿主机本地文件 page cache 灌热,效果弱很多。
+#   - 任何一步失败都只 warn,不阻断部署
+do_warmup() {
+    local local_url="http://localhost:${PORT}"
+    local target="${WARMUP_URL:-}"
+
+    # deploy.sh 默认不 source .env;这里专门读取 WARMUP_URL,避免影响其他变量。
+    if [ -z "$target" ] && [ -f "${SCRIPT_DIR}/.env" ]; then
+        target="$(grep -E '^[[:space:]]*WARMUP_URL[[:space:]]*=' "${SCRIPT_DIR}/.env" \
+            | head -1 \
+            | sed -E 's/^[[:space:]]*WARMUP_URL[[:space:]]*=[[:space:]]*//; s/^"(.*)"$/\1/; s/^'\''(.*)'\''$/\1/' \
+            || true)"
+    fi
+    target="${target:-$local_url}"
+
+    info "等待应用就绪 (最多 30s) ..."
+    local ready=0
+    local i
+    for i in $(seq 1 30); do
+        if curl -sf -m 2 "${local_url}/api/status" >/dev/null 2>&1; then
+            ready=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$ready" -ne 1 ]; then
+        warn "应用未在 30s 内就绪,跳过预热(部署本身已成功)"
+        return 0
+    fi
+
+    info "预热静态资源: ${target}"
+    local html
+    # --compressed 让 curl 自己解 gzip/br,避免 grep 命中 null byte
+    html="$(curl -sf -m 5 --compressed "${target}/" 2>/dev/null || true)"
+    if [ -z "$html" ]; then
+        warn "无法获取首页 HTML(${target}/),跳过预热"
+        return 0
+    fi
+
+    # 从 HTML 抓 /assets/*.js + /assets/*.css(去重)
+    local assets
+    assets="$(printf '%s' "$html" \
+        | grep -oE '/assets/[A-Za-z0-9_./-]+\.(js|css)' \
+        | sort -u)"
+
+    local count=0 fail=0 a
+    for a in $assets; do
+        if curl -sf -m 10 -o /dev/null --compressed "${target}${a}"; then
+            count=$((count + 1))
+        else
+            fail=$((fail + 1))
+        fi
+    done
+
+    if [ "$count" -gt 0 ]; then
+        info "预热完成: ${count} 个资源命中"
+    fi
+    if [ "$fail" -gt 0 ]; then
+        warn "预热失败: ${fail} 个资源(可能是 CDN 同步延迟,通常下一次访问会自动回源补齐)"
+    fi
+}
+
 do_run_standalone() {
     local db_dsn
     db_dsn="$(get_db_dsn)"
@@ -595,6 +665,7 @@ do_deploy() {
     do_build
     info "重新生成 docker-compose 配置..."
     do_up
+    do_warmup
 }
 
 do_restart() {

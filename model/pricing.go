@@ -35,6 +35,33 @@ type Pricing struct {
 	EnableGroup            []string                `json:"enable_groups"`
 	SupportedEndpointTypes []constant.EndpointType `json:"supported_endpoint_types"`
 	PricingVersion         string                  `json:"pricing_version,omitempty"`
+	// VideoInputRatio 输入含视频时的乘子。0=禁用(走基准价)。由「模型管理」配置。
+	VideoInputRatio float64 `json:"video_input_ratio,omitempty"`
+	// ConditionalPricing 仅当模型属于已注册的「条件分价」family 且总开关 enabled 时出现。
+	// 用于在前台模型广场详情页展示「同模型不同条件下的价格」,客户能直观看到
+	// generate_audio / draft / 1080p / 含视频输入等条件触发的乘子与折合单价。
+	ConditionalPricing *PricingConditional `json:"conditional_pricing,omitempty"`
+}
+
+// PricingConditional 描述一个模型的条件分价规则集合(展示用)。
+type PricingConditional struct {
+	FamilyKey   string                    `json:"family_key"`   // family 标识(后端契约)
+	FamilyLabel string                    `json:"family_label"` // 展示名,如 "Seedance 2.0"
+	BaseHint    string                    `json:"base_hint"`    // 基准价说明文案
+	Conditions  []PricingConditionalEntry `json:"conditions"`
+}
+
+// PricingConditionalEntry 单条 condition 的展示信息 + 当前生效乘子。
+//
+// Multiplier=0 / Enabled=false 时:此条件不再应用乘子(走基准价)。前端可选择
+// 用「已停用」灰色标签展示,或直接过滤掉。
+type PricingConditionalEntry struct {
+	Key        string  `json:"key"`        // 条件 key
+	Label      string  `json:"label"`      // 展示名
+	Match      string  `json:"match"`      // 匹配条件的人话描述
+	Hint       string  `json:"hint"`       // 来源备注
+	Multiplier float64 `json:"multiplier"` // 当前生效乘子(总开关关闭或本条 disabled 时为 0)
+	Enabled    bool    `json:"enabled"`    // 当前是否启用
 }
 
 type PricingVendor struct {
@@ -56,6 +83,9 @@ var (
 	// 缓存映射：模型名 -> 启用分组 / 计费类型
 	modelEnableGroups     = make(map[string][]string)
 	modelQuotaTypeMap     = make(map[string]int)
+	// modelVideoInputRatio:模型名 -> 输入含视频时的乘子,0 表示禁用。
+	// 由「模型管理」配置,GetPricing 一并刷新,通用计费链路可低开销查询。
+	modelVideoInputRatio  = make(map[string]float64)
 	modelEnableGroupsLock = sync.RWMutex{}
 )
 
@@ -302,6 +332,7 @@ func updatePricing() {
 			pricing.Tags = meta.Tags
 			pricing.VendorID = meta.VendorID
 			pricing.ContextLength = string(meta.ContextLength)
+			pricing.VideoInputRatio = meta.VideoInputRatio
 		}
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
 		if findPrice {
@@ -333,6 +364,8 @@ func updatePricing() {
 			audioCompletionRatio := ratio_setting.GetAudioCompletionRatio(model)
 			pricing.AudioCompletionRatio = &audioCompletionRatio
 		}
+		// 条件分价(仅 Seedance 等已注册 family + 总开关启用时填充)
+		pricing.ConditionalPricing = buildPricingConditional(model)
 		pricingMap = append(pricingMap, pricing)
 	}
 
@@ -345,9 +378,13 @@ func updatePricing() {
 	modelEnableGroupsLock.Lock()
 	modelEnableGroups = make(map[string][]string)
 	modelQuotaTypeMap = make(map[string]int)
+	modelVideoInputRatio = make(map[string]float64)
 	for _, p := range pricingMap {
 		modelEnableGroups[p.ModelName] = p.EnableGroup
 		modelQuotaTypeMap[p.ModelName] = p.QuotaType
+		if p.VideoInputRatio > 0 {
+			modelVideoInputRatio[p.ModelName] = p.VideoInputRatio
+		}
 	}
 	modelEnableGroupsLock.Unlock()
 
@@ -363,4 +400,51 @@ func GetSupportedEndpointMap() map[string]common.EndpointInfo {
 // 需先调用 GetPricing() 触发缓存构建
 func IsModelConfigured(modelName string) bool {
 	return configuredModelSet[modelName]
+}
+
+// GetModelVideoInputRatio 返回模型「输入含视频时的乘子」(0=未配置/禁用)。
+// 由 GetPricing() 刷新内存缓存,通用计费链路 O(1) 查询,不打 DB。
+func GetModelVideoInputRatio(modelName string) float64 {
+	if modelName == "" {
+		return 0
+	}
+	modelEnableGroupsLock.RLock()
+	defer modelEnableGroupsLock.RUnlock()
+	return modelVideoInputRatio[modelName]
+}
+
+// buildPricingConditional 为单个模型查找其所属的条件分价 family,把当前生效的乘子
+// 装进 PricingConditional 返回。模型不属于任何 family 或总开关关闭时返回 nil,
+// 客户端凭 omitempty 决定是否显示。
+//
+// 注意:GetConditionalRatio 在总开关关闭时直接返回 ok=false,这里我们想区分
+// 「总开关关闭(整体不渲染)」和「单条 disabled(渲染但标灰)」。所以同时调
+// ConditionalRatioEnabled() + ListConditionalRatioFamilies()。
+func buildPricingConditional(modelName string) *PricingConditional {
+	if !common.ConditionalRatioEnabled() {
+		return nil
+	}
+	family, ok := common.FindConditionalRatioFamilyByModel(modelName)
+	if !ok {
+		return nil
+	}
+	entries := make([]PricingConditionalEntry, 0, len(family.Conditions))
+	for _, c := range family.Conditions {
+		mul, enabled := common.GetConditionalRatio(family.Key, c.Key)
+		// 即便 disabled 也展示给客户(灰色),让客户知道有这一档
+		entries = append(entries, PricingConditionalEntry{
+			Key:        c.Key,
+			Label:      c.Label,
+			Match:      c.Match,
+			Hint:       c.Hint,
+			Multiplier: mul,
+			Enabled:    enabled,
+		})
+	}
+	return &PricingConditional{
+		FamilyKey:   family.Key,
+		FamilyLabel: family.Label,
+		BaseHint:    family.BaseHint,
+		Conditions:  entries,
+	}
 }

@@ -263,9 +263,30 @@ const PricingCardView = ({
                   <div className='flex items-start space-x-3 flex-1 min-w-0'>
                     {getModelIcon(model)}
                     <div className='flex-1 min-w-0'>
-                      <h3 className='text-lg font-bold text-gray-900 truncate'>
-                        {model.model_name}
-                      </h3>
+                      <div className='flex items-center gap-2 min-w-0'>
+                        <h3 className='text-lg font-bold text-gray-900 truncate min-w-0'>
+                          {model.model_name}
+                        </h3>
+                        {((model.conditional_pricing &&
+                          Array.isArray(model.conditional_pricing.conditions) &&
+                          model.conditional_pricing.conditions.length > 0) ||
+                          Number(model.video_input_ratio) > 0) && (
+                          <Tooltip
+                            content={t(
+                              '同模型不同条件下单价不同(分辨率/Draft/输入是否含视频等),点击查看详情',
+                            )}
+                          >
+                            <Tag
+                              size='small'
+                              color='violet'
+                              shape='circle'
+                              className='!flex-shrink-0'
+                            >
+                              {t('条件分价')}
+                            </Tag>
+                          </Tooltip>
+                        )}
+                      </div>
                       <div className='flex flex-col gap-1 text-xs mt-1'>
                         {formatPriceInfo(priceData, t, siteDisplayType)}
                       </div>

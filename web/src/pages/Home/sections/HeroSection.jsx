@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Input } from '@douyinfe/semi-ui';
+import { Input, Button } from '@douyinfe/semi-ui';
 import { IconCopy } from '@douyinfe/semi-icons';
 
 /**
@@ -44,13 +44,14 @@ export default function HeroSection({ stats, serverAddress, onCopyBaseURL, isLog
             size='large'
             className='!rounded-full'
             suffix={
-              <button
-                className='inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-900 text-white hover:bg-slate-800'
+              <Button
+                theme='solid'
+                type='primary'
+                icon={<IconCopy />}
                 onClick={onCopyBaseURL}
-                title={t('复制 BASE URL')}
-              >
-                <IconCopy />
-              </button>
+                className='!rounded-full'
+                aria-label={t('复制 BASE URL')}
+              />
             }
           />
         </div>

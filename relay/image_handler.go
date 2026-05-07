@@ -117,11 +117,22 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 	if request.N != nil {
 		imageN = *request.N
 	}
+	// 火山方舟 seedream 系列 (sequential_image_generation=auto) 实际生成张数
+	// 由上游 usage.generated_images 决定。优先使用真实张数,而非请求里的 n。
+	if g := usage.(*dto.Usage).GeneratedImages; g > 0 {
+		imageN = uint(g)
+	}
 	if usage.(*dto.Usage).TotalTokens == 0 {
 		usage.(*dto.Usage).TotalTokens = int(imageN)
 	}
 	if usage.(*dto.Usage).PromptTokens == 0 {
 		usage.(*dto.Usage).PromptTokens = int(imageN)
+	}
+	// ModelPrice (按次固定价) 路径下,PromptTokens / TotalTokens 不参与计费,
+	// 必须显式注入 OtherRatios["n"] 才能让组图按真实张数计价。
+	// Ratio 路径下 PromptTokens 已经线性放大,这里跳过避免重复倍乘。
+	if info.PriceData.UsePrice && imageN > 1 {
+		info.PriceData.AddOtherRatio("n", float64(imageN))
 	}
 
 	quality := "standard"

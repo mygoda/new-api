@@ -16,6 +16,7 @@ import NoticeModal from '../../components/layout/NoticeModal';
 
 import HeroSection from './sections/HeroSection';
 import CapabilitiesSection from './sections/CapabilitiesSection';
+import PricingDealsSection from './sections/PricingDealsSection';
 import CreationPromoSection from './sections/CreationPromoSection';
 import QuickStartSection from './sections/QuickStartSection';
 import TestimonialsSection from './sections/TestimonialsSection';
@@ -143,6 +144,8 @@ const Home = () => {
       />
 
       <CapabilitiesSection featured={dashboard?.featured_models} />
+
+      <PricingDealsSection items={dashboard?.pricing_deals} />
 
       <CreationPromoSection />
 

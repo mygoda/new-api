@@ -18,6 +18,7 @@ type HomeDashboard struct {
 	Testimonials    []HomeTestimonial               `json:"testimonials"`
 	FAQ             []HomeFAQItem                   `json:"faq"`
 	Footer          HomeFooter                      `json:"footer"`
+	PricingDeals    []HomePricingDeal               `json:"pricing_deals"`
 }
 
 type HomeStats struct {
@@ -62,6 +63,21 @@ type HomeFooterColumn struct {
 type HomeFooterLink struct {
 	Text string `json:"text"`
 	URL  string `json:"url"`
+}
+
+// HomePricingDeal 首页主推优惠模型卡片。
+//
+// admin 通过 HomePricingDeals option(JSON 数组)配置。official_price 是
+// 公开参考价,our_price 是平台对客户的报价;前端按 our_price/official_price
+// 计算折扣百分比并大字号展示。
+type HomePricingDeal struct {
+	Model         string  `json:"model"`
+	Vendor        string  `json:"vendor"`
+	OfficialPrice float64 `json:"official_price"`
+	OurPrice      float64 `json:"our_price"`
+	Unit          string  `json:"unit"`
+	Tagline       string  `json:"tagline"`
+	Highlight     bool    `json:"highlight"`
 }
 
 // HomeCapabilities 列出页面 Tab 顺序与对应的内部分类标识。
@@ -113,6 +129,7 @@ func buildHomeDashboard() *HomeDashboard {
 		Testimonials:   parseTestimonials(common.HomeTestimonials),
 		FAQ:            parseFAQ(common.HomeFAQ),
 		Footer:         parseFooter(common.HomeFooter),
+		PricingDeals:   parsePricingDeals(common.HomePricingDeals),
 	}
 }
 
@@ -281,6 +298,19 @@ func parseFooter(raw string) HomeFooter {
 	}
 	if out.Columns == nil {
 		out.Columns = []HomeFooterColumn{}
+	}
+	return out
+}
+
+// parsePricingDeals 解析首页价格优惠卡片配置。损坏 / 为空时返回空切片,
+// 不阻塞首页其他模块加载。
+func parsePricingDeals(raw string) []HomePricingDeal {
+	if strings.TrimSpace(raw) == "" {
+		return []HomePricingDeal{}
+	}
+	var out []HomePricingDeal
+	if err := common.UnmarshalJsonStr(raw, &out); err != nil {
+		return []HomePricingDeal{}
 	}
 	return out
 }

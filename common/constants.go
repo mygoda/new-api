@@ -126,11 +126,19 @@ var FeishuAlertRelay5xxWindowSeconds = 60
 var FeishuAlertRelay5xxThreshold = 10
 var FeishuAlertHeartbeatFailureLimit = 30
 
+// ConditionalRatios — 通用「模型条件分价」配置(JSON 字符串)。
+// admin 在「价格配置」UI 编辑每个 family/condition 的 enabled / multiplier。
+// 默认值由 InitOptionMap 从 ConditionalRatio 注册表生成,Schema:
+//   {"enabled":true,"models":{"<familyKey>":{"<condKey>":{"enabled":true,"multiplier":0.5},...},...}}
+// 各 family 由 task adapter 在 init() 中通过 RegisterConditionalRatioFamily 注册。
+var ConditionalRatios = ""
+
 // 首页配置 — 全部走 option,前后台可视化编辑
 var HomeStatsSLA = "99.95"
 var HomeTestimonials = "" // JSON array
 var HomeFAQ = ""          // JSON array
 var HomeFooter = ""       // JSON object
+var HomePricingDeals = "" // JSON array — 首页主推优惠模型清单(model/官方价/我方价/单位/标签)
 var QuotaRemindThreshold = 1000
 var PreConsumedQuota = 500
 

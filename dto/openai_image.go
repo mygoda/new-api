@@ -32,6 +32,15 @@ type ImageRequest struct {
 	WatermarkEnabled json.RawMessage `json:"watermark_enabled,omitempty"`
 	UserId           json.RawMessage `json:"user_id,omitempty"`
 	Image            json.RawMessage `json:"image,omitempty"`
+	// 火山方舟 doubao Seedream / Seedance 等 — 官方文档明确支持的字段,
+	// 用 RawMessage 透传以兼容多种类型(seed 可能是 int 或 -1)。
+	Seed                              json.RawMessage `json:"seed,omitempty"`
+	SequentialImageGeneration         json.RawMessage `json:"sequential_image_generation,omitempty"`
+	SequentialImageGenerationOptions  json.RawMessage `json:"sequential_image_generation_options,omitempty"`
+	OptimizePromptOptions             json.RawMessage `json:"optimize_prompt_options,omitempty"`
+	GuidanceScale                     json.RawMessage `json:"guidance_scale,omitempty"`
+	Stream                            json.RawMessage `json:"stream,omitempty"`
+	Tools                             json.RawMessage `json:"tools,omitempty"`
 	// 用匿名参数接收额外参数
 	Extra map[string]json.RawMessage `json:"-"`
 }

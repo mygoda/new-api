@@ -25,12 +25,12 @@ export default function BottomCTASection({ isLoggedIn }) {
           >
             {isLoggedIn ? t('进入控制台 →') : t('开始免费使用 →')}
           </Link>
-          <a
-            href='mailto:support@quantumnous.com'
+          <Link
+            to='/contact-sales'
             className='px-8 py-3 bg-white border border-slate-200 rounded-full font-medium text-base hover:bg-slate-50 transition text-slate-700'
           >
             {t('联系商务')}
-          </a>
+          </Link>
         </div>
       </div>
     </section>
