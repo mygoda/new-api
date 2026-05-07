@@ -72,10 +72,12 @@ func InitOptionMap() {
 	common.HomeTestimonials = defaultHomeTestimonialsJSON()
 	common.HomeFAQ = defaultHomeFAQJSON()
 	common.HomeFooter = defaultHomeFooterJSON()
+	common.HomePricingDeals = defaultHomePricingDealsJSON()
 	common.OptionMap["HomeStatsSLA"] = common.HomeStatsSLA
 	common.OptionMap["HomeTestimonials"] = common.HomeTestimonials
 	common.OptionMap["HomeFAQ"] = common.HomeFAQ
 	common.OptionMap["HomeFooter"] = common.HomeFooter
+	common.OptionMap["HomePricingDeals"] = common.HomePricingDeals
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
@@ -658,6 +660,8 @@ func updateOptionMap(key string, value string) (err error) {
 		common.HomeFAQ = value
 	case "HomeFooter":
 		common.HomeFooter = value
+	case "HomePricingDeals":
+		common.HomePricingDeals = value
 	case "QuotaPerUnit":
 		common.QuotaPerUnit, _ = strconv.ParseFloat(value, 64)
 	case "SensitiveWords":

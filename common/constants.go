@@ -138,6 +138,7 @@ var HomeStatsSLA = "99.95"
 var HomeTestimonials = "" // JSON array
 var HomeFAQ = ""          // JSON array
 var HomeFooter = ""       // JSON object
+var HomePricingDeals = "" // JSON array — 首页主推优惠模型清单(model/官方价/我方价/单位/标签)
 var QuotaRemindThreshold = 1000
 var PreConsumedQuota = 500
 

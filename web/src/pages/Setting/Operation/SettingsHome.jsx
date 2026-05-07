@@ -39,6 +39,7 @@ export default function SettingsHome(props) {
   const [testimonials, setTestimonials] = useState([]);
   const [faq, setFaq] = useState([]);
   const [footer, setFooter] = useState({ tagline: '', columns: [], copyright: '' });
+  const [deals, setDeals] = useState([]);
 
   const safeParseArray = (s) => {
     if (!s) return [];
@@ -70,6 +71,7 @@ export default function SettingsHome(props) {
       columns: Array.isArray(f.columns) ? f.columns : [],
       copyright: f.copyright || '',
     });
+    setDeals(safeParseArray(opts.HomePricingDeals));
   }, [props.options]);
 
   const submit = async (key, value) => {
@@ -101,7 +103,8 @@ export default function SettingsHome(props) {
           copyright: footer.copyright,
         }),
       );
-      if (ok1 && ok2 && ok3 && ok4) {
+      const ok5 = await submit('HomePricingDeals', JSON.stringify(deals));
+      if (ok1 && ok2 && ok3 && ok4 && ok5) {
         showSuccess(t('首页配置已保存,5 分钟内全站生效(或重启容器立即生效)'));
         props.refresh?.();
       }
@@ -131,6 +134,34 @@ export default function SettingsHome(props) {
     setFaq(next);
   };
   const removeFAQ = (i) => setFaq(faq.filter((_, idx) => idx !== i));
+
+  // ─── 价格优惠卡片操作 ──────────────────────────────────
+  const addDeal = () =>
+    setDeals([
+      ...deals,
+      {
+        model: '',
+        vendor: '',
+        official_price: 0,
+        our_price: 0,
+        unit: '美元/M tokens (输入)',
+        tagline: '',
+        highlight: false,
+      },
+    ]);
+  const updateDeal = (i, patch) => {
+    const next = [...deals];
+    next[i] = { ...next[i], ...patch };
+    setDeals(next);
+  };
+  const removeDeal = (i) => setDeals(deals.filter((_, idx) => idx !== i));
+  const dealDiscountText = (d) => {
+    const o = Number(d.official_price);
+    const x = Number(d.our_price);
+    if (!o || !x || o <= 0 || x < 0 || x > o) return '';
+    const pct = Math.round((1 - x / o) * 100);
+    return pct > 0 ? `≈ 省 ${pct}%(${(x / o) * 10 < 10 ? ((x / o) * 10).toFixed(1) : 10} 折)` : '';
+  };
 
   // ─── Footer 列操作 ────────────────────────────────────
   const addColumn = () =>
@@ -315,6 +346,131 @@ export default function SettingsHome(props) {
                         size='small'
                         icon={<IconDelete />}
                         onClick={() => removeFAQ(i)}
+                      >
+                        {t('删除')}
+                      </Button>
+                    </Col>
+                  </Row>
+                </Card>
+              ))}
+            </Space>
+          </Card>
+
+          {/* 价格优惠卡片 */}
+          <Card style={{ marginTop: 24 }} bordered>
+            <div className='flex items-center justify-between mb-3'>
+              <div>
+                <Typography.Title heading={6} className='!mb-0'>
+                  {t('价格优惠(首页主推)')}
+                </Typography.Title>
+                <Typography.Text type='tertiary' className='!text-xs'>
+                  {t(
+                    '展示在首页 PricingDeals 区。每张卡片对比官方价 vs 我方价,前端会自动算出折扣。建议 3 张,中间一张设为 highlight。',
+                  )}
+                </Typography.Text>
+              </div>
+              <Button icon={<IconPlus />} onClick={addDeal}>
+                {t('新增')}
+              </Button>
+            </div>
+            {deals.length === 0 && (
+              <div className='text-center py-6 text-slate-400 text-sm'>
+                {t('暂无优惠卡片(展示空时该 Section 不渲染)')}
+              </div>
+            )}
+            <Space vertical style={{ width: '100%' }} spacing={12}>
+              {deals.map((d, i) => (
+                <Card key={i} bordered className='!bg-slate-50/40'>
+                  <Row gutter={12}>
+                    <Col xs={24} sm={12}>
+                      <div className='mb-1 text-xs text-slate-500'>{t('模型展示名')}</div>
+                      <input
+                        type='text'
+                        className='w-full px-3 py-2 border border-slate-200 rounded-md text-sm'
+                        value={d.model || ''}
+                        onChange={(e) => updateDeal(i, { model: e.target.value })}
+                        placeholder='GPT-4o'
+                      />
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <div className='mb-1 text-xs text-slate-500'>{t('厂商徽章')}</div>
+                      <input
+                        type='text'
+                        className='w-full px-3 py-2 border border-slate-200 rounded-md text-sm'
+                        value={d.vendor || ''}
+                        onChange={(e) => updateDeal(i, { vendor: e.target.value })}
+                        placeholder='OpenAI'
+                      />
+                    </Col>
+                    <Col xs={12} sm={6}>
+                      <div className='mb-1 mt-2 text-xs text-slate-500'>{t('官方价')}</div>
+                      <input
+                        type='number'
+                        step='0.01'
+                        className='w-full px-3 py-2 border border-slate-200 rounded-md text-sm'
+                        value={d.official_price ?? 0}
+                        onChange={(e) =>
+                          updateDeal(i, { official_price: Number(e.target.value) || 0 })
+                        }
+                      />
+                    </Col>
+                    <Col xs={12} sm={6}>
+                      <div className='mb-1 mt-2 text-xs text-slate-500'>{t('我方价')}</div>
+                      <input
+                        type='number'
+                        step='0.01'
+                        className='w-full px-3 py-2 border border-slate-200 rounded-md text-sm'
+                        value={d.our_price ?? 0}
+                        onChange={(e) =>
+                          updateDeal(i, { our_price: Number(e.target.value) || 0 })
+                        }
+                      />
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <div className='mb-1 mt-2 text-xs text-slate-500'>{t('单位文案')}</div>
+                      <input
+                        type='text'
+                        className='w-full px-3 py-2 border border-slate-200 rounded-md text-sm'
+                        value={d.unit || ''}
+                        onChange={(e) => updateDeal(i, { unit: e.target.value })}
+                        placeholder={t('美元/M tokens (输入)')}
+                      />
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <div className='mb-1 mt-2 text-xs text-slate-500'>
+                        {t('副标题 / 徽章 (可选)')}
+                      </div>
+                      <input
+                        type='text'
+                        className='w-full px-3 py-2 border border-slate-200 rounded-md text-sm'
+                        value={d.tagline || ''}
+                        onChange={(e) => updateDeal(i, { tagline: e.target.value })}
+                        placeholder={t('限时 / 本月主推 / 国内首选')}
+                      />
+                    </Col>
+                    <Col span={24} style={{ marginTop: 12 }}>
+                      <Space>
+                        <label className='inline-flex items-center gap-2 text-sm text-slate-700 select-none cursor-pointer'>
+                          <input
+                            type='checkbox'
+                            checked={!!d.highlight}
+                            onChange={(e) =>
+                              updateDeal(i, { highlight: e.target.checked })
+                            }
+                          />
+                          {t('突出展示(中间高亮卡片)')}
+                        </label>
+                        <Typography.Text type='tertiary' className='!text-xs !ml-2'>
+                          {dealDiscountText(d) || t('请填写有效的官方价 / 我方价')}
+                        </Typography.Text>
+                      </Space>
+                    </Col>
+                    <Col span={24} style={{ marginTop: 12 }}>
+                      <Button
+                        type='danger'
+                        size='small'
+                        icon={<IconDelete />}
+                        onClick={() => removeDeal(i)}
                       >
                         {t('删除')}
                       </Button>

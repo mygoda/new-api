@@ -85,3 +85,46 @@ func defaultHomeFooterJSON() string {
   "copyright": "© 2026 QuantumNous"
 }`
 }
+
+// defaultHomePricingDealsJSON 返回首页主推优惠模型的默认配置。
+// admin 可在「运营设置 → 首页配置 → 价格优惠」表单中覆盖。
+//
+// 字段:
+//   model:          模型展示名(对应模型表里的 model_name 或自定义文案)
+//   vendor:         厂商徽章("OpenAI" / "Anthropic" / ...)
+//   official_price: 官方公开价(数字,展示用)
+//   our_price:      我方价(数字,可能等于实际计费价,也可能是限时活动价)
+//   unit:           计价单位文案("美元/M tokens (输入)" / "元/M tokens" / "元/张")
+//   tagline:        可选副标题/徽章文案("限时" / "热门" / "本月主推")
+//   highlight:      是否突出展示(中间一张设 true 视觉更醒目)
+func defaultHomePricingDealsJSON() string {
+	return `[
+  {
+    "model": "GPT-4o",
+    "vendor": "OpenAI",
+    "official_price": 5.00,
+    "our_price": 2.50,
+    "unit": "美元/M tokens (输入)",
+    "tagline": "对标官方",
+    "highlight": false
+  },
+  {
+    "model": "Claude Sonnet 4",
+    "vendor": "Anthropic",
+    "official_price": 3.00,
+    "our_price": 1.50,
+    "unit": "美元/M tokens (输入)",
+    "tagline": "本月主推",
+    "highlight": true
+  },
+  {
+    "model": "DeepSeek-V3",
+    "vendor": "DeepSeek",
+    "official_price": 2.00,
+    "our_price": 1.00,
+    "unit": "元/M tokens (输入)",
+    "tagline": "国内首选",
+    "highlight": false
+  }
+]`
+}
