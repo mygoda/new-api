@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -87,9 +88,48 @@ func rateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gi
 	}
 }
 
+// staticAssetPath 静态资源(由 vite 产出的 hash 文件名 / 内嵌资源)路径前缀。
+// 走纯文件 serve,不应消耗 web rate budget——SPA 拆 chunk 后单页可能并发拉
+// 几十个 chunks,占用 budget 会很快触发 429,影响真实用户。
+var staticAssetPathPrefixes = []string{
+	"/assets/",
+	"/static/",
+	"/fonts/",
+	"/images/",
+}
+
+// staticAssetPathExacts 单文件静态资源(根目录下),同样豁免限速。
+var staticAssetPathExacts = map[string]struct{}{
+	"/favicon.ico": {},
+	"/logo.png":    {},
+	"/robots.txt": {},
+}
+
+func isStaticAssetPath(path string) bool {
+	if _, ok := staticAssetPathExacts[path]; ok {
+		return true
+	}
+	for _, p := range staticAssetPathPrefixes {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
+}
+
 func GlobalWebRateLimit() func(c *gin.Context) {
 	if common.GlobalWebRateLimitEnable {
-		return rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW")
+		limit := rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW")
+		return func(c *gin.Context) {
+			// 跳过静态资源:vite 拆 chunk 后单页面首屏 + 路由跳转可能瞬间数十个
+			// /assets/*.js 请求,纳入限速会让真实用户 5xx/429。这些是只读公开资源,
+			// 通过 hash 文件名 + 7 天强缓存防滥用已经足够。
+			if isStaticAssetPath(c.Request.URL.Path) {
+				c.Next()
+				return
+			}
+			limit(c)
+		}
 	}
 	return defNext
 }
