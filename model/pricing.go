@@ -35,6 +35,8 @@ type Pricing struct {
 	EnableGroup            []string                `json:"enable_groups"`
 	SupportedEndpointTypes []constant.EndpointType `json:"supported_endpoint_types"`
 	PricingVersion         string                  `json:"pricing_version,omitempty"`
+	// VideoInputRatio 输入含视频时的乘子。0=禁用(走基准价)。由「模型管理」配置。
+	VideoInputRatio float64 `json:"video_input_ratio,omitempty"`
 	// ConditionalPricing 仅当模型属于已注册的「条件分价」family 且总开关 enabled 时出现。
 	// 用于在前台模型广场详情页展示「同模型不同条件下的价格」,客户能直观看到
 	// generate_audio / draft / 1080p / 含视频输入等条件触发的乘子与折合单价。
@@ -81,6 +83,9 @@ var (
 	// 缓存映射：模型名 -> 启用分组 / 计费类型
 	modelEnableGroups     = make(map[string][]string)
 	modelQuotaTypeMap     = make(map[string]int)
+	// modelVideoInputRatio:模型名 -> 输入含视频时的乘子,0 表示禁用。
+	// 由「模型管理」配置,GetPricing 一并刷新,通用计费链路可低开销查询。
+	modelVideoInputRatio  = make(map[string]float64)
 	modelEnableGroupsLock = sync.RWMutex{}
 )
 
@@ -327,6 +332,7 @@ func updatePricing() {
 			pricing.Tags = meta.Tags
 			pricing.VendorID = meta.VendorID
 			pricing.ContextLength = string(meta.ContextLength)
+			pricing.VideoInputRatio = meta.VideoInputRatio
 		}
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
 		if findPrice {
@@ -372,9 +378,13 @@ func updatePricing() {
 	modelEnableGroupsLock.Lock()
 	modelEnableGroups = make(map[string][]string)
 	modelQuotaTypeMap = make(map[string]int)
+	modelVideoInputRatio = make(map[string]float64)
 	for _, p := range pricingMap {
 		modelEnableGroups[p.ModelName] = p.EnableGroup
 		modelQuotaTypeMap[p.ModelName] = p.QuotaType
+		if p.VideoInputRatio > 0 {
+			modelVideoInputRatio[p.ModelName] = p.VideoInputRatio
+		}
 	}
 	modelEnableGroupsLock.Unlock()
 
@@ -390,6 +400,17 @@ func GetSupportedEndpointMap() map[string]common.EndpointInfo {
 // 需先调用 GetPricing() 触发缓存构建
 func IsModelConfigured(modelName string) bool {
 	return configuredModelSet[modelName]
+}
+
+// GetModelVideoInputRatio 返回模型「输入含视频时的乘子」(0=未配置/禁用)。
+// 由 GetPricing() 刷新内存缓存,通用计费链路 O(1) 查询,不打 DB。
+func GetModelVideoInputRatio(modelName string) float64 {
+	if modelName == "" {
+		return 0
+	}
+	modelEnableGroupsLock.RLock()
+	defer modelEnableGroupsLock.RUnlock()
+	return modelVideoInputRatio[modelName]
 }
 
 // buildPricingConditional 为单个模型查找其所属的条件分价 family,把当前生效的乘子

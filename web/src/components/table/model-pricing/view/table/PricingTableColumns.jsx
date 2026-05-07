@@ -237,7 +237,8 @@ export const getPricingTableColumns = ({
       });
       const cp = record?.conditional_pricing;
       const hasConditional =
-        cp && Array.isArray(cp.conditions) && cp.conditions.length > 0;
+        (cp && Array.isArray(cp.conditions) && cp.conditions.length > 0) ||
+        Number(record?.video_input_ratio) > 0;
       if (!hasConditional) return tag;
       return (
         <span className='inline-flex items-center gap-1.5 flex-wrap'>

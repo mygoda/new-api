@@ -93,6 +93,12 @@ type Model struct {
 	// 首页推荐优先级。0 = 不推荐(natural order),数字越大越靠前。
 	// 用于 /api/home/dashboard 筛选「能力 Tabs」中每个 capability 的精选模型。
 	HomePriority int            `json:"home_priority" gorm:"default:0;index"`
+	// VideoInputRatio 输入含视频时的乘子。0 = 禁用(走基准价)。
+	//   触发条件:OpenAI 兼容 messages[].content[].type == "video_url"
+	//   或 task body 的 content 数组中包含 video_url 类型项
+	// 例如 doubao-seed-2-0-pro 这类多模态聊天模型,输入含视频按 1.5× 计费,
+	// admin 在「模型管理」编辑表单中配置即可,无需改代码。
+	VideoInputRatio float64    `json:"video_input_ratio" gorm:"default:0"`
 	Status       int            `json:"status" gorm:"default:1"`
 	SyncOfficial int            `json:"sync_official" gorm:"default:1"`
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`

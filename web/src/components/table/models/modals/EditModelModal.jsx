@@ -155,6 +155,7 @@ const EditModelModal = (props) => {
     endpoints: '',
     creation_target: '',
     home_priority: 0,
+    video_input_ratio: 0,
     name_rule: props.editingModel?.model_name ? 0 : undefined, // 通过未配置模型过来的固定为精确匹配
     status: true,
     sync_official: true,
@@ -579,6 +580,21 @@ const EditModelModal = (props) => {
                       style={{ width: '100%' }}
                       extraText={t(
                         '0 = 不推荐(自然顺序);数字越大,在首页「能力 Tabs」越靠前。每个能力(对话/图像/视频/代码/音频/向量) 各取前 6 个。',
+                      )}
+                    />
+                  </Col>
+                  <Col span={24}>
+                    <Form.InputNumber
+                      field='video_input_ratio'
+                      label={t('视频输入加价乘子')}
+                      placeholder='0'
+                      min={0}
+                      max={20}
+                      step={0.1}
+                      precision={4}
+                      style={{ width: '100%' }}
+                      extraText={t(
+                        '0 = 禁用(走基准价);>0 = 当用户请求体含 video_url 时,实际扣费 = 基准价 × 此乘子。例如豆包 doubao-seed-2-0-pro 视频输入约比纯文本贵 1.5 倍,这里填 1.5。',
                       )}
                     />
                   </Col>

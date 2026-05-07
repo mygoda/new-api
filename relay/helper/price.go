@@ -194,6 +194,14 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 	if common.DebugEnabled {
 		println(fmt.Sprintf("model_price_helper result: %s", priceData.ToSetting()))
 	}
+	// 「输入含视频」加价:模型在 model.VideoInputRatio 配置 + 请求体含 video_url 时
+	// 把乘子写入 priceData.OtherRatios["video_input"]。文本路径的 PreConsume 不会
+	// 自动应用 OtherRatios,这里立即放大 QuotaToPreConsume,避免用户预扣不足
+	// (text_quota.go 终态结算会自动 ×OtherRatios)。
+	ApplyVideoInputRatioFromRequest(c, info, &priceData)
+	if r, ok := priceData.OtherRatios["video_input"]; ok && r > 0 && priceData.QuotaToPreConsume > 0 {
+		priceData.QuotaToPreConsume = int(float64(priceData.QuotaToPreConsume) * r)
+	}
 	info.PriceData = priceData
 	return priceData, nil
 }
@@ -243,6 +251,11 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 		Quota:          quota,
 		GroupRatioInfo: groupRatioInfo,
 	}
+
+	// 「输入含视频」加价:对按次计费(MJ / Task)同样适用;只写 OtherRatios,
+	// task 路径的 OtherRatios → Quota 统一乘法循环会处理 Quota 放大,
+	// 避免在此处与 task 循环双重相乘。
+	ApplyVideoInputRatioFromRequest(c, info, &priceData)
 
 	return priceData, nil
 }
