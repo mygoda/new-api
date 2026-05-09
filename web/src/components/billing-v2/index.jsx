@@ -27,13 +27,14 @@ import DetailsTab from './tabs/DetailsTab';
 export default function BillingV2Page() {
   const { t } = useTranslation();
 
-  // 全局筛选状态(period + 模型 + token),所有 Tab 共享
+  // 全局筛选状态(period + 模型 + 令牌),所有 Tab 共享。
+  // modelNames / tokenNames 为多选数组,空数组 = 不筛。
   const [filter, setFilter] = useState({
     period: 'month', // month | today | 7d | 30d | custom
     startTime: '',
     endTime: '',
-    modelName: '',
-    tokenName: '',
+    modelNames: [],
+    tokenNames: [],
   });
 
   const [activeTab, setActiveTab] = useState('model');
@@ -55,14 +56,20 @@ export default function BillingV2Page() {
     window.history.replaceState(null, '', newUrl);
   };
 
-  // 共享给所有 Tab 的 query params
+  // 共享给所有 Tab 的 query params(plain object,数组字段在 fetch 时序列化为
+  // 重复参数 ?model_name=a&model_name=b)。useMemo 让引用稳定,Tab 内部
+  // 用 JSON.stringify 做 useEffect 依赖。
   const queryParams = useMemo(() => {
     const p = { period: filter.period };
-    if (filter.modelName) p.model_name = filter.modelName;
-    if (filter.tokenName) p.token_name = filter.tokenName;
     if (filter.period === 'custom' && filter.startTime && filter.endTime) {
       p.start_time = filter.startTime;
       p.end_time = filter.endTime;
+    }
+    if (filter.modelNames && filter.modelNames.length > 0) {
+      p.model_name = filter.modelNames;
+    }
+    if (filter.tokenNames && filter.tokenNames.length > 0) {
+      p.token_name = filter.tokenNames;
     }
     return p;
   }, [filter]);
@@ -86,7 +93,7 @@ export default function BillingV2Page() {
         <Tabs.TabPane tab={t('按时间')} itemKey='time'>
           <ByTimeTab queryParams={queryParams} />
         </Tabs.TabPane>
-        <Tabs.TabPane tab={t('按 Token')} itemKey='token'>
+        <Tabs.TabPane tab={t('按令牌')} itemKey='token'>
           <ByTokenTab queryParams={queryParams} />
         </Tabs.TabPane>
         <Tabs.TabPane tab={t('异常请求')} itemKey='anomaly'>

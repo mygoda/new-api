@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { API, showError } from '../../../helpers';
 import { renderQuota } from '../../../helpers/render';
 import { vendorOf } from '../../../constants/billing/vendor-groups';
+import { buildQueryString } from '../queryUtils';
 
 /**
  * 「流水明细」Tab。
@@ -29,11 +30,11 @@ export default function DetailsTab({ queryParams }) {
     (async () => {
       setLoading(true);
       try {
-        const qs = new URLSearchParams({
+        const qs = buildQueryString({
           ...queryParams,
           page: String(page),
           page_size: String(pageSize),
-        }).toString();
+        });
         const res = await API.get(`/api/billing/v2/details?${qs}`);
         if (!alive) return;
         if (res.data?.success) {
@@ -74,7 +75,7 @@ export default function DetailsTab({ queryParams }) {
         );
       },
     },
-    { title: 'Token', dataIndex: 'token_name', width: 130, render: (n) => n || 'default' },
+    { title: t('令牌'), dataIndex: 'token_name', width: 130, render: (n) => n || 'default' },
     {
       title: t('输入/输出'),
       width: 130,

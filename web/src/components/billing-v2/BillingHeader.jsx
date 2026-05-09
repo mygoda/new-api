@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { API, showError } from '../../helpers';
 import { renderQuota } from '../../helpers/render';
+import { buildQueryString } from './queryUtils';
 
 const { Text } = Typography;
 
@@ -23,20 +24,53 @@ const PERIODS = [
 /**
  * 顶部:筛选栏 + 4 张总览卡。
  *
+ * 筛选支持模糊搜索 + 多选(模型 / 令牌),候选项来自用户最近 30 天用过的内容
+ * (走 breakdown 接口取),Select 内置 client-side filter 做模糊匹配。
+ *
  * 4 张卡数据来自 /api/billing/v2/overview,filter 变化时自动 refetch。
- * 同比增长 %:同一 period 长度的上一窗口对比。
  */
 export default function BillingHeader({ filter, setFilter, queryParams }) {
   const { t } = useTranslation();
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // 候选项(用过的模型 / 令牌列表),供 Select 的 optionList
+  const [modelOptions, setModelOptions] = useState([]);
+  const [tokenOptions, setTokenOptions] = useState([]);
+
+  // 拉一次最近 30 天用过的模型 / 令牌列表作为 Select 候选
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [mRes, tRes] = await Promise.all([
+          API.get('/api/billing/v2/breakdown?period=30d&dim=model&top=200'),
+          API.get('/api/billing/v2/breakdown?period=30d&dim=token&top=200'),
+        ]);
+        if (!alive) return;
+        const ms = (mRes.data?.data?.items || [])
+          .filter((i) => i.key && i.key !== '__others__')
+          .map((i) => ({ value: i.label, label: i.label }));
+        const ts = (tRes.data?.data?.items || [])
+          .filter((i) => i.key && i.key !== '__others__')
+          .map((i) => ({ value: i.label, label: i.label || 'default' }));
+        setModelOptions(ms);
+        setTokenOptions(ts);
+      } catch (e) {
+        // 不阻塞总览数据加载
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   useEffect(() => {
     let alive = true;
     const fetchData = async () => {
       setLoading(true);
       try {
-        const qs = new URLSearchParams(queryParams).toString();
+        const qs = buildQueryString(queryParams);
         const res = await API.get(`/api/billing/v2/overview?${qs}`);
         if (!alive) return;
         if (res.data?.success) {
@@ -104,24 +138,38 @@ export default function BillingHeader({ filter, setFilter, queryParams }) {
               />
             </div>
           )}
-          <div className='flex items-center gap-2 flex-1 min-w-[160px]'>
+          <div className='flex items-center gap-2 flex-1 min-w-[260px]'>
             <Text type='tertiary' size='small'>{t('模型')}</Text>
-            <input
-              type='text'
-              className='px-3 py-1.5 border border-slate-200 rounded-md text-sm flex-1 max-w-[260px]'
-              placeholder={t('模糊匹配,留空 = 全部')}
-              value={filter.modelName}
-              onChange={(e) => setFilter({ ...filter, modelName: e.target.value })}
+            <Select
+              multiple
+              filter
+              maxTagCount={2}
+              showRestTagsPopover
+              placeholder={t('搜索 / 多选,留空 = 全部')}
+              value={filter.modelNames}
+              onChange={(v) => setFilter({ ...filter, modelNames: v || [] })}
+              optionList={modelOptions}
+              emptyContent={
+                modelOptions.length === 0 ? t('暂无候选模型') : t('无匹配结果')
+              }
+              style={{ flex: 1, maxWidth: 360 }}
             />
           </div>
-          <div className='flex items-center gap-2 flex-1 min-w-[160px]'>
-            <Text type='tertiary' size='small'>Token</Text>
-            <input
-              type='text'
-              className='px-3 py-1.5 border border-slate-200 rounded-md text-sm flex-1 max-w-[260px]'
-              placeholder={t('Token 名称,留空 = 全部')}
-              value={filter.tokenName}
-              onChange={(e) => setFilter({ ...filter, tokenName: e.target.value })}
+          <div className='flex items-center gap-2 flex-1 min-w-[260px]'>
+            <Text type='tertiary' size='small'>{t('令牌')}</Text>
+            <Select
+              multiple
+              filter
+              maxTagCount={2}
+              showRestTagsPopover
+              placeholder={t('搜索 / 多选,留空 = 全部')}
+              value={filter.tokenNames}
+              onChange={(v) => setFilter({ ...filter, tokenNames: v || [] })}
+              optionList={tokenOptions}
+              emptyContent={
+                tokenOptions.length === 0 ? t('暂无候选令牌') : t('无匹配结果')
+              }
+              style={{ flex: 1, maxWidth: 360 }}
             />
           </div>
         </div>

@@ -96,7 +96,7 @@ export default function ByModelTab({ queryParams }) {
       render: (n) => Number(n).toLocaleString(),
     },
     {
-      title: t('Token'),
+      title: 'Tokens',
       dataIndex: 'total_tokens',
       width: 100,
       render: (n) => Number(n).toLocaleString(),

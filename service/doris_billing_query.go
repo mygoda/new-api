@@ -12,10 +12,14 @@ type BillingFilter struct {
 	UserIds   []int // for dealer: query multiple sub-user IDs
 	TokenId   int
 	TokenName string
-	ModelName string
-	ChannelId int
-	StartTime string // "2006-01-02 15:04:05"
-	EndTime   string
+	// TokenNames 多选(精确 IN);非空时优先于 TokenName 单值。
+	TokenNames []string
+	ModelName  string
+	// ModelNames 多选(精确 IN);非空时优先于 ModelName(LIKE)。
+	ModelNames []string
+	ChannelId  int
+	StartTime  string // "2006-01-02 15:04:05"
+	EndTime    string
 }
 
 type BillingQueryResult struct {
@@ -66,11 +70,27 @@ func buildBillingWhere(filter BillingFilter) (string, []interface{}) {
 		conditions = append(conditions, "token_id = ?")
 		args = append(args, filter.TokenId)
 	}
-	if filter.TokenName != "" {
+	// 多选优先,精确 IN;否则单值兜底(精确 =)。
+	if len(filter.TokenNames) > 0 {
+		placeholders := make([]string, len(filter.TokenNames))
+		for i, n := range filter.TokenNames {
+			placeholders[i] = "?"
+			args = append(args, n)
+		}
+		conditions = append(conditions, "token_name IN ("+strings.Join(placeholders, ",")+")")
+	} else if filter.TokenName != "" {
 		conditions = append(conditions, "token_name = ?")
 		args = append(args, filter.TokenName)
 	}
-	if filter.ModelName != "" {
+	// 多选优先,精确 IN;否则单值兜底(LIKE 模糊)。
+	if len(filter.ModelNames) > 0 {
+		placeholders := make([]string, len(filter.ModelNames))
+		for i, n := range filter.ModelNames {
+			placeholders[i] = "?"
+			args = append(args, n)
+		}
+		conditions = append(conditions, "model_name IN ("+strings.Join(placeholders, ",")+")")
+	} else if filter.ModelName != "" {
 		conditions = append(conditions, "model_name LIKE ?")
 		args = append(args, "%"+filter.ModelName+"%")
 	}

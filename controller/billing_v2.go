@@ -85,15 +85,57 @@ func fmtTime(t time.Time) string {
 
 // userBillingFilter 构造一个仅查询当前用户、并带上时间窗口与可选筛选的 BillingFilter。
 // 由 controller 强制注入 user_id,防止越权读其他用户数据。
+//
+// 多选支持:接受重复参数 model_name=a&model_name=b&token_name=x&token_name=y,
+// 单值也兼容(c.QueryArray 单值时返回 [a],c.Query 取首项)。
 func userBillingFilter(c *gin.Context, start, end time.Time) service.BillingFilter {
 	uid := c.GetInt("id") // gin auth middleware sets this
-	return service.BillingFilter{
+
+	models := dedupNonEmpty(c.QueryArray("model_name"))
+	tokens := dedupNonEmpty(c.QueryArray("token_name"))
+
+	f := service.BillingFilter{
 		UserId:    uid,
-		ModelName: c.Query("model_name"),
-		TokenName: c.Query("token_name"),
 		StartTime: fmtTime(start),
 		EndTime:   fmtTime(end),
 	}
+	switch len(models) {
+	case 0:
+		// noop
+	case 1:
+		f.ModelName = models[0]
+	default:
+		f.ModelNames = models
+	}
+	switch len(tokens) {
+	case 0:
+		// noop
+	case 1:
+		f.TokenName = tokens[0]
+	default:
+		f.TokenNames = tokens
+	}
+	return f
+}
+
+// dedupNonEmpty 去掉空字符串和重复项,保留顺序。
+func dedupNonEmpty(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
 }
 
 // ─── 1. Overview ─────────────────────────────────────────

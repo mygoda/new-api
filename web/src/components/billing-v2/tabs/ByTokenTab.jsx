@@ -32,12 +32,12 @@ export default function ByTokenTab({ queryParams }) {
   const columns = [
     { title: '#', width: 50, render: (_, __, i) => i + 1 },
     {
-      title: t('Token 名称'),
+      title: t('令牌名称'),
       dataIndex: 'label',
       render: (label) => <span className='font-medium'>{label || 'default'}</span>,
     },
     { title: t('调用次数'), dataIndex: 'request_count', width: 110, render: (n) => Number(n).toLocaleString() },
-    { title: t('Token'), dataIndex: 'total_tokens', width: 110, render: (n) => Number(n).toLocaleString() },
+    { title: 'Tokens', dataIndex: 'total_tokens', width: 110, render: (n) => Number(n).toLocaleString() },
     { title: t('消费'), dataIndex: 'quota', width: 130, render: (q) => <span className='font-semibold tabular-nums'>{renderQuota(q, 2)}</span> },
     {
       title: t('占比'),
@@ -60,7 +60,7 @@ export default function ByTokenTab({ queryParams }) {
   return (
     <Card className='!rounded-2xl border-0' shadows='hover'>
       <div className='mb-2 text-sm font-medium'>
-        {t('按 Token 聚合')} · {t('总计')} {renderQuota(total, 2)}
+        {t('按令牌聚合')} · {t('总计')} {renderQuota(total, 2)}
       </div>
       <Table dataSource={items} columns={columns} rowKey='key' pagination={false} size='middle' />
     </Card>

@@ -64,7 +64,7 @@ export default function AnomaliesTab({ queryParams }) {
       ),
     },
     { title: t('模型'), dataIndex: 'model_name' },
-    { title: 'Token', dataIndex: 'token_name', width: 120 },
+    { title: t('令牌'), dataIndex: 'token_name', width: 120 },
     { title: t('Prompt Tokens'), dataIndex: 'prompt_tokens', width: 120, render: (n) => Number(n).toLocaleString() },
     { title: t('消费'), dataIndex: 'quota', width: 110, render: (q) => <span className='font-semibold tabular-nums'>{renderQuota(q, 2)}</span> },
     {

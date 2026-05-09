@@ -100,7 +100,7 @@ export default function ByVendorTab({ queryParams }) {
       ),
     },
     { title: t('调用次数'), dataIndex: 'request_count', width: 110, render: (n) => Number(n).toLocaleString() },
-    { title: t('Token'), dataIndex: 'total_tokens', width: 110, render: (n) => Number(n).toLocaleString() },
+    { title: 'Tokens', dataIndex: 'total_tokens', width: 110, render: (n) => Number(n).toLocaleString() },
     { title: t('消费'), dataIndex: 'quota', width: 120, render: (q) => <span className='font-semibold tabular-nums'>{renderQuota(q, 2)}</span> },
     { title: t('占比'), dataIndex: 'percent', width: 90, render: (p) => `${(p || 0).toFixed(1)}%` },
   ];
