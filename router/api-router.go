@@ -363,6 +363,17 @@ func SetApiRouter(router *gin.Engine) {
 			billingRoute.GET("/self", middleware.UserAuth(), controller.GetBillingRecordsSelf)
 			billingRoute.GET("/summary", middleware.AdminAuth(), controller.GetBillingSummary)
 			billingRoute.GET("/self/summary", middleware.UserAuth(), controller.GetBillingSummarySelf)
+
+			// v2 用户视角账单接口(严格不暴露 channel 字段)
+			billingV2 := billingRoute.Group("/v2")
+			billingV2.Use(middleware.UserAuth())
+			{
+				billingV2.GET("/overview", controller.GetBillingV2Overview)
+				billingV2.GET("/breakdown", controller.GetBillingV2Breakdown)
+				billingV2.GET("/timeseries", controller.GetBillingV2Timeseries)
+				billingV2.GET("/anomalies", controller.GetBillingV2Anomalies)
+				billingV2.GET("/details", controller.GetBillingV2Details)
+			}
 		}
 
 		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
