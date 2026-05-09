@@ -66,11 +66,13 @@ export default function DetailsTab({ queryParams }) {
       render: (model) => {
         const v = vendorOf(model);
         return (
-          <div className='flex items-center gap-2'>
-            <span className='font-medium'>{model}</span>
-            <Tag size='small' color='violet' shape='circle'>
-              {v.label}
-            </Tag>
+          <div className='min-w-0'>
+            <div className='font-medium text-sm break-all leading-tight'>{model}</div>
+            <div className='mt-0.5'>
+              <Tag size='small' color='violet' shape='circle'>
+                {v.label}
+              </Tag>
+            </div>
           </div>
         );
       },

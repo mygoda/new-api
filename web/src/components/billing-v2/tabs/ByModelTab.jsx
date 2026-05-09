@@ -41,7 +41,7 @@ export default function ByModelTab({ queryParams }) {
         state: { hover: { outerRadius: 0.9, stroke: '#000', lineWidth: 1 } },
       },
       legends: { visible: true, orient: 'right', position: 'middle' },
-      label: { visible: true, formatMethod: (text, datum) => datum?.type || '' },
+      label: { visible: false }, // legend 已展示完整名,饼图周围不再叠加 label,避免长模型名被截断
       tooltip: {
         mark: {
           content: [
@@ -80,11 +80,13 @@ export default function ByModelTab({ queryParams }) {
       render: (label) => {
         const v = vendorOf(label);
         return (
-          <div className='flex items-center gap-2'>
-            <span className='font-medium'>{label}</span>
-            <Tag size='small' color='violet' shape='circle'>
-              {v.label}
-            </Tag>
+          <div className='min-w-0'>
+            <div className='font-medium text-sm break-all leading-tight'>{label}</div>
+            <div className='mt-1'>
+              <Tag size='small' color='violet' shape='circle'>
+                {v.label}
+              </Tag>
+            </div>
           </div>
         );
       },

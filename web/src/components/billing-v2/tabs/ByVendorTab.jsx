@@ -68,7 +68,7 @@ export default function ByVendorTab({ queryParams }) {
         state: { hover: { outerRadius: 0.9, stroke: '#000', lineWidth: 1 } },
       },
       legends: { visible: true, orient: 'right', position: 'middle' },
-      label: { visible: true, formatMethod: (text, d) => d?.type || '' },
+      label: { visible: false },
       tooltip: {
         mark: {
           content: [{ key: (d) => d.type, value: (d) => renderQuota(d.value, 2) }],
