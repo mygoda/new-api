@@ -191,12 +191,25 @@ type CreationModelInfo struct {
 //   - 不暴露任何价格、倍率等敏感信息
 //   - 通过 endpoints 字段供前端按模态过滤
 //
+// 过滤规则(2 道关):
+//   1. models.status = 1(模型本身在「模型管理」里启用)
+//   2. abilities 表中至少有一条 enabled=true 的记录(即至少有一个渠道仍在服务)
+//      —— channel 禁用时 UpdateAbilityStatus 会同步把 abilities.enabled 置 false,
+//         这样能保证此处筛选与实际可调用性一致。
+//
 // 鉴权：公开接口，未登录也可访问
 func GetCreationModels(c *gin.Context) {
 	var models []*model.Model
 	if err := model.DB.Where("status = ?", 1).Find(&models).Error; err != nil {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error()})
 		return
+	}
+
+	// 把当前可服务的模型集合(至少有 1 个 enabled ability)放进 set,O(1) 查询
+	enabledNames := model.GetEnabledModels()
+	enabledSet := make(map[string]struct{}, len(enabledNames))
+	for _, n := range enabledNames {
+		enabledSet[n] = struct{}{}
 	}
 
 	// 加载 vendors 用于回填 vendor_name
@@ -208,6 +221,10 @@ func GetCreationModels(c *gin.Context) {
 
 	list := make([]CreationModelInfo, 0, len(models))
 	for _, m := range models {
+		// 没有任何启用渠道的模型,在创作中心展示也无法调用,直接过滤
+		if _, ok := enabledSet[m.ModelName]; !ok {
+			continue
+		}
 		info := CreationModelInfo{
 			ModelName:      m.ModelName,
 			Description:    m.Description,
