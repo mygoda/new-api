@@ -50,7 +50,9 @@ export default function DetailsTab({ queryParams }) {
     return () => {
       alive = false;
     };
-  }, [queryParams, page, pageSize, t]);
+    // 用 JSON.stringify 稳定 object 依赖,避免引用变化触发死循环。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(queryParams), page, pageSize]);
 
   const items = data?.items || [];
   const total = data?.total || 0;

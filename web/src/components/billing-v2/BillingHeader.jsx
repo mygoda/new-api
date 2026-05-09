@@ -54,7 +54,9 @@ export default function BillingHeader({ filter, setFilter, queryParams }) {
     return () => {
       alive = false;
     };
-  }, [queryParams, t]);
+    // 用 JSON 序列化稳定 queryParams object 引用,避免 effect 死循环。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(queryParams)]);
 
   // 同比 / 预测计算(避免除以 0)
   const yoyQuota = useMemo(() => {
