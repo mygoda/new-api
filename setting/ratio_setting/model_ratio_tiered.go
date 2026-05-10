@@ -10,7 +10,7 @@ import (
 )
 
 // ModelRatioTier 表示一个阶梯档位配置。
-// 语义：当本次请求的 prompt_tokens > Threshold 时该档生效；
+// 语义：当本次请求的 prompt_tokens >= Threshold 时该档生效；
 // 若多个档位都满足，选取 Threshold 最大（即档位下标最靠后）的那个。
 // 首档 Threshold 约定为 0（任意请求都会命中，作为基础档）。
 type ModelRatioTier struct {
@@ -125,7 +125,8 @@ func copyAndConvertTiers(modelName string, tiers []ModelRatioTier) []ModelRatioT
 }
 
 // SelectTierByPromptTokens 在已升序排序的 tiers 中选档。
-// 规则：prompt_tokens > tier[i].Threshold 时第 i 档生效；多档同时满足取下标最大者。
+// 规则：prompt_tokens >= tier[i].Threshold 时第 i 档生效；多档同时满足取下标最大者。
+// 首档 Threshold=0，任何 prompt_tokens（含 0）都满足，相当于默认档。
 // tiers 为空时返回 (-1, 零值)，由调用方兜底。
 func SelectTierByPromptTokens(tiers []ModelRatioTier, promptTokens int) (int, ModelRatioTier) {
 	if len(tiers) == 0 {
@@ -133,7 +134,7 @@ func SelectTierByPromptTokens(tiers []ModelRatioTier, promptTokens int) (int, Mo
 	}
 	selected := 0
 	for i := range tiers {
-		if promptTokens > tiers[i].Threshold {
+		if promptTokens >= tiers[i].Threshold {
 			selected = i
 		}
 	}

@@ -20,10 +20,12 @@ func TestSelectTierByPromptTokens(t *testing.T) {
 	}{
 		{"zero prompt", 0, 0, 0.625, 8},
 		{"below first threshold", 1, 0, 0.625, 8},
-		{"exactly at second threshold", 200000, 0, 0.625, 8},
+		{"just below second threshold", 199999, 0, 0.625, 8},
+		{"exactly at second threshold", 200000, 1, 1.25, 8},
 		{"just over second threshold", 200001, 1, 1.25, 8},
 		{"middle tier", 500000, 1, 1.25, 8},
-		{"exactly at third threshold", 1000000, 1, 1.25, 8},
+		{"just below third threshold", 999999, 1, 1.25, 8},
+		{"exactly at third threshold", 1000000, 2, 2.5, 12},
 		{"just over third threshold", 1000001, 2, 2.5, 12},
 		{"way past third threshold", 9999999, 2, 2.5, 12},
 	}

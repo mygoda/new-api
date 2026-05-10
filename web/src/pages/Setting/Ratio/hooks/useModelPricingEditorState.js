@@ -337,14 +337,10 @@ export const validateTiers = (model, t) => {
       );
     }
     if (inputPrice === null || inputPrice <= 0) {
-      errors.push(
-        t('第 {{idx}} 档输入价格必须大于 0', { idx: idx + 1 }),
-      );
+      errors.push(t('第 {{idx}} 档输入价格必须大于 0', { idx: idx + 1 }));
     }
     if (completionPrice === null || completionPrice <= 0) {
-      errors.push(
-        t('第 {{idx}} 档输出价格必须大于 0', { idx: idx + 1 }),
-      );
+      errors.push(t('第 {{idx}} 档输出价格必须大于 0', { idx: idx + 1 }));
     }
     if (threshold !== null) prevThreshold = threshold;
   });
@@ -399,7 +395,11 @@ export const serializeModel = (model, t) => {
     ModelRatioTiered: null,
   };
 
-  if (model.tieredEnabled && Array.isArray(model.tiers) && model.tiers.length > 0) {
+  if (
+    model.tieredEnabled &&
+    Array.isArray(model.tiers) &&
+    model.tiers.length > 0
+  ) {
     const errs = validateTiers(model, t);
     if (errs.length > 0) {
       throw new Error(
@@ -920,12 +920,15 @@ export function useModelPricingEditorState({
           ...EMPTY_TIER,
           threshold: '0',
           inputPrice: hasValue(model.inputPrice) ? model.inputPrice : '',
-          completionPrice: hasValue(model.completionPrice) ? model.completionPrice : '',
+          completionPrice: hasValue(model.completionPrice)
+            ? model.completionPrice
+            : '',
         };
         return {
           ...model,
           tieredEnabled: true,
-          tiers: model.tiers && model.tiers.length > 0 ? model.tiers : [initialTier],
+          tiers:
+            model.tiers && model.tiers.length > 0 ? model.tiers : [initialTier],
         };
       }
       return { ...model, tieredEnabled: false };
@@ -966,6 +969,21 @@ export function useModelPricingEditorState({
         i === index ? { ...tier, [field]: value } : tier,
       ),
     }));
+  };
+
+  // 编辑「第 index 档结束阈值」即编辑「第 index+1 档开始阈值」。
+  const handleTierEndThresholdChange = (index, value) => {
+    if (!selectedModel) return;
+    if (!NUMERIC_INPUT_REGEX.test(value)) return;
+    upsertModel(selectedModel.name, (model) => {
+      if (index + 1 >= model.tiers.length) return model;
+      return {
+        ...model,
+        tiers: model.tiers.map((tier, i) =>
+          i === index + 1 ? { ...tier, threshold: value } : tier,
+        ),
+      };
+    });
   };
 
   const addModel = (modelName) => {
@@ -1161,6 +1179,7 @@ export function useModelPricingEditorState({
     handleAddTier,
     handleDeleteTier,
     handleTierFieldChange,
+    handleTierEndThresholdChange,
     handleSubmit,
     addModel,
     deleteModel,

@@ -45,7 +45,12 @@ const PRICING_OPTION_KEYS = [
 ];
 
 const toNumberOrNull = (value) => {
-  if (value === '' || value === null || value === undefined || value === false) {
+  if (
+    value === '' ||
+    value === null ||
+    value === undefined ||
+    value === false
+  ) {
     return null;
   }
   const num = Number(value);
@@ -165,20 +170,17 @@ export default function ConfigurePriceModal({
     }
   }, [visible, modelName, loadPricingData]);
 
-  const handleNumericFieldChange = useCallback(
-    (field, value) => {
-      if (!NUMERIC_INPUT_REGEX.test(value)) return;
-      setModelState((prev) => {
-        if (!prev) return prev;
-        const updated = { ...prev, [field]: value };
-        if (field === 'inputPrice') {
-          return fillDerivedPricesFromBase(updated, value);
-        }
-        return updated;
-      });
-    },
-    [],
-  );
+  const handleNumericFieldChange = useCallback((field, value) => {
+    if (!NUMERIC_INPUT_REGEX.test(value)) return;
+    setModelState((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, [field]: value };
+      if (field === 'inputPrice') {
+        return fillDerivedPricesFromBase(updated, value);
+      }
+      return updated;
+    });
+  }, []);
 
   const handleBillingModeChange = useCallback((value) => {
     setModelState((prev) => (prev ? { ...prev, billingMode: value } : prev));
@@ -193,27 +195,24 @@ export default function ConfigurePriceModal({
     [toggles, modelState],
   );
 
-  const handleOptionalFieldToggle = useCallback(
-    (field, checked) => {
-      setToggles((prev) => ({ ...prev, [field]: checked }));
-      if (!checked) {
-        setModelState((prev) => {
-          if (!prev) return prev;
-          const next = { ...prev, [field]: '' };
-          if (field === 'audioInputPrice') {
-            next.audioOutputPrice = '';
-            setToggles((p) => ({
-              ...p,
-              audioInputPrice: false,
-              audioOutputPrice: false,
-            }));
-          }
-          return next;
-        });
-      }
-    },
-    [],
-  );
+  const handleOptionalFieldToggle = useCallback((field, checked) => {
+    setToggles((prev) => ({ ...prev, [field]: checked }));
+    if (!checked) {
+      setModelState((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev, [field]: '' };
+        if (field === 'audioInputPrice') {
+          next.audioOutputPrice = '';
+          setToggles((p) => ({
+            ...p,
+            audioInputPrice: false,
+            audioOutputPrice: false,
+          }));
+        }
+        return next;
+      });
+    }
+  }, []);
 
   const handleTieredToggle = useCallback((checked) => {
     setModelState((prev) => {
@@ -269,6 +268,23 @@ export default function ConfigurePriceModal({
     });
   }, []);
 
+  // 编辑「第 index 档的结束阈值」实际等价于编辑「第 index+1 档的开始阈值」。
+  // 末档没有下一档，结束阈值显示「无上限」并禁用，不会调到这里。
+  const handleTierEndThresholdChange = useCallback((index, value) => {
+    if (!NUMERIC_INPUT_REGEX.test(value)) return;
+    setModelState((prev) => {
+      if (!prev) return prev;
+      const tiers = Array.isArray(prev.tiers) ? prev.tiers : [];
+      if (index + 1 >= tiers.length) return prev;
+      return {
+        ...prev,
+        tiers: tiers.map((tier, i) =>
+          i === index + 1 ? { ...tier, threshold: value } : tier,
+        ),
+      };
+    });
+  }, []);
+
   const handleTierFieldChange = useCallback((index, field, value) => {
     if (!NUMERIC_INPUT_REGEX.test(value)) return;
     setModelState((prev) => {
@@ -284,10 +300,7 @@ export default function ConfigurePriceModal({
   }, []);
 
   const warnings = useMemo(
-    () => [
-      ...getModelWarnings(modelState, t),
-      ...validateTiers(modelState, t),
-    ],
+    () => [...getModelWarnings(modelState, t), ...validateTiers(modelState, t)],
     [modelState, t],
   );
 
@@ -439,7 +452,9 @@ export default function ConfigurePriceModal({
               value={modelState.fixedPrice}
               placeholder={t('输入每次调用价格')}
               suffix={t('$/次')}
-              onChange={(value) => handleNumericFieldChange('fixedPrice', value)}
+              onChange={(value) =>
+                handleNumericFieldChange('fixedPrice', value)
+              }
               extraText={t('适合 MJ / 任务类等按次收费模型。')}
             />
           ) : (
@@ -708,17 +723,36 @@ export default function ConfigurePriceModal({
                           }}
                         >
                           <PriceInput
-                            label={t('阈值（prompt tokens）')}
-                            value={tier.threshold}
+                            label={t('开始阈值（prompt tokens）')}
+                            value={idx === 0 ? '0' : tier.threshold}
                             placeholder={
-                              idx === 0
-                                ? '0'
-                                : t('如 200000 表示 >200K 时生效')
+                              idx === 0 ? '0' : t('如 32000 表示 ≥32K 时生效')
                             }
                             suffix='tokens'
                             disabled={idx === 0}
                             onChange={(value) =>
                               handleTierFieldChange(idx, 'threshold', value)
+                            }
+                          />
+                          <PriceInput
+                            label={t('结束阈值（prompt tokens）')}
+                            value={
+                              idx === (modelState.tiers || []).length - 1
+                                ? ''
+                                : ((modelState.tiers || [])[idx + 1]
+                                    ?.threshold ?? '')
+                            }
+                            placeholder={
+                              idx === (modelState.tiers || []).length - 1
+                                ? t('无上限')
+                                : t('如 64000 表示该档覆盖到 64K')
+                            }
+                            suffix='tokens'
+                            disabled={
+                              idx === (modelState.tiers || []).length - 1
+                            }
+                            onChange={(value) =>
+                              handleTierEndThresholdChange(idx, value)
                             }
                           />
                           <PriceInput
