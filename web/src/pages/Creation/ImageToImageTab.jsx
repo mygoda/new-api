@@ -233,6 +233,37 @@ const ImageToImageTab = () => {
       return;
     }
 
+    // OpenAI /v1/images/edits 强制 multipart/form-data。
+    // 把 normalizer 输出的 JSON body 改写成 FormData：
+    //   - 参考图 URL → fetch → Blob → FormData("image", blob)
+    //   - 其它字段（model/prompt/n/size/quality 等）原样 append
+    //   - axios 检测到 FormData 会自动设 Content-Type: multipart/form-data; boundary=...
+    if (
+      req.url === '/v1/images/edits' &&
+      imageRef &&
+      !(req.body instanceof FormData)
+    ) {
+      try {
+        const fetchRes = await fetch(imageRef);
+        if (!fetchRes.ok) {
+          throw new Error(`HTTP ${fetchRes.status}`);
+        }
+        const blob = await fetchRes.blob();
+        const fd = new FormData();
+        for (const [k, v] of Object.entries(req.body || {})) {
+          if (k === 'image') continue;
+          if (v === undefined || v === null || v === '') continue;
+          fd.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+        }
+        const ext = (blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+        fd.append('image', blob, `image.${ext}`);
+        req.body = fd;
+      } catch (e) {
+        Toast.error(`${t('参考图加载失败')}: ${e.message || e}`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     debug.setRequest(req);
     const placeholderId = genId();
