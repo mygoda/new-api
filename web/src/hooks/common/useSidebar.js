@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useState, useEffect, useMemo, useContext, useRef } from 'react';
 import { StatusContext } from '../../context/Status';
-import { API } from '../../helpers';
+import { API, isAdmin } from '../../helpers';
 
 // 创建一个全局事件系统来同步所有useSidebar实例
 const sidebarEventTarget = new EventTarget();
@@ -277,6 +277,13 @@ export const useSidebar = () => {
 
   // 检查特定功能是否应该显示
   const isModuleVisible = (sectionKey, moduleKey = null) => {
+    // 管理员默认看到全部菜单，绕过 SidebarModulesAdmin 全局开关与个人设置覆盖。
+    // 设计意图：admin 给普通用户屏蔽某些模块（如使用日志、请求日志）时，
+    // 自己不应被一起屏蔽。admin 看到的「显示某菜单」配置仅作为对其它用户的全局默认。
+    // 注：「钱包管理 / 个人设置」这类用户私域菜单，admin 也属于用户，依然该看到。
+    if (isAdmin()) {
+      return true;
+    }
     if (moduleKey) {
       return finalConfig[sectionKey]?.[moduleKey] === true;
     } else {
@@ -286,6 +293,9 @@ export const useSidebar = () => {
 
   // 检查区域是否有任何可见的功能
   const hasSectionVisibleModules = (sectionKey) => {
+    if (isAdmin()) {
+      return true;
+    }
     const section = finalConfig[sectionKey];
     if (!section?.enabled) return false;
 
@@ -296,6 +306,12 @@ export const useSidebar = () => {
 
   // 获取区域的可见功能列表
   const getVisibleModules = (sectionKey) => {
+    if (isAdmin()) {
+      // admin 全可见：返回 adminConfig 该区域所有键（除 enabled）。
+      const section = adminConfig[sectionKey];
+      if (!section) return [];
+      return Object.keys(section).filter((key) => key !== 'enabled');
+    }
     const section = finalConfig[sectionKey];
     if (!section?.enabled) return [];
 
