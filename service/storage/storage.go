@@ -110,3 +110,9 @@ func newStorage(cs *system_setting.CreationSetting) (Storage, error) {
 		return nil, errors.New("storage: unknown upload driver: " + cs.UploadDriver)
 	}
 }
+
+// NewForTest 用给定配置即时构造一个 storage 实例，不缓存、不影响全局 current。
+// 仅用于 admin「测试上传」校验场景。生产路径请走 Get()。
+func NewForTest(cs *system_setting.CreationSetting) (Storage, error) {
+	return newStorage(cs)
+}

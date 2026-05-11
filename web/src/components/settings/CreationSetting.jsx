@@ -35,39 +35,182 @@ const PREFIX = 'creation_setting.';
 
 // 表单字段定义；boolean 与 number 单独标注
 const FIELDS = [
-  { key: 'enabled', label: '启用创作中心', type: 'bool', help: '关闭后侧边栏菜单隐藏' },
-  { key: 'upload_driver', label: '存储驱动', type: 'select', options: [{ label: 'Local 文件系统', value: 'local' }, { label: 'S3 / S3 兼容', value: 's3' }] },
+  {
+    key: 'enabled',
+    label: '启用创作中心',
+    type: 'bool',
+    help: '关闭后侧边栏菜单隐藏',
+  },
+  {
+    key: 'upload_driver',
+    label: '存储驱动',
+    type: 'select',
+    options: [
+      { label: 'Local 文件系统', value: 'local' },
+      { label: 'S3 / S3 兼容', value: 's3' },
+    ],
+  },
   { key: 'upload_max_file_mb', label: '单文件最大体积 (MB)', type: 'number' },
-  { key: 'upload_daily_quota_mb', label: '单用户每日配额 (MB，<= 0 不限)', type: 'number' },
-  { key: 'cloud_gallery_enabled', label: '启用云端作品库', type: 'bool', help: '开启后作品自动同步到数据库；关闭则仅使用浏览器本地存储' },
+  {
+    key: 'upload_daily_quota_mb',
+    label: '单用户每日配额 (MB，<= 0 不限)',
+    type: 'number',
+  },
+  {
+    key: 'cloud_gallery_enabled',
+    label: '启用云端作品库',
+    type: 'bool',
+    help: '开启后作品自动同步到数据库；关闭则仅使用浏览器本地存储',
+  },
 
   // local
-  { key: 'local_upload_path', label: '本地存储根目录', type: 'text', section: 'local', placeholder: './data/uploads' },
-  { key: 'local_public_base_url', label: '本地对外 URL 前缀（可选）', type: 'text', section: 'local', placeholder: '为空则使用 /api/upload/file/' },
+  {
+    key: 'local_upload_path',
+    label: '本地存储根目录',
+    type: 'text',
+    section: 'local',
+    placeholder: './data/uploads',
+  },
+  {
+    key: 'local_public_base_url',
+    label: '本地对外 URL 前缀（可选）',
+    type: 'text',
+    section: 'local',
+    placeholder: '为空则使用 /api/upload/file/',
+  },
 
   // s3
-  { key: 's3_endpoint', label: 'S3 Endpoint', type: 'text', section: 's3', placeholder: 'https://s3.amazonaws.com（AWS 留空）/ https://oss-cn-hangzhou.aliyuncs.com / https://tos-s3-cn-beijing.volces.com' },
-  { key: 's3_region', label: 'Region', type: 'text', section: 's3', placeholder: 'us-east-1 / cn-beijing 等' },
+  {
+    key: 's3_endpoint',
+    label: 'S3 Endpoint',
+    type: 'text',
+    section: 's3',
+    placeholder:
+      'https://s3.amazonaws.com（AWS 留空）/ https://oss-cn-hangzhou.aliyuncs.com / https://tos-s3-cn-beijing.volces.com',
+  },
+  {
+    key: 's3_region',
+    label: 'Region',
+    type: 'text',
+    section: 's3',
+    placeholder: 'us-east-1 / cn-beijing 等',
+  },
   { key: 's3_bucket', label: 'Bucket', type: 'text', section: 's3' },
-  { key: 's3_access_key_id', label: 'Access Key ID', type: 'text', section: 's3' },
-  { key: 's3_access_key_secret', label: 'Access Key Secret', type: 'password', section: 's3', help: '出于安全考虑当前值不显示。留空保持不变；填入新值后保存即覆盖。' },
-  { key: 's3_use_path_style', label: '使用 Path Style（MinIO/部分私有部署需要）', type: 'bool', section: 's3' },
-  { key: 's3_public_base_url', label: '自定义对外 URL 前缀（CDN）', type: 'text', section: 's3', placeholder: '为空按 endpoint+bucket 拼接' },
-  { key: 's3_key_prefix', label: '对象 Key 前缀', type: 'text', section: 's3', placeholder: 'creation/' },
+  {
+    key: 's3_access_key_id',
+    label: 'Access Key ID',
+    type: 'text',
+    section: 's3',
+  },
+  {
+    key: 's3_access_key_secret',
+    label: 'Access Key Secret',
+    type: 'password',
+    section: 's3',
+    help: '出于安全考虑当前值不显示。留空保持不变；填入新值后保存即覆盖。',
+  },
+  {
+    key: 's3_use_path_style',
+    label: '使用 Path Style（MinIO/部分私有部署需要）',
+    type: 'bool',
+    section: 's3',
+  },
+  {
+    key: 's3_public_base_url',
+    label: '自定义对外 URL 前缀（CDN）',
+    type: 'text',
+    section: 's3',
+    placeholder: '为空按 endpoint+bucket 拼接',
+  },
+  {
+    key: 's3_key_prefix',
+    label: '对象 Key 前缀',
+    type: 'text',
+    section: 's3',
+    placeholder: 'creation/',
+  },
 
   // mirror
-  { key: 'mirror_upstream_urls', label: '镜像上游 URL', type: 'bool', section: 'mirror', help: '可灵 / 火山方舟等返回的视频/图片 URL 一般 24 小时内有效。开启后任务成功时会异步把资源拉到本地存储并回写 URL。默认关闭。' },
-  { key: 'mirror_download_timeout_sec', label: '下载超时（秒）', type: 'number', section: 'mirror' },
-  { key: 'mirror_max_file_mb', label: '最大文件体积（MB）', type: 'number', section: 'mirror' },
+  {
+    key: 'mirror_upstream_urls',
+    label: '镜像上游 URL',
+    type: 'bool',
+    section: 'mirror',
+    help: '可灵 / 火山方舟等返回的视频/图片 URL 一般 24 小时内有效。开启后任务成功时会异步把资源拉到本地存储并回写 URL。默认关闭。',
+  },
+  {
+    key: 'mirror_download_timeout_sec',
+    label: '下载超时（秒）',
+    type: 'number',
+    section: 'mirror',
+  },
+  {
+    key: 'mirror_max_file_mb',
+    label: '最大文件体积（MB）',
+    type: 'number',
+    section: 'mirror',
+  },
 ];
 
 export default function CreationSetting() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [values, setValues] = useState({});
   const [original, setOriginal] = useState({});
   const refForm = React.useRef();
+
+  // 测试上传：用当前表单值（未保存也可测）发到后端构造 storage 跑 Put + Delete
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null); // { ok, message, url, driver }
+
+  const handleTestUpload = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      // 拼请求体：跟 CreationSetting 后端字段一一对应。
+      // s3_access_key_secret 为空时不下发，让后端 fallback 到 DB 里的真值，
+      // 这样 admin 不改 SK 也能测当前已保存的 SK 是否可用。
+      const body = {
+        upload_driver: values.upload_driver || 'local',
+        local_upload_path: values.local_upload_path || '',
+        local_public_base_url: values.local_public_base_url || '',
+        s3_endpoint: values.s3_endpoint || '',
+        s3_region: values.s3_region || '',
+        s3_bucket: values.s3_bucket || '',
+        s3_access_key_id: values.s3_access_key_id || '',
+        s3_public_base_url: values.s3_public_base_url || '',
+        s3_key_prefix: values.s3_key_prefix || '',
+        s3_use_path_style: !!values.s3_use_path_style,
+      };
+      if (values.s3_access_key_secret) {
+        body.s3_access_key_secret = String(values.s3_access_key_secret);
+      }
+      const res = await API.post('/api/option/test/creation_storage', body);
+      const data = res?.data || {};
+      if (data.success) {
+        setTestResult({
+          ok: true,
+          driver: data.driver,
+          url: data.url,
+          message: data.delete_error || t('测试通过：写入成功并已清理测试文件'),
+        });
+      } else {
+        setTestResult({
+          ok: false,
+          message: data.message || t('测试失败'),
+        });
+      }
+    } catch (e) {
+      setTestResult({
+        ok: false,
+        message: e?.response?.data?.message || e?.message || t('请求异常'),
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -98,7 +241,12 @@ export default function CreationSetting() {
       }
       setValues(fixed);
       setOriginal(fixed);
+      // 重要：Semi UI Form 的 initValues 仅在 mount 时生效；后续修改 React state
+      // 不会重渲染表单内容。这里同时调 formApi.setValues 强制刷新，并设 loaded
+      // 标志（首次加载时延迟 mount Form，保证 initValues 就是 DB 里的真值，
+      // 否则刷新页面会看到空表单——即用户反馈"保存后看不到 S3 配置"的根因）。
       refForm.current?.formApi?.setValues?.(fixed);
+      setLoaded(true);
     } catch (e) {
       Toast.error(e?.message || t('加载失败'));
     } finally {
@@ -140,7 +288,9 @@ export default function CreationSetting() {
         API.put('/api/option/', { key: PREFIX + k, value: v }),
       );
       const results = await Promise.allSettled(tasks);
-      const failed = results.filter((r) => r.status === 'rejected' || r.value?.data?.success === false);
+      const failed = results.filter(
+        (r) => r.status === 'rejected' || r.value?.data?.success === false,
+      );
       if (failed.length) {
         Toast.error(t('部分项保存失败'));
       } else {
@@ -162,18 +312,10 @@ export default function CreationSetting() {
       style: { width: '100%' },
     };
     if (f.type === 'bool') {
-      return (
-        <Form.Switch {...common} />
-      );
+      return <Form.Switch {...common} />;
     }
     if (f.type === 'number') {
-      return (
-        <Form.InputNumber
-          {...common}
-          min={0}
-          style={{ width: 200 }}
-        />
-      );
+      return <Form.InputNumber {...common} min={0} style={{ width: 200 }} />;
     }
     if (f.type === 'select') {
       return (
@@ -236,7 +378,9 @@ export default function CreationSetting() {
           closeIcon={null}
           description={
             <span>
-              {t('S3 / S3 兼容存储适配：AWS S3、阿里云 OSS、腾讯云 COS、火山引擎 TOS、MinIO 等。详见')}
+              {t(
+                'S3 / S3 兼容存储适配：AWS S3、阿里云 OSS、腾讯云 COS、火山引擎 TOS、MinIO 等。详见',
+              )}
               <a
                 href='/docs/pm/creation-center-tech-design.md'
                 target='_blank'
@@ -249,21 +393,71 @@ export default function CreationSetting() {
           }
         />
 
-        <Form
-          getFormApi={(api) => (refForm.current = { formApi: api })}
-          initValues={values}
-          onValueChange={(v) => setValues((prev) => ({ ...prev, ...v }))}
-          style={{ marginTop: 16 }}
-        >
-          {renderSection('', null)}
-          {!isS3 && renderSection('本地存储', 'local')}
-          {isS3 && renderSection('S3 / S3 兼容存储', 's3')}
-          {renderSection('上游 URL 镜像', 'mirror')}
+        {loaded && (
+          <Form
+            getFormApi={(api) => (refForm.current = { formApi: api })}
+            initValues={values}
+            onValueChange={(v) => setValues((prev) => ({ ...prev, ...v }))}
+            style={{ marginTop: 16 }}
+          >
+            {renderSection('', null)}
+            {!isS3 && renderSection('本地存储', 'local')}
+            {isS3 && renderSection('S3 / S3 兼容存储', 's3')}
 
-          <Button theme='solid' type='primary' onClick={handleSave} loading={saving}>
-            {t('保存')}
-          </Button>
-        </Form>
+            {/* 测试上传：local / s3 都能用。验证当前表单值是否真能写入存储后端。 */}
+            <div className='mb-6 flex items-start gap-3'>
+              <Button onClick={handleTestUpload} loading={testing}>
+                {t('测试上传')}
+              </Button>
+              {testResult && (
+                <div
+                  className={
+                    'flex-1 text-xs px-3 py-2 rounded border ' +
+                    (testResult.ok
+                      ? 'bg-green-50 border-green-200 text-green-800'
+                      : 'bg-red-50 border-red-200 text-red-800')
+                  }
+                >
+                  <div className='font-medium'>
+                    {testResult.ok ? t('✓ 测试通过') : t('✗ 测试失败')}
+                    {testResult.driver ? (
+                      <span className='ml-2 text-[10px] text-slate-500'>
+                        driver={testResult.driver}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className='mt-1 break-all whitespace-pre-wrap'>
+                    {testResult.message}
+                  </div>
+                  {testResult.url ? (
+                    <div className='mt-1 break-all'>
+                      <span className='text-slate-500'>{t('返回 URL')}: </span>
+                      <a
+                        href={testResult.url}
+                        target='_blank'
+                        rel='noreferrer'
+                        className='underline'
+                      >
+                        {testResult.url}
+                      </a>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+            {renderSection('上游 URL 镜像', 'mirror')}
+
+            <Button
+              theme='solid'
+              type='primary'
+              onClick={handleSave}
+              loading={saving}
+            >
+              {t('保存')}
+            </Button>
+          </Form>
+        )}
       </Card>
     </Spin>
   );
