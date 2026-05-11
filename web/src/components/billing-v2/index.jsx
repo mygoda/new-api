@@ -12,7 +12,6 @@ import ByModelTab from './tabs/ByModelTab';
 import ByVendorTab from './tabs/ByVendorTab';
 import ByTimeTab from './tabs/ByTimeTab';
 import ByTokenTab from './tabs/ByTokenTab';
-import AnomaliesTab from './tabs/AnomaliesTab';
 import DetailsTab from './tabs/DetailsTab';
 
 /**
@@ -43,7 +42,7 @@ export default function BillingV2Page() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get('tab');
-    if (t && ['model', 'vendor', 'time', 'token', 'anomaly', 'detail'].includes(t)) {
+    if (t && ['model', 'vendor', 'time', 'token', 'detail'].includes(t)) {
       setActiveTab(t);
     }
   }, []);
@@ -95,9 +94,6 @@ export default function BillingV2Page() {
         </Tabs.TabPane>
         <Tabs.TabPane tab={t('按令牌')} itemKey='token'>
           <ByTokenTab queryParams={queryParams} />
-        </Tabs.TabPane>
-        <Tabs.TabPane tab={t('异常请求')} itemKey='anomaly'>
-          <AnomaliesTab queryParams={queryParams} />
         </Tabs.TabPane>
         <Tabs.TabPane tab={t('流水明细')} itemKey='detail'>
           <DetailsTab queryParams={queryParams} />

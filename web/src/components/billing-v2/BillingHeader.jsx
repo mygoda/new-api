@@ -175,9 +175,9 @@ export default function BillingHeader({ filter, setFilter, queryParams }) {
         </div>
       </Card>
 
-      {/* 4 张总览卡 */}
+      {/* 3 张总览卡 */}
       <Spin spinning={loading} size='middle'>
-        <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
           <OverviewCard
             label={t('本期消费')}
             primary={overview ? renderQuota(overview.current_quota, 2) : '—'}
@@ -187,12 +187,6 @@ export default function BillingHeader({ filter, setFilter, queryParams }) {
                 : t('无对比数据')
             }
             subColor={yoyQuota === null ? 'tertiary' : yoyQuota >= 0 ? 'danger' : 'success'}
-          />
-          <OverviewCard
-            label={t('预测周期末')}
-            primary={overview ? renderQuota(overview.estimated_total, 2) : '—'}
-            sub={overview?.prev_quota ? `${t('上期')} ${renderQuota(overview.prev_quota, 2)}` : t('暂无预测')}
-            subColor='tertiary'
           />
           <OverviewCard
             label={t('当前余额')}
