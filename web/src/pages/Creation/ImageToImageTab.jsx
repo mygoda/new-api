@@ -244,7 +244,18 @@ const ImageToImageTab = () => {
       !(req.body instanceof FormData)
     ) {
       try {
-        const fetchRes = await fetch(imageRef);
+        // cache: 'no-store' — 绕开浏览器磁盘缓存（之前 CORS preflight 失败的响应
+        // 可能被缓存在内存/disk cache 里，即使 TOS 已配好 CORS，浏览器仍会沿用旧
+        // 失败响应）。
+        // mode: 'cors' — 显式声明跨域请求，缺省也是 cors，写明只是为了可读性。
+        // credentials: 'omit' — 不带 cookies，TOS 签名 URL 鉴权靠 query string，
+        // 带 credentials 反而触发更严格的 CORS 检查（Access-Control-Allow-Origin
+        // 不能是 *，必须明确 origin），所以显式不带。
+        const fetchRes = await fetch(imageRef, {
+          cache: 'no-store',
+          mode: 'cors',
+          credentials: 'omit',
+        });
         if (!fetchRes.ok) {
           throw new Error(`HTTP ${fetchRes.status}`);
         }
