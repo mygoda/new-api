@@ -109,13 +109,11 @@ add_column_if_missing() {
   fi
 
   echo "    Adding column '${table}.${col}' ..."
-  # Try the standard "ADD COLUMN" form first. Some Doris versions reject
-  # the COLUMN keyword with a ParseException; fall back to "ADD" in that case.
+  # Doris 2.1 默认启用 Nereids planner，但 Nereids 不支持 ALTER TABLE ADD COLUMN
+  # 语法（会报 'mismatched input COLUMN' 或 'missing CONSTRAINT'）。必须在同一
+  # session 里先 SET enable_nereids_planner=false 走 legacy planner，加列才生效。
   local out
-  out=$(run_sql "ALTER TABLE \`${DORIS_DATABASE}\`.\`${table}\` ADD COLUMN \`${col}\` ${def};" || true)
-  if echo "$out" | grep -qiE 'error|exception'; then
-    out=$(run_sql "ALTER TABLE \`${DORIS_DATABASE}\`.\`${table}\` ADD \`${col}\` ${def};" || true)
-  fi
+  out=$(run_sql "SET enable_nereids_planner=false; ALTER TABLE \`${DORIS_DATABASE}\`.\`${table}\` ADD COLUMN \`${col}\` ${def};" || true)
   if echo "$out" | grep -qiE 'error|exception'; then
     echo "    Failed to add column '${table}.${col}':"
     echo "$out" | sed 's/^/      /'

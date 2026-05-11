@@ -228,6 +228,7 @@ func ensureDorisRequestLogsColumns() {
 		{"tier_index", `INT DEFAULT "0" COMMENT '阶梯计费命中档位(0-based)'`},
 		{"tier_threshold", `INT DEFAULT "0" COMMENT '阶梯计费命中档位的 prompt_tokens 阈值'`},
 		{"tier_total", `INT DEFAULT "0" COMMENT '阶梯计费总档位数(0表示未启用)'`},
+		{"cache_creation_tokens", `INT DEFAULT "0" COMMENT '缓存写入Token总数(创建)'`},
 	}
 	addMissingDorisColumns(db, "request_logs", requestLogsColumns)
 	addMissingDorisColumns(db, "billing_records", billingRecordsColumns)
@@ -253,17 +254,17 @@ func addMissingDorisColumns(db *sql.DB, tableName string, columns []dorisColumnS
 		if exists > 0 {
 			continue
 		}
-		// Try standard "ADD COLUMN" first; some Doris versions reject the
-		// COLUMN keyword with a ParseException. Fall back to "ADD" on parse errors.
-		withColumn := fmt.Sprintf("ALTER TABLE `%s`.`%s` ADD COLUMN `%s` %s",
+		// Doris 2.1 默认启用 Nereids planner，但 Nereids 不支持 ALTER TABLE ADD COLUMN
+		// 语法（会报 'mismatched input COLUMN' 或 'missing CONSTRAINT'）。在同一连接里
+		// 先 SET enable_nereids_planner=false 走 legacy planner，加列才生效。
+		if _, err := db.Exec("SET enable_nereids_planner=false"); err != nil {
+			common.SysLog(fmt.Sprintf("doris: SET enable_nereids_planner=false skipped: %s", err))
+		}
+		stmt := fmt.Sprintf("ALTER TABLE `%s`.`%s` ADD COLUMN `%s` %s",
 			common.DorisDatabase, tableName, col.name, col.def)
-		if _, err := db.Exec(withColumn); err != nil {
-			withoutColumn := fmt.Sprintf("ALTER TABLE `%s`.`%s` ADD `%s` %s",
-				common.DorisDatabase, tableName, col.name, col.def)
-			if _, err2 := db.Exec(withoutColumn); err2 != nil {
-				common.SysLog(fmt.Sprintf("doris: add column %s.%s failed: %s (fallback: %s)", tableName, col.name, err, err2))
-				continue
-			}
+		if _, err := db.Exec(stmt); err != nil {
+			common.SysLog(fmt.Sprintf("doris: add column %s.%s failed: %s", tableName, col.name, err))
+			continue
 		}
 		common.SysLog(fmt.Sprintf("doris: column %s.%s added", tableName, col.name))
 	}
@@ -341,6 +342,7 @@ const billingRecordsDDL = `CREATE TABLE IF NOT EXISTS %s.billing_records (
     completion_tokens   INT             DEFAULT 0  COMMENT '输出Token',
     total_tokens        INT             DEFAULT 0  COMMENT '总Token',
     cache_tokens        INT             DEFAULT 0  COMMENT '缓存Token',
+    cache_creation_tokens INT           DEFAULT 0  COMMENT '缓存写入Token(创建)',
     quota               INT             DEFAULT 0  COMMENT '消耗额度',
     model_ratio         DOUBLE          DEFAULT 0  COMMENT '模型倍率',
     group_ratio         DOUBLE          DEFAULT 0  COMMENT '分组倍率',
