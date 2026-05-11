@@ -545,6 +545,7 @@ func emitDorisTextLog(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage 
 		CompletionTokens: summary.CompletionTokens,
 		TotalTokens:      summary.TotalTokens,
 		CacheTokens:      summary.CacheTokens,
+		CacheCreationTokens: summary.CacheCreationTokens,
 		Quota:            summary.Quota,
 		ModelRatio:       summary.ModelRatio,
 		GroupRatio:       summary.GroupRatio,

@@ -361,6 +361,7 @@ func GetBillingV2Details(c *gin.Context) {
 			CompletionTokens: r.CompletionTokens,
 			TotalTokens:      r.TotalTokens,
 			CacheTokens:      r.CacheTokens,
+			CacheCreationTokens: r.CacheCreationTokens,
 			Quota:            r.Quota,
 			ModelRatio:       r.ModelRatio,
 			GroupRatio:       r.GroupRatio,

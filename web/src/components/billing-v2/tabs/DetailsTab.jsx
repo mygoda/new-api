@@ -67,7 +67,9 @@ export default function DetailsTab({ queryParams }) {
         const v = vendorOf(model);
         return (
           <div className='min-w-0'>
-            <div className='font-medium text-sm break-all leading-tight'>{model}</div>
+            <div className='font-medium text-sm break-all leading-tight'>
+              {model}
+            </div>
             <div className='mt-0.5'>
               <Tag size='small' color='violet' shape='circle'>
                 {v.label}
@@ -77,21 +79,51 @@ export default function DetailsTab({ queryParams }) {
         );
       },
     },
-    { title: t('令牌'), dataIndex: 'token_name', width: 130, render: (n) => n || 'default' },
+    {
+      title: t('令牌'),
+      dataIndex: 'token_name',
+      width: 130,
+      render: (n) => n || 'default',
+    },
     {
       title: t('输入/输出'),
       width: 130,
       render: (_, r) => (
         <span className='tabular-nums text-xs'>
-          {Number(r.prompt_tokens).toLocaleString()} / {Number(r.completion_tokens).toLocaleString()}
+          {Number(r.prompt_tokens).toLocaleString()} /{' '}
+          {Number(r.completion_tokens).toLocaleString()}
         </span>
       ),
+    },
+    {
+      title: t('缓存读/写'),
+      width: 130,
+      render: (_, r) => {
+        const read = Number(r.cache_tokens || 0);
+        const write = Number(r.cache_creation_tokens || 0);
+        if (!read && !write) {
+          return <span className='tabular-nums text-xs text-slate-400'>—</span>;
+        }
+        return (
+          <span className='tabular-nums text-xs'>
+            <span className={read ? '' : 'text-slate-400'}>
+              {read.toLocaleString()}
+            </span>
+            {' / '}
+            <span className={write ? '' : 'text-slate-400'}>
+              {write.toLocaleString()}
+            </span>
+          </span>
+        );
+      },
     },
     {
       title: t('消费'),
       dataIndex: 'quota',
       width: 110,
-      render: (q) => <span className='font-semibold tabular-nums'>{renderQuota(q, 4)}</span>,
+      render: (q) => (
+        <span className='font-semibold tabular-nums'>{renderQuota(q, 4)}</span>
+      ),
     },
     {
       title: t('耗时'),
@@ -105,18 +137,30 @@ export default function DetailsTab({ queryParams }) {
       width: 80,
       render: (s) =>
         s ? (
-          <Tag size='small' color='green' shape='circle'>{t('成功')}</Tag>
+          <Tag size='small' color='green' shape='circle'>
+            {t('成功')}
+          </Tag>
         ) : (
-          <Tag size='small' color='red' shape='circle'>{t('失败')}</Tag>
+          <Tag size='small' color='red' shape='circle'>
+            {t('失败')}
+          </Tag>
         ),
     },
   ];
 
   if (loading && !data) {
-    return <div className='py-12 flex justify-center'><Spin size='large' /></div>;
+    return (
+      <div className='py-12 flex justify-center'>
+        <Spin size='large' />
+      </div>
+    );
   }
   if (!loading && !items.length) {
-    return <Card className='!rounded-2xl border-0' shadows='hover'><Empty description={t('当前周期无消费记录')} /></Card>;
+    return (
+      <Card className='!rounded-2xl border-0' shadows='hover'>
+        <Empty description={t('当前周期无消费记录')} />
+      </Card>
+    );
   }
 
   return (

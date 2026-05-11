@@ -48,6 +48,7 @@ type BillingSummaryResult struct {
 const billingListColumns = "request_id, user_id, token_id, token_name, IFNULL(token_key, '') AS token_key, " +
 	"user_group, using_group, model_name, channel_id, channel_name, " +
 	"prompt_tokens, completion_tokens, total_tokens, cache_tokens, " +
+	"IFNULL(cache_creation_tokens, 0) AS cache_creation_tokens, " +
 	"quota, model_ratio, group_ratio, model_price, " +
 	"is_success, use_time_ms, created_at"
 
@@ -158,6 +159,7 @@ func QueryBillingRecords(filter BillingFilter, page, pageSize int) (*BillingQuer
 			&r.RequestId, &r.UserId, &r.TokenId, &r.TokenName, &r.TokenKey,
 			&r.UserGroup, &r.UsingGroup, &r.ModelName, &r.ChannelId, &r.ChannelName,
 			&r.PromptTokens, &r.CompletionTokens, &r.TotalTokens, &r.CacheTokens,
+			&r.CacheCreationTokens,
 			&r.Quota, &r.ModelRatio, &r.GroupRatio, &r.ModelPrice,
 			&r.IsSuccess, &r.UseTimeMs, &r.CreatedAt,
 		); err != nil {

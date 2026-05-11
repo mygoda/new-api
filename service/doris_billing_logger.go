@@ -35,6 +35,7 @@ type BillingRecord struct {
 	CompletionTokens int     `json:"completion_tokens"`
 	TotalTokens      int     `json:"total_tokens"`
 	CacheTokens      int     `json:"cache_tokens"`
+	CacheCreationTokens int  `json:"cache_creation_tokens"`
 	Quota            int     `json:"quota"`
 	ModelRatio       float64 `json:"model_ratio"`
 	GroupRatio       float64 `json:"group_ratio"`
@@ -205,6 +206,7 @@ func EmitBillingRecord(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage
 		record.CompletionTokens = usage.CompletionTokens
 		record.TotalTokens = usage.TotalTokens
 		record.CacheTokens = usage.PromptTokensDetails.CachedTokens
+		record.CacheCreationTokens = usage.PromptTokensDetails.CachedCreationTokens
 	}
 
 	record.ModelRatio = relayInfo.PriceData.ModelRatio

@@ -99,36 +99,37 @@ PROPERTIES (
 echo "==> Checking and adding missing columns (safe to ignore 'already exists' errors) ..."
 
 add_column_if_missing() {
-  local col="$1"
-  local def="$2"
+  local table="$1"
+  local col="$2"
+  local def="$3"
   # DESC will show the column if it exists; we grep for it
-  if run_sql "DESC \`${DORIS_DATABASE}\`.\`${DORIS_TABLE}\`;" | grep -qw "$col"; then
-    echo "    Column '${col}' already exists, skipping."
+  if run_sql "DESC \`${DORIS_DATABASE}\`.\`${table}\`;" | grep -qw "$col"; then
+    echo "    Column '${table}.${col}' already exists, skipping."
     return 0
   fi
 
-  echo "    Adding column '${col}' ..."
+  echo "    Adding column '${table}.${col}' ..."
   # Try the standard "ADD COLUMN" form first. Some Doris versions reject
   # the COLUMN keyword with a ParseException; fall back to "ADD" in that case.
   local out
-  out=$(run_sql "ALTER TABLE \`${DORIS_DATABASE}\`.\`${DORIS_TABLE}\` ADD COLUMN \`${col}\` ${def};" || true)
+  out=$(run_sql "ALTER TABLE \`${DORIS_DATABASE}\`.\`${table}\` ADD COLUMN \`${col}\` ${def};" || true)
   if echo "$out" | grep -qiE 'error|exception'; then
-    out=$(run_sql "ALTER TABLE \`${DORIS_DATABASE}\`.\`${DORIS_TABLE}\` ADD \`${col}\` ${def};" || true)
+    out=$(run_sql "ALTER TABLE \`${DORIS_DATABASE}\`.\`${table}\` ADD \`${col}\` ${def};" || true)
   fi
   if echo "$out" | grep -qiE 'error|exception'; then
-    echo "    Failed to add column '${col}':"
+    echo "    Failed to add column '${table}.${col}':"
     echo "$out" | sed 's/^/      /'
     return 1
   fi
-  echo "    Added column '${col}'."
+  echo "    Added column '${table}.${col}'."
 }
 
-add_column_if_missing "token_key"                "VARCHAR(512)  DEFAULT '' COMMENT 'API 密钥'"
-add_column_if_missing "request_body"             "STRING        DEFAULT '' COMMENT '请求体'"
-add_column_if_missing "response_content"         "STRING        DEFAULT '' COMMENT '响应内容'"
-add_column_if_missing "cache_creation_tokens"    "INT           DEFAULT 0  COMMENT '缓存写入Token总数(创建)'"
-add_column_if_missing "cache_creation_tokens_5m" "INT           DEFAULT 0  COMMENT 'Claude 5m TTL 缓存写入Token'"
-add_column_if_missing "cache_creation_tokens_1h" "INT           DEFAULT 0  COMMENT 'Claude 1h TTL 缓存写入Token'"
+add_column_if_missing "${DORIS_TABLE}" "token_key"                "VARCHAR(512)  DEFAULT '' COMMENT 'API 密钥'"
+add_column_if_missing "${DORIS_TABLE}" "request_body"             "STRING        DEFAULT '' COMMENT '请求体'"
+add_column_if_missing "${DORIS_TABLE}" "response_content"         "STRING        DEFAULT '' COMMENT '响应内容'"
+add_column_if_missing "${DORIS_TABLE}" "cache_creation_tokens"    "INT           DEFAULT 0  COMMENT '缓存写入Token总数(创建)'"
+add_column_if_missing "${DORIS_TABLE}" "cache_creation_tokens_5m" "INT           DEFAULT 0  COMMENT 'Claude 5m TTL 缓存写入Token'"
+add_column_if_missing "${DORIS_TABLE}" "cache_creation_tokens_1h" "INT           DEFAULT 0  COMMENT 'Claude 1h TTL 缓存写入Token'"
 
 # 4. Create billing_records table
 BILLING_TABLE="billing_records"
@@ -150,6 +151,7 @@ CREATE TABLE IF NOT EXISTS \`${DORIS_DATABASE}\`.\`${BILLING_TABLE}\` (
     completion_tokens   INT             DEFAULT 0  COMMENT '输出Token',
     total_tokens        INT             DEFAULT 0  COMMENT '总Token',
     cache_tokens        INT             DEFAULT 0  COMMENT '缓存Token',
+    cache_creation_tokens INT           DEFAULT 0  COMMENT '缓存写入Token(创建)',
     quota               INT             DEFAULT 0  COMMENT '消耗额度',
     model_ratio         DOUBLE          DEFAULT 0  COMMENT '模型倍率',
     group_ratio         DOUBLE          DEFAULT 0  COMMENT '分组倍率',
@@ -170,6 +172,9 @@ PROPERTIES (
     'dynamic_partition.create_history_partition' = 'true'
 );
 "
+
+# billing_records 也做幂等迁移：老库需要补 cache_creation_tokens 列
+add_column_if_missing "${BILLING_TABLE}" "cache_creation_tokens" "INT DEFAULT 0 COMMENT '缓存写入Token(创建)'"
 
 echo "==> Doris setup completed successfully!"
 echo "    Database : ${DORIS_DATABASE}"
