@@ -190,8 +190,12 @@ export const IMAGE_MODELS = [
     },
     pricing: {
       unit: '张',
-      estimate: ({ sequential_image_generation = 'disabled', max_images = 1 }) => {
-        const n = sequential_image_generation === 'auto' ? Math.min(max_images, 15) : 1;
+      estimate: ({
+        sequential_image_generation = 'disabled',
+        max_images = 1,
+      }) => {
+        const n =
+          sequential_image_generation === 'auto' ? Math.min(max_images, 15) : 1;
         return n * 25;
       },
     },
@@ -421,7 +425,12 @@ export const VIDEO_MODELS = [
     },
     pricing: {
       unit: '秒',
-      estimate: ({ duration = 5, resolution = '720p', generate_audio = true, service_tier = 'default' }) => {
+      estimate: ({
+        duration = 5,
+        resolution = '720p',
+        generate_audio = true,
+        service_tier = 'default',
+      }) => {
         const base = resolution === '1080p' ? 100 : 50;
         const audioMul = generate_audio ? 1.3 : 1;
         const tierMul = service_tier === 'flex' ? 0.5 : 1;
@@ -501,6 +510,16 @@ export function getModelSchema(modelName) {
 export function getModelsForModality(modality) {
   if (modality === 'image') return IMAGE_MODELS;
   if (modality === 'video') return VIDEO_MODELS;
+  // image-to-image：从 IMAGE_MODELS 过滤出 protocol === 'openai-image' 的
+  // （MJ 协议不走 /v1/images/edits，不能在 i2i tab 用）
+  if (modality === 'image-to-image') {
+    return IMAGE_MODELS.filter((m) => m.protocol === 'openai-image').map(
+      (m) => ({
+        ...m,
+        modality: 'image-to-image',
+      }),
+    );
+  }
   return [];
 }
 
@@ -514,28 +533,46 @@ export function inferModelSchema(modelInfo) {
 
   // 1. 优先精确匹配
   const exact = getModelSchema(modelName);
-  if (exact) return exact;
+  if (exact) {
+    // i2i 模态下，把 image 类 schema 的 modality 切到 image-to-image，
+    // 让 normalizer.validate 走 image-to-image 分支（要求 image_first 必填）。
+    // 实际请求路径由 normalizer 根据是否存在 image_first 自动选 /v1/images/edits。
+    if (
+      modality === 'image-to-image' &&
+      exact.modality === 'image' &&
+      exact.protocol === 'openai-image'
+    ) {
+      return { ...exact, modality: 'image-to-image' };
+    }
+    return exact;
+  }
 
   // 2. 按厂商/系列匹配预设
-  if (modality === 'image') {
+  if (modality === 'image' || modality === 'image-to-image') {
     if (vendor === 'midjourney' || /midjourney|^mj-/.test(lowerName)) {
+      // MJ 协议不支持 /v1/images/edits，i2i 模态下跳过 MJ
+      if (modality === 'image-to-image') return null;
       const mj = IMAGE_MODELS.find((m) => m.modelName === 'midjourney');
       return mj ? { ...mj, modelName, displayName: modelName } : null;
     }
     if (vendor === 'doubao' || /seedream|seededit/.test(lowerName)) {
-      const tpl = IMAGE_MODELS.find((m) => m.modelName === 'doubao-seedream-5-0-260128');
-      return tpl ? { ...tpl, modelName, displayName: modelName } : null;
+      const tpl = IMAGE_MODELS.find(
+        (m) => m.modelName === 'doubao-seedream-5-0-260128',
+      );
+      if (!tpl) return null;
+      return { ...tpl, modelName, displayName: modelName, modality };
     }
     if (vendor === 'openai' || /gpt|dall-e/.test(lowerName)) {
       const tpl = IMAGE_MODELS.find((m) => m.modelName === 'gpt-image-1');
-      return tpl ? { ...tpl, modelName, displayName: modelName } : null;
+      if (!tpl) return null;
+      return { ...tpl, modelName, displayName: modelName, modality };
     }
     // 通用图像生成兜底
     return {
       modelName,
       displayName: modelName,
       vendor,
-      modality: 'image',
+      modality,
       protocol: 'openai-image',
       endpoint: '/v1/images/generations',
       fields: {
@@ -609,10 +646,12 @@ export function inferModelSchema(modelInfo) {
           label: '随机种子',
         },
       },
-      pricing: { unit: '秒', estimate: ({ duration = 5 }) => Math.round(duration * 50) },
+      pricing: {
+        unit: '秒',
+        estimate: ({ duration = 5 }) => Math.round(duration * 50),
+      },
     };
   }
 
   return null;
 }
-

@@ -361,7 +361,7 @@ const EditModelModal = (props) => {
                       onSelect={(option) => {
                         const val =
                           typeof option === 'object'
-                            ? option?.value ?? option?.label ?? ''
+                            ? (option?.value ?? option?.label ?? '')
                             : option;
                         setModelNameSearch(val || '');
                         formApiRef.current?.setValue('model_name', val || '');
@@ -539,15 +539,14 @@ const EditModelModal = (props) => {
                       field='capabilities_list'
                       label={t('能力')}
                       direction='horizontal'
-                      extraText={t(
-                        '模型支持的能力，仅在「模型」展示',
-                      )}
+                      extraText={t('模型支持的能力，仅在「模型」展示')}
                       options={[
                         { value: 'vision', label: t('视觉') },
                         { value: 'tool_calling', label: t('工具调用') },
                         { value: 'reasoning', label: t('推理') },
                         { value: 'caching', label: t('缓存') },
                         { value: 'image_generation', label: t('图像生成') },
+                        { value: 'image_to_image', label: t('图生图') },
                         { value: 'computer_use', label: t('电脑操作') },
                       ]}
                     />
@@ -556,7 +555,9 @@ const EditModelModal = (props) => {
                     <Form.Select
                       field='creation_target'
                       label={t('创作中心可见性')}
-                      placeholder={t('自动判断（按 capabilities/endpoints/名称）')}
+                      placeholder={t(
+                        '自动判断（按 capabilities/endpoints/名称）',
+                      )}
                       style={{ width: '100%' }}
                       extraText={t(
                         '显式控制本模型是否在「创作中心」出现以及出现在哪些 tab；留空表示按规则自动判断',
@@ -604,9 +605,7 @@ const EditModelModal = (props) => {
                       label={t('知识截止')}
                       placeholder={t('如：2024-04')}
                       style={{ width: '100%' }}
-                      extraText={t(
-                        '模型训练数据知识截止日期，仅作展示',
-                      )}
+                      extraText={t('模型训练数据知识截止日期，仅作展示')}
                     />
                   </Col>
                   <Col span={24}>

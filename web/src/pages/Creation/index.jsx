@@ -7,9 +7,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Layout, Typography } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { Image, Video, FolderOpen } from 'lucide-react';
+import { Image, ImagePlus, Video, FolderOpen } from 'lucide-react';
 
 import ImageTab from './ImageTab';
+import ImageToImageTab from './ImageToImageTab';
 import VideoTab from './VideoTab';
 import GalleryTab from './GalleryTab';
 import { useTokenGuard } from '../../components/creation/TokenGuard';
@@ -17,6 +18,7 @@ import TokenSelector from '../../components/creation/TokenSelector';
 
 const TABS = [
   { key: 'image', icon: Image, label: '图像' },
+  { key: 'image-to-image', icon: ImagePlus, label: '图生图' },
   { key: 'video', icon: Video, label: '视频' },
   { key: 'gallery', icon: FolderOpen, label: '作品库' },
 ];
@@ -72,6 +74,7 @@ const Creation = () => {
         {/* 内容区 */}
         <div className='flex-1 overflow-hidden'>
           {active === 'image' && <ImageTab />}
+          {active === 'image-to-image' && <ImageToImageTab />}
           {active === 'video' && <VideoTab />}
           {active === 'gallery' && <GalleryTab />}
         </div>

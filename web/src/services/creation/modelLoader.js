@@ -15,20 +15,35 @@ import { API } from '../../helpers/api';
 // 模态对应的 endpoint 关键字
 const ENDPOINT_KEYWORDS = {
   image: ['image', 'image-generation', 'images', 'midjourney', 'mj'],
-  video: ['video', 'openai-video', 'kling', 'sora', 'jimeng-video', 'hailuo', 'vidu'],
+  video: [
+    'video',
+    'openai-video',
+    'kling',
+    'sora',
+    'jimeng-video',
+    'hailuo',
+    'vidu',
+  ],
   chat: ['chat', 'chat-completions', 'completions', 'messages', 'responses'],
 };
 
 // capabilities 字段的关键字（多模态模型在「模型管理」里通常会标这些能力）
 const CAPABILITY_KEYWORDS = {
   image: ['image-generation', 'image-edit', 'image', 'multimodal'],
+  'image-to-image': [
+    'image-to-image',
+    'image_to_image',
+    'image-edit',
+    'image_edit',
+  ],
   video: ['video-generation', 'video', 'multimodal'],
   chat: ['chat', 'function-calling', 'tool-use', 'multimodal'],
 };
 
 // 模型名兜底正则（endpoints/tags/capabilities 都没匹配上时用）
 const NAME_FALLBACK_REGEX = {
-  image: /dall-e|midjourney|^mj-|imagen|stable-diffusion|gpt-image|seedream|jimeng-img|nano-banana|gemini[\w.-]*image|flux|sdxl|qwen-image/,
+  image:
+    /dall-e|midjourney|^mj-|imagen|stable-diffusion|gpt-image|seedream|jimeng-img|nano-banana|gemini[\w.-]*image|flux|sdxl|qwen-image/,
   video: /sora|kling|seedance|jimeng-video|hailuo|vidu|veo/,
   chat: /gpt-[0-9]|^o[0-9]|claude|gemini-(pro|flash|2|1)|qwen|glm|deepseek|moonshot|yi-|llama/,
 };
@@ -84,12 +99,18 @@ function detectVendor(model) {
   if (vendor) return vendor;
 
   const name = (model.model_name || '').toLowerCase();
-  if (name.includes('gpt') || name.includes('dall-e') || name.includes('o1')) return 'openai';
+  if (name.includes('gpt') || name.includes('dall-e') || name.includes('o1'))
+    return 'openai';
   if (name.includes('claude')) return 'anthropic';
   if (name.includes('gemini') || name.includes('imagen')) return 'google';
   if (name.match(/midjourney|^mj-/)) return 'midjourney';
   if (name.includes('stable-')) return 'stability';
-  if (name.includes('doubao') || name.includes('seedance') || name.includes('seedream')) return 'doubao';
+  if (
+    name.includes('doubao') ||
+    name.includes('seedance') ||
+    name.includes('seedream')
+  )
+    return 'doubao';
   if (name.includes('jimeng')) return 'jimeng';
   if (name.includes('kling')) return 'kling';
   if (name.includes('hailuo') || name.includes('minimax')) return 'hailuo';

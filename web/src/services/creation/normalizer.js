@@ -19,9 +19,13 @@ const stripUndefined = (obj) => {
 const ratioToSize = (ratio, resolution) => {
   // 把 16:9 + 720p 推算成 "1280x720"
   const dim =
-    resolution === '1080p' ? 1080 :
-    resolution === '720p'  ? 720  :
-    resolution === '480p'  ? 480  : 720;
+    resolution === '1080p'
+      ? 1080
+      : resolution === '720p'
+        ? 720
+        : resolution === '480p'
+          ? 480
+          : 720;
   const [w, h] = (ratio || '16:9').split(':').map(Number);
   if (!w || !h) return undefined;
   if (w >= h) {
@@ -53,7 +57,8 @@ function toOpenAIImage(p, schema) {
         : undefined,
     watermark: typeof p.watermark === 'boolean' ? p.watermark : undefined,
     sequential_image_generation:
-      p.sequential_image_generation === 'auto' || p.sequential_image_generation === 'disabled'
+      p.sequential_image_generation === 'auto' ||
+      p.sequential_image_generation === 'disabled'
         ? p.sequential_image_generation
         : undefined,
     sequential_image_generation_options:
@@ -61,7 +66,9 @@ function toOpenAIImage(p, schema) {
         ? { max_images: p.max_images }
         : undefined,
     optimize_prompt_options:
-      p.optimize_prompt_mode && (p.optimize_prompt_mode === 'standard' || p.optimize_prompt_mode === 'fast')
+      p.optimize_prompt_mode &&
+      (p.optimize_prompt_mode === 'standard' ||
+        p.optimize_prompt_mode === 'fast')
         ? { mode: p.optimize_prompt_mode }
         : undefined,
     // 仅 5.0 lite 支持自定义;其它模型即便传也无害(被忽略)
@@ -121,13 +128,17 @@ function toMidjourney(p, schema) {
 // MJ 任务状态字符串映射到统一态
 export function mapMjStatusToUnified(s) {
   switch (s) {
-    case 'SUCCESS':       return 'completed';
+    case 'SUCCESS':
+      return 'completed';
     case 'IN_PROGRESS':
     case 'SUBMITTED':
     case 'NOT_START':
-    case 'QUEUED':        return 'in_progress';
-    case 'FAILURE':       return 'failed';
-    default:              return 'in_progress';
+    case 'QUEUED':
+      return 'in_progress';
+    case 'FAILURE':
+      return 'failed';
+    default:
+      return 'in_progress';
   }
 }
 
@@ -139,14 +150,14 @@ function toOpenAIVideo(p, schema) {
 
   // OpenAI 通用字段
   if (p.duration != null) body.duration = p.duration;
-  if (p.seconds != null)  body.seconds = String(p.seconds);
-  if (p.size)             body.size = p.size;
+  if (p.seconds != null) body.seconds = String(p.seconds);
+  if (p.size) body.size = p.size;
   else if (p.aspect_ratio && p.resolution) {
     const sz = ratioToSize(p.aspect_ratio, p.resolution);
     if (sz) body.size = sz;
   }
   if (p.seed != null && p.seed >= 0) body.seed = p.seed;
-  if (p.n)   body.n = p.n;
+  if (p.n) body.n = p.n;
   if (p.fps) body.fps = p.fps;
   if (p.image_first) body.image = p.image_first;
 
@@ -158,13 +169,24 @@ function toOpenAIVideo(p, schema) {
     motion_strength: p.motion_strength,
     // 兼容两种字段名:camera_fixed (旧, 来自 camera_preset=fixed) 与 camerafixed (新, 直接 schema 字段)
     camera_fixed:
-      p.camera_preset === 'fixed' ? true :
-      p.camerafixed === true ? true :
-      p.camerafixed === false ? false : undefined,
-    generate_audio: typeof p.generate_audio === 'boolean' ? p.generate_audio : undefined,
+      p.camera_preset === 'fixed'
+        ? true
+        : p.camerafixed === true
+          ? true
+          : p.camerafixed === false
+            ? false
+            : undefined,
+    generate_audio:
+      typeof p.generate_audio === 'boolean' ? p.generate_audio : undefined,
     watermark: typeof p.watermark === 'boolean' ? p.watermark : undefined,
-    return_last_frame: typeof p.return_last_frame === 'boolean' ? p.return_last_frame : undefined,
-    service_tier: p.service_tier && p.service_tier !== 'default' ? p.service_tier : undefined,
+    return_last_frame:
+      typeof p.return_last_frame === 'boolean'
+        ? p.return_last_frame
+        : undefined,
+    service_tier:
+      p.service_tier && p.service_tier !== 'default'
+        ? p.service_tier
+        : undefined,
     prompt_optimizer: p.prompt_optimizer,
     fast_pretreatment: p.fast_pretreatment,
     image_last: p.image_last,
@@ -180,7 +202,11 @@ function toOpenAIVideo(p, schema) {
   });
 
   // 镜头控制（Kling 专属，后端 kling adapter 取 metadata.camera_control 或在 metadata 中合并）
-  if (p.camera && (p.camera.preset || (p.camera.advanced && Object.keys(p.camera.advanced).length))) {
+  if (
+    p.camera &&
+    (p.camera.preset ||
+      (p.camera.advanced && Object.keys(p.camera.advanced).length))
+  ) {
     if (p.camera.preset === 'simple') {
       metadata.camera_control = {
         type: 'simple',
@@ -230,8 +256,18 @@ export function validate(params, schema) {
   if (schema?.modality === 'video') {
     if (params.mode === 'i2v' && !params.image_first)
       errs.push({ field: 'image_first', msg: '图生视频需要上传首帧' });
-    if (params.mode === 'keyframes' && (!params.image_first || !params.image_last))
-      errs.push({ field: 'image_last', msg: '首尾帧模式需要同时上传首帧和尾帧' });
+    if (
+      params.mode === 'keyframes' &&
+      (!params.image_first || !params.image_last)
+    )
+      errs.push({
+        field: 'image_last',
+        msg: '首尾帧模式需要同时上传首帧和尾帧',
+      });
+  }
+
+  if (schema?.modality === 'image-to-image' && !params.image_first) {
+    errs.push({ field: 'image_first', msg: '图生图需要上传参考图' });
   }
 
   // duration / seconds 选项必须在 schema 允许的范围内
@@ -247,7 +283,9 @@ export function validate(params, schema) {
 }
 
 export function buildCurl(req, token, origin = '') {
-  const url = (origin || (typeof window !== 'undefined' ? window.location.origin : '')) + req.url;
+  const url =
+    (origin || (typeof window !== 'undefined' ? window.location.origin : '')) +
+    req.url;
   const lines = [
     `curl -X ${req.method} '${url}' \\`,
     `  -H 'Authorization: Bearer ${token || '<YOUR_API_KEY>'}' \\`,
