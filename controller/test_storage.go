@@ -6,7 +6,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/service/storage"
@@ -110,11 +112,28 @@ func TestCreationStorage(c *gin.Context) {
 		return
 	}
 
-	// 删测试对象。失败不影响整体成功——可能权限只允许 Put 不允许 Delete，admin 可以人工清理。
+	// Put 成功还不够——签名 / endpoint 错误也可能让客户端拉不到。
+	// 端到端验证：用返回的公网 URL 真正 GET 一次，验证客户端能拉到对象。
+	// 走 storage.Get 是后端 SDK 路径（鉴权用 AK/SK），跟客户端浏览器走签名 URL 的
+	// 路径不一样，所以这里直接用 net/http 拉 publicURL 才有意义。
+	readErr := verifyReadable(ctx, publicURL)
+
+	// 不管读验证结果如何，都尽量删测试对象，避免污染 bucket。
 	delErr := st.Delete(context.Background(), key)
+
+	if readErr != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "上传成功但读取测试失败（可能是 ACL / 签名 / 域名解析问题）: " + readErr.Error(),
+			"driver":  st.Driver(),
+			"url":     publicURL,
+		})
+		return
+	}
+
 	deleteMsg := ""
 	if delErr != nil {
-		deleteMsg = "上传成功，但删除测试对象失败（仅警告，可手工清理）: " + delErr.Error()
+		deleteMsg = "上传/读取均成功，但删除测试对象失败（仅警告，可手工清理）: " + delErr.Error()
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -124,6 +143,36 @@ func TestCreationStorage(c *gin.Context) {
 		"test_key":     key,
 		"delete_error": deleteMsg,
 	})
+}
+
+// verifyReadable 用 HTTP GET 拉 publicURL 验证客户端浏览器能拿到对象。
+// 不读完整 body（最多 1KB），节省时间。
+func verifyReadable(ctx context.Context, publicURL string) error {
+	if publicURL == "" {
+		return fmt.Errorf("storage 没有返回 URL")
+	}
+	// /api/upload/file/... 这种相对路径来自 local driver，跳过端到端读测试
+	// （后端没有自己的 base URL，且 local 已经在 Put 时落盘成功）。
+	if strings.HasPrefix(publicURL, "/") {
+		return nil
+	}
+	c2, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(c2, http.MethodGet, publicURL, nil)
+	if err != nil {
+		return fmt.Errorf("构造 GET 请求失败: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("GET 网络错误: %w", err)
+	}
+	defer resp.Body.Close()
+	// 拉前 1KB 用于触发实际读取
+	_, _ = io.CopyN(io.Discard, resp.Body, 1024)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("GET HTTP %d（公开 bucket 需 PublicRead；私有 bucket 需勾选「私有 Bucket」走签名 URL）", resp.StatusCode)
+	}
+	return nil
 }
 
 func firstNonEmpty(a, b string) string {
