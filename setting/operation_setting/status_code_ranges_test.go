@@ -55,6 +55,8 @@ func TestShouldRetryByStatusCode(t *testing.T) {
 	orig := AutomaticRetryStatusCodeRanges
 	t.Cleanup(func() { AutomaticRetryStatusCodeRanges = orig })
 
+	// 测试场景：admin 自定义收窄重试范围到 429 + 500-599。
+	// 由于 alwaysSkip 黑名单已清空，500-599 内的 504/524 也会被允许重试。
 	AutomaticRetryStatusCodeRanges = []StatusCodeRange{
 		{Start: 429, End: 429},
 		{Start: 500, End: 599},
@@ -62,26 +64,26 @@ func TestShouldRetryByStatusCode(t *testing.T) {
 
 	require.True(t, ShouldRetryByStatusCode(429))
 	require.True(t, ShouldRetryByStatusCode(500))
-	require.False(t, ShouldRetryByStatusCode(504))
-	require.False(t, ShouldRetryByStatusCode(524))
+	require.True(t, ShouldRetryByStatusCode(504))
+	require.True(t, ShouldRetryByStatusCode(524))
 	require.False(t, ShouldRetryByStatusCode(400))
 	require.False(t, ShouldRetryByStatusCode(200))
 }
 
-func TestShouldRetryByStatusCode_DefaultMatchesLegacyBehavior(t *testing.T) {
+func TestShouldRetryByStatusCode_DefaultRetriesAll4xx5xx(t *testing.T) {
 	require.False(t, ShouldRetryByStatusCode(200))
-	require.False(t, ShouldRetryByStatusCode(400))
+	require.True(t, ShouldRetryByStatusCode(400))
 	require.True(t, ShouldRetryByStatusCode(401))
-	require.False(t, ShouldRetryByStatusCode(408))
+	require.True(t, ShouldRetryByStatusCode(408))
 	require.True(t, ShouldRetryByStatusCode(429))
 	require.True(t, ShouldRetryByStatusCode(500))
-	require.False(t, ShouldRetryByStatusCode(504))
-	require.False(t, ShouldRetryByStatusCode(524))
+	require.True(t, ShouldRetryByStatusCode(504))
+	require.True(t, ShouldRetryByStatusCode(524))
 	require.True(t, ShouldRetryByStatusCode(599))
 }
 
 func TestIsAlwaysSkipRetryStatusCode(t *testing.T) {
-	require.True(t, IsAlwaysSkipRetryStatusCode(504))
-	require.True(t, IsAlwaysSkipRetryStatusCode(524))
+	require.False(t, IsAlwaysSkipRetryStatusCode(504))
+	require.False(t, IsAlwaysSkipRetryStatusCode(524))
 	require.False(t, IsAlwaysSkipRetryStatusCode(500))
 }
