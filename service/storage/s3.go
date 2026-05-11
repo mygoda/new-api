@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
@@ -18,13 +19,16 @@ import (
 )
 
 type s3Storage struct {
-	client    *s3.Client
-	uploader  *manager.Uploader
-	bucket    string
-	publicURL string // 自定义公网 URL 前缀（trim trailing /）
-	endpoint  string // 用于回退构造 URL
-	pathStyle bool
-	keyPrefix string // 包含末尾 /，例如 "creation/"
+	client        *s3.Client
+	presignClient *s3.PresignClient
+	uploader      *manager.Uploader
+	bucket        string
+	publicURL     string // 自定义公网 URL 前缀（trim trailing /）
+	endpoint      string // 用于回退构造 URL
+	pathStyle     bool
+	keyPrefix     string // 包含末尾 /，例如 "creation/"
+	privateBucket bool
+	presignExpire time.Duration
 }
 
 func newS3Storage(cs *system_setting.CreationSetting) (Storage, error) {
@@ -65,14 +69,26 @@ func newS3Storage(cs *system_setting.CreationSetting) (Storage, error) {
 		keyPrefix += "/"
 	}
 
+	expire := time.Duration(cs.S3PresignExpireSeconds) * time.Second
+	if expire <= 0 {
+		expire = 24 * time.Hour
+	}
+	// AWS 文档上限 7 天；保险起见 cap 一下，避免被服务端拒。
+	if expire > 7*24*time.Hour {
+		expire = 7 * 24 * time.Hour
+	}
+
 	return &s3Storage{
-		client:    client,
-		uploader:  manager.NewUploader(client),
-		bucket:    cs.S3Bucket,
-		publicURL: strings.TrimRight(cs.S3PublicBaseURL, "/"),
-		endpoint:  strings.TrimRight(cs.S3Endpoint, "/"),
-		pathStyle: cs.S3UsePathStyle,
-		keyPrefix: keyPrefix,
+		client:        client,
+		presignClient: s3.NewPresignClient(client),
+		uploader:      manager.NewUploader(client),
+		bucket:        cs.S3Bucket,
+		publicURL:     strings.TrimRight(cs.S3PublicBaseURL, "/"),
+		endpoint:      strings.TrimRight(cs.S3Endpoint, "/"),
+		pathStyle:     cs.S3UsePathStyle,
+		keyPrefix:     keyPrefix,
+		privateBucket: cs.S3PrivateBucket,
+		presignExpire: expire,
 	}, nil
 }
 
@@ -94,24 +110,25 @@ func (s *s3Storage) Put(ctx context.Context, key string, body io.Reader, _ int64
 	}
 	full := s.fullKey(key)
 
-	_, err := s.uploader.Upload(ctx, &s3.PutObjectInput{
+	// 私有 bucket 大多禁止 PublicRead ACL（设了会被服务端 reject）。
+	// 公开模式下保留 ACL，让对象直接公网可读（最常见的简化部署）。
+	putInput := &s3.PutObjectInput{
 		Bucket:       &s.bucket,
 		Key:          &full,
 		Body:         body,
 		ContentType:  &contentType,
 		CacheControl: &cacheControl,
-		ACL:          types.ObjectCannedACLPublicRead,
-	})
+	}
+	if !s.privateBucket {
+		putInput.ACL = types.ObjectCannedACLPublicRead
+	}
+
+	_, err := s.uploader.Upload(ctx, putInput)
 	if err != nil {
-		// 部分私有云不支持 ACL；fallback 不带 ACL 再试一次
-		if isACLNotSupported(err) {
-			_, err2 := s.uploader.Upload(ctx, &s3.PutObjectInput{
-				Bucket:       &s.bucket,
-				Key:          &full,
-				Body:         body,
-				ContentType:  &contentType,
-				CacheControl: &cacheControl,
-			})
+		// 公开模式下部分私有云不支持 ACL；fallback 不带 ACL 再试一次
+		if !s.privateBucket && isACLNotSupported(err) {
+			putInput.ACL = ""
+			_, err2 := s.uploader.Upload(ctx, putInput)
 			if err2 != nil {
 				return "", fmt.Errorf("storage s3: upload (no acl): %w", err2)
 			}
@@ -119,7 +136,7 @@ func (s *s3Storage) Put(ctx context.Context, key string, body io.Reader, _ int64
 			return "", fmt.Errorf("storage s3: upload: %w", err)
 		}
 	}
-	return s.publicURLFor(full), nil
+	return s.publicURLFor(ctx, full)
 }
 
 func (s *s3Storage) Delete(ctx context.Context, key string) error {
@@ -177,25 +194,37 @@ func (s *s3Storage) Get(ctx context.Context, key string) (io.ReadCloser, string,
 	return out.Body, ct, nil
 }
 
-// publicURLFor 拼接对外 URL；如果配置了 S3PublicBaseURL 优先用它
-func (s *s3Storage) publicURLFor(fullKey string) string {
+// publicURLFor 决定对外 URL：
+//   - 私有 bucket：返回 GET 预签名 URL（带 X-Amz-Signature，有有效期）
+//   - 公开 bucket：返回明文 URL（CDN > endpoint 拼接）
+func (s *s3Storage) publicURLFor(ctx context.Context, fullKey string) (string, error) {
+	if s.privateBucket {
+		req, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+			Bucket: &s.bucket,
+			Key:    &fullKey,
+		}, s3.WithPresignExpires(s.presignExpire))
+		if err != nil {
+			return "", fmt.Errorf("storage s3: presign: %w", err)
+		}
+		return req.URL, nil
+	}
 	if s.publicURL != "" {
-		return s.publicURL + "/" + fullKey
+		return s.publicURL + "/" + fullKey, nil
 	}
 	if s.endpoint == "" {
 		// 默认 AWS 模板
-		return fmt.Sprintf("https://%s.s3.amazonaws.com/%s", s.bucket, fullKey)
+		return fmt.Sprintf("https://%s.s3.amazonaws.com/%s", s.bucket, fullKey), nil
 	}
 	u, err := url.Parse(s.endpoint)
 	if err != nil {
-		return fmt.Sprintf("%s/%s/%s", s.endpoint, s.bucket, fullKey)
+		return fmt.Sprintf("%s/%s/%s", s.endpoint, s.bucket, fullKey), nil
 	}
 	if s.pathStyle {
 		// {scheme}://{host}/{bucket}/{key}
-		return fmt.Sprintf("%s://%s/%s/%s", u.Scheme, u.Host, s.bucket, fullKey)
+		return fmt.Sprintf("%s://%s/%s/%s", u.Scheme, u.Host, s.bucket, fullKey), nil
 	}
 	// 虚拟主机模式：{scheme}://{bucket}.{host}/{key}
-	return fmt.Sprintf("%s://%s.%s/%s", u.Scheme, s.bucket, u.Host, fullKey)
+	return fmt.Sprintf("%s://%s.%s/%s", u.Scheme, s.bucket, u.Host, fullKey), nil
 }
 
 func isACLNotSupported(err error) bool {

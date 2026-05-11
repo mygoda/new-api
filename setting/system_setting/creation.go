@@ -41,6 +41,15 @@ type CreationSetting struct {
 	S3PublicBaseURL   string `json:"s3_public_base_url"`  // 自定义 CDN/公网 URL 前缀（结尾不带 /）；为空则按 endpoint 拼
 	S3KeyPrefix       string `json:"s3_key_prefix"`       // 所有对象 key 前缀，例如 "creation/"
 
+	// S3PrivateBucket=true 时：
+	//   - 上传不加 PublicRead ACL（兼容禁止公共 ACL 的私有 bucket）
+	//   - 返回的访问 URL 改为 GET 预签名 URL（带 X-Amz-Signature），客户端浏览器可拉取
+	// 注意：预签名 URL 有过期时间，超期后图片会 403。配合 S3PresignExpireSeconds 调整。
+	S3PrivateBucket bool `json:"s3_private_bucket"`
+	// 预签名 URL 有效期（秒）。<=0 时使用默认 86400（24 小时）。
+	// AWS 上限 7 天（604800）；多数 S3 兼容服务也接受这个范围。
+	S3PresignExpireSeconds int `json:"s3_presign_expire_seconds"`
+
 	// === 上游 URL 镜像 ===
 	// 火山方舟 / 可灵 / Hailuo / Vidu / 阿里 等多数视频/图像生成接口返回的是 24 小时内有效的临时 URL。
 	// 默认 false：直接展示原始上游 URL；设为 true：任务成功后异步把资源拉到本地存储，回写 ResultURL。
@@ -71,6 +80,8 @@ var defaultCreationSetting = CreationSetting{
 	S3UsePathStyle:           false,
 	S3PublicBaseURL:          "",
 	S3KeyPrefix:              "creation/",
+	S3PrivateBucket:          false,
+	S3PresignExpireSeconds:   86400,
 	MirrorUpstreamUrls:       false,
 	MirrorDownloadTimeoutSec: 60,
 	MirrorMaxFileMB:          100,

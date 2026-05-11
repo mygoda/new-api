@@ -129,6 +129,20 @@ const FIELDS = [
     section: 's3',
     placeholder: 'creation/',
   },
+  {
+    key: 's3_private_bucket',
+    label: '私有 Bucket',
+    type: 'bool',
+    section: 's3',
+    help: '勾选后：上传不带 PublicRead ACL；访问 URL 改为带签名的预签名 URL，到期前可公开拉取，到期后 403。适用于 OSS/COS/TOS 的私有桶。',
+  },
+  {
+    key: 's3_presign_expire_seconds',
+    label: '预签名 URL 有效期（秒）',
+    type: 'number',
+    section: 's3',
+    help: '仅在「私有 Bucket」勾选时生效。默认 86400（24 小时），上限 604800（7 天）。',
+  },
 
   // mirror
   {
@@ -183,6 +197,9 @@ export default function CreationSetting() {
         s3_public_base_url: values.s3_public_base_url || '',
         s3_key_prefix: values.s3_key_prefix || '',
         s3_use_path_style: !!values.s3_use_path_style,
+        s3_private_bucket: !!values.s3_private_bucket,
+        s3_presign_expire_seconds:
+          Number(values.s3_presign_expire_seconds) || 0,
       };
       if (values.s3_access_key_secret) {
         body.s3_access_key_secret = String(values.s3_access_key_secret);

@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strconv"
 	"sync"
 
 	"github.com/QuantumNous/new-api/setting/system_setting"
@@ -90,7 +91,9 @@ func configKey(cs *system_setting.CreationSetting) string {
 		"\x00" + cs.S3Endpoint + "\x00" + cs.S3Region + "\x00" + cs.S3Bucket +
 		"\x00" + cs.S3AccessKeyID + "\x00" + cs.S3AccessKeySecret +
 		"\x00" + cs.S3PublicBaseURL + "\x00" + cs.S3KeyPrefix +
-		"\x00" + boolStr(cs.S3UsePathStyle)
+		"\x00" + boolStr(cs.S3UsePathStyle) +
+		"\x00" + boolStr(cs.S3PrivateBucket) +
+		"\x00" + strconv.Itoa(cs.S3PresignExpireSeconds)
 }
 
 func boolStr(b bool) string {

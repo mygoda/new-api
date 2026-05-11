@@ -28,14 +28,16 @@ type TestCreationStorageReq struct {
 	LocalUploadPath    string `json:"local_upload_path"`
 	LocalPublicBaseURL string `json:"local_public_base_url"`
 
-	S3Endpoint        string `json:"s3_endpoint"`
-	S3Region          string `json:"s3_region"`
-	S3Bucket          string `json:"s3_bucket"`
-	S3AccessKeyID     string `json:"s3_access_key_id"`
-	S3AccessKeySecret string `json:"s3_access_key_secret"`
-	S3UsePathStyle    *bool  `json:"s3_use_path_style"`
-	S3PublicBaseURL   string `json:"s3_public_base_url"`
-	S3KeyPrefix       string `json:"s3_key_prefix"`
+	S3Endpoint             string `json:"s3_endpoint"`
+	S3Region               string `json:"s3_region"`
+	S3Bucket               string `json:"s3_bucket"`
+	S3AccessKeyID          string `json:"s3_access_key_id"`
+	S3AccessKeySecret      string `json:"s3_access_key_secret"`
+	S3UsePathStyle         *bool  `json:"s3_use_path_style"`
+	S3PublicBaseURL        string `json:"s3_public_base_url"`
+	S3KeyPrefix            string `json:"s3_key_prefix"`
+	S3PrivateBucket        *bool  `json:"s3_private_bucket"`
+	S3PresignExpireSeconds int    `json:"s3_presign_expire_seconds"`
 }
 
 // TestCreationStorage admin-only：用请求里的配置临时构造 storage，执行一次
@@ -67,6 +69,16 @@ func TestCreationStorage(c *gin.Context) {
 		cs.S3UsePathStyle = *req.S3UsePathStyle
 	} else {
 		cs.S3UsePathStyle = cur.S3UsePathStyle
+	}
+	if req.S3PrivateBucket != nil {
+		cs.S3PrivateBucket = *req.S3PrivateBucket
+	} else {
+		cs.S3PrivateBucket = cur.S3PrivateBucket
+	}
+	if req.S3PresignExpireSeconds > 0 {
+		cs.S3PresignExpireSeconds = req.S3PresignExpireSeconds
+	} else {
+		cs.S3PresignExpireSeconds = cur.S3PresignExpireSeconds
 	}
 
 	// newStorage 是包内私有，通过 storage.NewForTest 暴露一个测试入口。
