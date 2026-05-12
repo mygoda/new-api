@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 */
 
 import React, { useMemo, useState } from 'react';
-import { Typography, Input, Spin } from '@douyinfe/semi-ui';
+import { Typography, Input, Spin, Popover } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import { Search, Check } from 'lucide-react';
 
@@ -82,7 +82,9 @@ const ModelPicker = ({ models, value, onChange, loading = false }) => {
         ) : (
           list.map((m) => {
             const active = m.modelName === value;
-            return (
+            const hasPreview = m.styleTags?.length > 0 || m.previewImage || m.description;
+
+            const button = (
               <button
                 key={m.modelName}
                 type='button'
@@ -122,6 +124,40 @@ const ModelPicker = ({ models, value, onChange, loading = false }) => {
                   )}
                 </div>
               </button>
+            );
+
+            if (!hasPreview) return button;
+
+            return (
+              <Popover
+                key={m.modelName}
+                content={
+                  <div className='w-64 p-2'>
+                    {m.previewImage && (
+                      <img src={m.previewImage} className='w-full rounded mb-2' alt={m.modelName} />
+                    )}
+                    {m.styleTags && m.styleTags.length > 0 && (
+                      <div className='flex flex-wrap gap-1 mb-2'>
+                        {m.styleTags.map((tag) => (
+                          <span key={tag} className='px-2 py-0.5 bg-gray-100 text-gray-700 text-[10px] rounded'>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {m.description && (
+                      <Text type='tertiary' className='!text-[11px]'>
+                        {m.description}
+                      </Text>
+                    )}
+                  </div>
+                }
+                position='right'
+                trigger='hover'
+                showArrow
+              >
+                {button}
+              </Popover>
             );
           })
         )}

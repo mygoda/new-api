@@ -14,11 +14,11 @@ const STAGES = [
   { key: 'finalizing', icon: '🎬', text: '即将完成' },
 ];
 
-// 模型类型 -> 期望时长（秒）
+// 模型类型 -> 期望时长范围（秒）
 const EXPECTED_DURATION = {
-  image: 25,
-  video: 90,
-  default: 30,
+  image: { min: 10, max: 30 },
+  video: { min: 60, max: 120 },
+  default: { min: 15, max: 45 },
 };
 
 /**
@@ -33,12 +33,13 @@ export function getProgressNarrative(asset) {
   const now = Date.now();
   const elapsed = Math.max(0, (now - (asset.createdAt || now)) / 1000);
   const expected = EXPECTED_DURATION[asset.modality] || EXPECTED_DURATION.default;
+  const avgExpected = (expected.min + expected.max) / 2;
 
   // 1. 进度优先用后端真实值；没有则按时间合成
   let progress = asset.progress;
   if (progress == null || progress <= 0) {
     // 时间合成：缓启动 + 渐近 95%
-    const ratio = Math.min(1, elapsed / expected);
+    const ratio = Math.min(1, elapsed / avgExpected);
     progress = Math.round(95 * (1 - Math.pow(1 - ratio, 2)));
   }
   progress = Math.min(99, Math.max(0, progress));
@@ -50,17 +51,19 @@ export function getProgressNarrative(asset) {
   else if (progress < 90) stage = STAGES[2];
   else stage = STAGES[3];
 
-  // 3. 剩余预估
-  const remaining = Math.max(0, expected - elapsed);
+  // 3. 剩余预估：初始阶段显示范围，后续显示具体时间
   let etaText;
-  if (remaining > 60) {
-    etaText = `约 ${Math.ceil(remaining / 60)} 分钟`;
-  } else if (remaining > 10) {
-    etaText = `约 ${Math.ceil(remaining / 10) * 10} 秒`;
-  } else if (remaining > 0) {
-    etaText = '即将完成';
+  if (progress < 25) {
+    etaText = `预计 ${expected.min}-${expected.max}s`;
   } else {
-    etaText = '稍候片刻';
+    const remaining = Math.max(0, avgExpected - elapsed);
+    if (remaining > 60) {
+      etaText = `约 ${Math.ceil(remaining / 60)} 分钟`;
+    } else if (remaining > 10) {
+      etaText = `约 ${Math.ceil(remaining / 10) * 10} 秒`;
+    } else {
+      etaText = '即将完成';
+    }
   }
 
   return {

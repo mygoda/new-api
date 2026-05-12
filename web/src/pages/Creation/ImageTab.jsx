@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Button, Toast, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { Send, Code2, Layers } from 'lucide-react';
+import { Send, Code2, Layers, Grid3x3, List } from 'lucide-react';
 
 import ModelPicker from '../../components/creation/ModelPicker';
 import PromptComposer from '../../components/creation/PromptComposer';
@@ -107,6 +107,10 @@ const ImageTab = () => {
   const [submitting, setSubmitting] = useState(false);
   const [assets, setAssets] = useState(loadAssets);
   const [showBatch, setShowBatch] = useState(false);
+  const [viewMode, setViewMode] = useState(() => {
+    const cfg = loadConfig(MODALITY);
+    return cfg?.viewMode || 'timeline';
+  });
   const debug = useDebugState();
 
   // 模型加载完成后自动选中 + 合并默认参数
@@ -189,8 +193,8 @@ const ImageTab = () => {
   }, []);
 
   React.useEffect(() => {
-    saveConfig(MODALITY, { model, params, prompt });
-  }, [model, params, prompt]);
+    saveConfig(MODALITY, { model, params, prompt, viewMode });
+  }, [model, params, prompt, viewMode]);
 
   useEffect(() => {
     if (!schema || !prompt) {
@@ -647,80 +651,143 @@ const ImageTab = () => {
 
       {/* 中央 - 创作区 */}
       <main className='flex-1 flex flex-col overflow-hidden'>
-        {/* 作品流（时间轴：最旧在上，最新在下） */}
-        <div ref={timelineRef} className='flex-1 overflow-y-auto'>
-          {imageAssets.length === 0 ? (
-            <div className='min-h-full flex items-center'>
-              <PresetGrid
-                modality={MODALITY}
-                availableModels={models}
-                onApply={applyPreset}
-              />
-            </div>
-          ) : (
-            <div className='max-w-4xl mx-auto px-6 py-6 space-y-8'>
-              {timelineDays.map(({ key, date, rows }) => (
-                <section key={key} className='space-y-3'>
-                  {/* 日分隔 */}
-                  <div className='flex items-center gap-3 sticky top-0 z-[1] py-1 bg-[#fafafa]/85 backdrop-blur'>
-                    <div className='h-px flex-1 bg-gray-200/70' />
-                    <Text type='tertiary' className='!text-[11px] !text-gray-500'>
-                      {formatDayLabel(date)}
-                    </Text>
-                    <div className='h-px flex-1 bg-gray-200/70' />
-                  </div>
+        {/* 作品流 */}
+        {viewMode === 'timeline' ? (
+          <div ref={timelineRef} className='flex-1 overflow-y-auto'>
+            {imageAssets.length === 0 ? (
+              <div className='min-h-full flex items-center'>
+                <PresetGrid
+                  modality={MODALITY}
+                  availableModels={models}
+                  onApply={applyPreset}
+                />
+              </div>
+            ) : (
+              <div className='max-w-4xl mx-auto px-6 py-6 space-y-8'>
+                {timelineDays.map(({ key, date, rows }) => (
+                  <section key={key} className='space-y-3'>
+                    {/* 日分隔 */}
+                    <div className='flex items-center gap-3 sticky top-0 z-[1] py-1 bg-[#fafafa]/85 backdrop-blur'>
+                      <div className='h-px flex-1 bg-gray-200/70' />
+                      <Text type='tertiary' className='!text-[11px] !text-gray-500'>
+                        {formatDayLabel(date)}
+                      </Text>
+                      <div className='h-px flex-1 bg-gray-200/70' />
+                    </div>
 
-                  {rows.map((row) => (
-                    <TimelineItem key={row.id} createdAt={row.createdAt}>
-                      {row.kind === 'batch' ? (
-                        <BatchCompareCard
-                          batch={row}
-                          onReplay={handleReplay}
-                          onRetry={handleBatchRetryOne}
-                          onTileDelete={(asset) => {
-                            setAssets((prev) => prev.filter((a) => a.id !== asset.id));
-                            removeAsset(asset.id);
-                          }}
-                          onDelete={() => {
-                            setAssets((prev) => prev.filter((a) => a.batchId !== row.batchId));
-                            (row.items || []).forEach((it) => removeAsset(it.id));
-                          }}
-                        />
-                      ) : (
-                        (() => {
-                          const g = row;
-                          const allSuccess = (g.items || []).every((it) => it.status === 'success');
-                          const isMulti = (g.items || []).length > 1 && allSuccess;
-                          if (isMulti) {
+                    {rows.map((row) => (
+                      <TimelineItem key={row.id} createdAt={row.createdAt}>
+                        {row.kind === 'batch' ? (
+                          <BatchCompareCard
+                            batch={row}
+                            onReplay={handleReplay}
+                            onRetry={handleBatchRetryOne}
+                            onTileDelete={(asset) => {
+                              setAssets((prev) => prev.filter((a) => a.id !== asset.id));
+                              removeAsset(asset.id);
+                            }}
+                            onDelete={() => {
+                              setAssets((prev) => prev.filter((a) => a.batchId !== row.batchId));
+                              (row.items || []).forEach((it) => removeAsset(it.id));
+                            }}
+                          />
+                        ) : (
+                          (() => {
+                            const g = row;
+                            const allSuccess = (g.items || []).every((it) => it.status === 'success');
+                            const isMulti = (g.items || []).length > 1 && allSuccess;
+                            if (isMulti) {
+                              return (
+                                <AssetGroupCard
+                                  group={g}
+                                  onReplay={handleReplay}
+                                  onUpscale={handleUpscale}
+                                  onVariation={handleVariation}
+                                  onDelete={handleDeleteGroup}
+                                />
+                              );
+                            }
+                            const single = g.items[0];
                             return (
-                              <AssetGroupCard
-                                group={g}
+                              <AssetCard
+                                asset={single}
                                 onReplay={handleReplay}
-                                onUpscale={handleUpscale}
-                                onVariation={handleVariation}
-                                onDelete={handleDeleteGroup}
+                                onRetry={handleRetry}
+                                onSwitchModel={handleSwitchModel}
+                                onDelete={handleDelete}
                               />
                             );
-                          }
-                          const single = g.items[0];
+                          })()
+                        )}
+                      </TimelineItem>
+                    ))}
+                  </section>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className='flex-1 overflow-y-auto px-6 py-6'>
+            {imageAssets.length === 0 ? (
+              <div className='min-h-full flex items-center'>
+                <PresetGrid
+                  modality={MODALITY}
+                  availableModels={models}
+                  onApply={applyPreset}
+                />
+              </div>
+            ) : (
+              <div className='max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+                {renderRows.map((row) => (
+                  <div key={row.id}>
+                    {row.kind === 'batch' ? (
+                      <BatchCompareCard
+                        batch={row}
+                        onReplay={handleReplay}
+                        onRetry={handleBatchRetryOne}
+                        onTileDelete={(asset) => {
+                          setAssets((prev) => prev.filter((a) => a.id !== asset.id));
+                          removeAsset(asset.id);
+                        }}
+                        onDelete={() => {
+                          setAssets((prev) => prev.filter((a) => a.batchId !== row.batchId));
+                          (row.items || []).forEach((it) => removeAsset(it.id));
+                        }}
+                      />
+                    ) : (
+                      (() => {
+                        const g = row;
+                        const allSuccess = (g.items || []).every((it) => it.status === 'success');
+                        const isMulti = (g.items || []).length > 1 && allSuccess;
+                        if (isMulti) {
                           return (
-                            <AssetCard
-                              asset={single}
+                            <AssetGroupCard
+                              group={g}
                               onReplay={handleReplay}
-                              onRetry={handleRetry}
-                              onSwitchModel={handleSwitchModel}
-                              onDelete={handleDelete}
+                              onUpscale={handleUpscale}
+                              onVariation={handleVariation}
+                              onDelete={handleDeleteGroup}
                             />
                           );
-                        })()
-                      )}
-                    </TimelineItem>
-                  ))}
-                </section>
-              ))}
-            </div>
-          )}
-        </div>
+                        }
+                        const single = g.items[0];
+                        return (
+                          <AssetCard
+                            asset={single}
+                            onReplay={handleReplay}
+                            onRetry={handleRetry}
+                            onSwitchModel={handleSwitchModel}
+                            onDelete={handleDelete}
+                          />
+                        );
+                      })()
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 底部固定 - Prompt 输入 + 提交（仪式感） */}
         <div className='flex-shrink-0 px-6 pt-4 pb-5 bg-white border-t border-gray-200/70 shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.06)]'>
@@ -735,17 +802,24 @@ const ImageTab = () => {
             />
             <div className='mt-3 flex items-center justify-end'>
               <div className='flex items-center gap-2'>
-                <Tooltip content={t('批量对比 · 多模型同提示词')}>
+                <Tooltip content={viewMode === 'timeline' ? t('切换到网格视图') : t('切换到时间轴')}>
                   <Button
                     theme='borderless'
                     type='tertiary'
-                    icon={<Layers size={14} />}
-                    onClick={() => setShowBatch(true)}
-                    disabled={!prompt.trim() || models.length < 2}
-                  >
-                    {t('批量对比')}
-                  </Button>
+                    icon={viewMode === 'timeline' ? <Grid3x3 size={14} /> : <List size={14} />}
+                    onClick={() => setViewMode((v) => v === 'timeline' ? 'grid' : 'timeline')}
+                  />
                 </Tooltip>
+                <Button
+                  theme='light'
+                  type='primary'
+                  icon={<Layers size={14} />}
+                  onClick={() => setShowBatch(true)}
+                  disabled={!prompt.trim() || models.length < 2}
+                  className='!text-sm'
+                >
+                  {t('多模型对比')}
+                </Button>
                 <Tooltip content={t('调试面板（查看请求体 / 响应）')}>
                   <Button
                     theme={debug.showPanel ? 'solid' : 'borderless'}

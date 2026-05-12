@@ -5,11 +5,12 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 import React, { useState, useEffect } from 'react';
 import { TextArea, Button, Tooltip, Typography, Modal, Tabs, TabPane, Spin, Toast, Popover, Select } from '@douyinfe/semi-ui';
-import { Sparkles, Wand2, Tag as TagIcon, Settings2 } from 'lucide-react';
+import { Sparkles, Wand2, Tag as TagIcon, Settings2, History } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { PROMPT_EXAMPLES } from '../../constants/creation/prompt-examples';
 import { enhancePrompt, getEnhancerModel, setEnhancerModel } from '../../services/creation/promptEnhance';
 import { loadChatModels } from '../../services/creation/modelLoader';
+import { loadPromptHistory, addPromptHistory } from '../../services/creation/storage';
 import QuickTags from './QuickTags';
 
 const { Text } = Typography;
@@ -32,6 +33,8 @@ const PromptComposer = ({
   const [enhancerModel, setEnhancerModelState] = useState(getEnhancerModel());
   const [chatModels, setChatModels] = useState([]);
   const [showEnhancerCfg, setShowEnhancerCfg] = useState(false);
+  const [history, setHistory] = useState(() => loadPromptHistory());
+  const [showHistory, setShowHistory] = useState(false);
   const examples = PROMPT_EXAMPLES[modality] || [];
   const len = (value || '').length;
 
@@ -52,7 +55,11 @@ const PromptComposer = ({
   const handleKeyDown = (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      if (value && value.trim()) onSubmit?.();
+      if (value && value.trim()) {
+        addPromptHistory(value.trim());
+        setHistory(loadPromptHistory());
+        onSubmit?.();
+      }
     }
   };
 
@@ -138,6 +145,16 @@ const PromptComposer = ({
         >
           {t('快速标签')}
         </Button>
+        <Button
+          size='small'
+          theme={showHistory ? 'light' : 'borderless'}
+          type={showHistory ? 'primary' : 'tertiary'}
+          icon={<History size={12} />}
+          onClick={() => setShowHistory((v) => !v)}
+          className='!text-[11px] !text-gray-700 !h-6'
+        >
+          {t('历史')} {history.length > 0 && `(${history.length})`}
+        </Button>
         <Tooltip content={enhancerModel ? t('用 Chat 模型重写提示词') : t('请先在右侧齿轮中选择优化用的 Chat 模型')}>
           <Button
             size='small'
@@ -214,6 +231,30 @@ const PromptComposer = ({
       {showTags && (
         <div className='p-3 bg-gray-50 border border-gray-100 rounded-lg'>
           <QuickTags modality={modality} value={value} onChange={onChange} />
+        </div>
+      )}
+
+      {/* Prompt 历史 */}
+      {showHistory && history.length > 0 && (
+        <div className='max-h-48 overflow-y-auto border border-gray-200 rounded-lg bg-white'>
+          {history.map((p, idx) => (
+            <button
+              key={idx}
+              type='button'
+              onClick={() => {
+                onChange(p);
+                setShowHistory(false);
+              }}
+              className='w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-0 truncate transition-colors'
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      )}
+      {showHistory && history.length === 0 && (
+        <div className='p-4 text-center text-xs text-gray-400 border border-gray-200 rounded-lg bg-white'>
+          {t('暂无历史记录')}
         </div>
       )}
 

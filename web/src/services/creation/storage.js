@@ -104,3 +104,26 @@ export function genId() {
     Math.random().toString(36).slice(2, 10)
   );
 }
+
+// === Prompt 历史 ===
+
+const PROMPT_HISTORY_KEY = 'prompt_history';
+const PROMPT_HISTORY_MAX = 20;
+
+export function loadPromptHistory() {
+  const list = safeGet(PROMPT_HISTORY_KEY, []);
+  return Array.isArray(list) ? list : [];
+}
+
+export function savePromptHistory(list) {
+  safeSet(PROMPT_HISTORY_KEY, list.slice(0, PROMPT_HISTORY_MAX));
+}
+
+export function addPromptHistory(prompt) {
+  if (!prompt || !prompt.trim()) return;
+  const trimmed = prompt.trim();
+  const list = loadPromptHistory();
+  const filtered = list.filter((p) => p !== trimmed);
+  filtered.unshift(trimmed);
+  savePromptHistory(filtered);
+}
