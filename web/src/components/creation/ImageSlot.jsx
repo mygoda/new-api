@@ -5,7 +5,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 import React, { useRef, useState, useCallback } from 'react';
 import { Spin, Toast, Typography } from '@douyinfe/semi-ui';
-import { ImagePlus, X, Link as LinkIcon } from 'lucide-react';
+import { ImagePlus, X, Link as LinkIcon, Maximize2 } from 'lucide-react';
+import ImageLightbox from './ImageLightbox';
 import { useTranslation } from 'react-i18next';
 import { uploadImage } from '../../services/creation/imageUpload';
 
@@ -27,6 +28,7 @@ const ImageSlot = ({ label, value, onChange, maxSizeMB = 10 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlText, setUrlText] = useState('');
+  const [lightbox, setLightbox] = useState(false);
 
   const handleFile = useCallback(async (file) => {
     if (!file) return;
@@ -110,7 +112,7 @@ const ImageSlot = ({ label, value, onChange, maxSizeMB = 10 }) => {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={[
-          'relative w-full aspect-[4/3] rounded-lg border-2 border-dashed transition-colors flex items-center justify-center overflow-hidden group',
+          'relative w-full min-h-[200px] rounded-lg border-2 border-dashed transition-colors flex items-center justify-center overflow-hidden group',
           isFilled
             ? 'border-transparent bg-gray-50'
             : dragOver
@@ -141,6 +143,13 @@ const ImageSlot = ({ label, value, onChange, maxSizeMB = 10 }) => {
               className='absolute top-1.5 right-1.5 bg-black/50 hover:bg-black/70 rounded p-1 text-white transition-colors opacity-0 group-hover:opacity-100'
             >
               <X size={14} />
+            </button>
+            <button
+              type='button'
+              onClick={(e) => { e.stopPropagation(); setLightbox(true); }}
+              className='absolute bottom-1.5 right-1.5 bg-black/50 hover:bg-black/70 rounded p-1 text-white transition-colors opacity-0 group-hover:opacity-100'
+            >
+              <Maximize2 size={14} />
             </button>
           </>
         ) : (
@@ -181,6 +190,9 @@ const ImageSlot = ({ label, value, onChange, maxSizeMB = 10 }) => {
             {t('确定')}
           </button>
         </div>
+      )}
+      {lightbox && value && (
+        <ImageLightbox images={[value]} index={0} onClose={() => setLightbox(false)} />
       )}
 
       <input

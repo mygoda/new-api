@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, Button, Tag, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { Download, Copy, RotateCcw, Trash2, Image as ImageIcon, Video as VideoIcon, Sparkles, Maximize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import ImageLightbox from './ImageLightbox';
 import { getProgressNarrative } from '../../utils/creation/progressNarrative';
 import { copyText, downloadUrl } from '../../utils/creation/clipboard';
 
@@ -20,6 +21,7 @@ const AssetCard = ({ asset, onReplay, onDelete, onCopyPrompt, onRetry, onSwitchM
 
   // 生成中：每秒刷新进度叙事
   const [tick, setTick] = useState(0);
+  const [lightbox, setLightbox] = useState(false);
   useEffect(() => {
     if (status !== 'pending' && status !== 'in_progress' && status !== 'queued') return;
     const id = setInterval(() => setTick((t) => t + 1), 1000);
@@ -87,23 +89,35 @@ const AssetCard = ({ asset, onReplay, onDelete, onCopyPrompt, onRetry, onSwitchM
       );
     }
     return (
-      <div className='relative group/media'>
-        <img
-          src={asset.assetUrl}
-          alt={asset.prompt}
-          className='w-full rounded'
-          style={{ maxHeight: 480, objectFit: 'contain' }}
-          loading='lazy'
-        />
-        {/* 悬浮放大 */}
-        <button
-          onClick={() => window.open(asset.assetUrl, '_blank', 'noopener,noreferrer')}
-          className='absolute top-2 right-2 bg-black/55 hover:bg-black/75 backdrop-blur-sm text-white rounded p-1.5 opacity-0 group-hover/media:opacity-100 transition-opacity'
-          title={t('放大查看')}
-        >
-          <Maximize2 size={13} />
-        </button>
-      </div>
+      <>
+        <div className='relative group/media'>
+          <img
+            src={asset.assetUrl}
+            alt={asset.prompt}
+            className='w-full rounded cursor-zoom-in'
+            style={{ maxHeight: 480, objectFit: 'contain' }}
+            loading='lazy'
+            onClick={() => setLightbox(true)}
+          />
+          <button
+            onClick={() => setLightbox(true)}
+            className='absolute top-2 right-2 bg-black/55 hover:bg-black/75 backdrop-blur-sm text-white rounded p-1.5 opacity-0 group-hover/media:opacity-100 transition-opacity'
+            title={t('放大查看')}
+          >
+            <Maximize2 size={13} />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); downloadUrl(asset.assetUrl, `${asset.modelName || 'asset'}_${Date.now()}.png`); }}
+            className='absolute bottom-2 right-2 bg-black/55 hover:bg-black/75 backdrop-blur-sm text-white rounded p-1.5 transition-colors'
+            title={t('下载')}
+          >
+            <Download size={13} />
+          </button>
+        </div>
+        {lightbox && (
+          <ImageLightbox images={[asset.assetUrl]} index={0} onClose={() => setLightbox(false)} />
+        )}
+      </>
     );
   };
 

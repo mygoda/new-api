@@ -13,6 +13,7 @@ import { Card, Button, Tag, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { Download, Copy, RotateCcw, Trash2, Sparkles, Maximize2, Wand2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import AssetCard from './AssetCard';
+import ImageLightbox from './ImageLightbox';
 import { copyText, downloadUrl } from '../../utils/creation/clipboard';
 
 const { Text, Paragraph } = Typography;
@@ -27,6 +28,7 @@ const AssetGroupCard = ({
 }) => {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState(null);
+  const [lightboxIdx, setLightboxIdx] = useState(null);
 
   const items = group.items || [];
   if (items.length === 0) return null;
@@ -49,6 +51,7 @@ const AssetGroupCard = ({
                    items.length === 3 ? 'grid-cols-3' : 'grid-cols-2';
 
   return (
+    <>
     <Card bordered bodyStyle={{ padding: 12 }} className='!rounded-lg hover:shadow-md transition-shadow'>
       <div className={`grid ${gridCols} gap-1.5`}>
         {items.map((it, idx) => (
@@ -81,7 +84,7 @@ const AssetGroupCard = ({
               <div className='absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity flex items-end justify-center gap-1 pb-2'>
                 <Tooltip content={t('放大查看')}>
                   <button
-                    onClick={() => window.open(it.assetUrl, '_blank', 'noopener,noreferrer')}
+                    onClick={() => setLightboxIdx(idx)}
                     className='p-1.5 bg-white/95 hover:bg-white text-gray-700 rounded shadow-sm transition-colors'
                   >
                     <Maximize2 size={11} />
@@ -171,7 +174,16 @@ const AssetGroupCard = ({
         </div>
       </div>
     </Card>
-  );
+    {lightboxIdx !== null && (
+      <ImageLightbox
+        images={items.filter((it) => it.assetUrl).map((it) => it.assetUrl)}
+        index={lightboxIdx}
+        onClose={() => setLightboxIdx(null)}
+        onNav={setLightboxIdx}
+      />
+    )}
+  </>
+);
 };
 
 export default AssetGroupCard;

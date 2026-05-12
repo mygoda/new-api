@@ -26,6 +26,12 @@ const FieldRow = ({ field, name, value, onChange }) => {
   const { t } = useTranslation();
   const label = field.label ? t(field.label) : name;
 
+  const SIZE_LABEL = {
+    '1024x1024': '1:1', '512x512': '1:1', '256x256': '1:1',
+    '1024x1536': '2:3', '1536x1024': '3:2',
+    '1024x1792': '9:16', '1792x1024': '16:9',
+  };
+
   const renderControl = () => {
     switch (field.type) {
       case FIELD.segmented:
@@ -48,7 +54,7 @@ const FieldRow = ({ field, name, value, onChange }) => {
                       : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/60',
                   ].join(' ')}
                 >
-                  {String(opt)}
+                  {SIZE_LABEL[String(opt)] || String(opt)}
                 </button>
               );
             })}
