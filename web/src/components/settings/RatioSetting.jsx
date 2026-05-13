@@ -120,7 +120,7 @@ const RatioSetting = () => {
           <Tabs.TabPane tab={t('汇率设置')} itemKey='currency'>
             <CurrencySettings options={inputs} refresh={onRefresh} />
           </Tabs.TabPane>
-          <Tabs.TabPane tab={t('条件分价')} itemKey='conditional_ratio'>
+          <Tabs.TabPane tab={t('条件分价(v1 旧版)')} itemKey='conditional_ratio'>
             <ConditionalRatioSettings options={inputs} refresh={onRefresh} />
           </Tabs.TabPane>
         </Tabs>

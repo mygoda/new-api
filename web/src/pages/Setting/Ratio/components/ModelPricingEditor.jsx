@@ -49,6 +49,9 @@ import {
   useModelPricingEditorState,
 } from '../hooks/useModelPricingEditorState';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
+import ModelConditionalRulesEditor, {
+  useConditionalDimensions,
+} from './ModelConditionalRulesEditor';
 
 const { Text } = Typography;
 const EMPTY_CANDIDATE_MODEL_NAMES = [];
@@ -101,6 +104,7 @@ export default function ModelPricingEditor({
   const [addVisible, setAddVisible] = useState(false);
   const [batchVisible, setBatchVisible] = useState(false);
   const [newModelName, setNewModelName] = useState('');
+  const { dimensions: conditionalDimensions } = useConditionalDimensions();
 
   const {
     selectedModel,
@@ -128,6 +132,7 @@ export default function ModelPricingEditor({
     handleDeleteTier,
     handleTierFieldChange,
     handleTierEndThresholdChange,
+    handleConditionalRulesChange,
     handleSubmit,
     addModel,
     deleteModel,
@@ -867,6 +872,37 @@ export default function ModelPricingEditor({
                           </Button>
                         </div>
                       ) : null}
+                    </Card>
+
+                    <Card
+                      bodyStyle={{ padding: 16 }}
+                      style={{
+                        marginBottom: 16,
+                        background: 'var(--semi-color-fill-0)',
+                      }}
+                    >
+                      <div className='mb-3 flex items-start justify-between gap-3'>
+                        <div>
+                          <div className='font-medium'>
+                            {t('条件分价')}
+                            <Tag size='small' color='violet' className='!ml-2'>
+                              {(selectedModel.conditionalRules || []).length}{' '}
+                              {t('条规则')}
+                            </Tag>
+                          </div>
+                          <div className='text-xs text-gray-500 mt-1'>
+                            {t(
+                              '按请求维度组合切换不同档位的价格(如分辨率/是否含视频)。后端在 BaseBilling.AdjustBillingOnSubmit 自动应用,以"元/百万 token"输入。规则集非空即生效,与阶梯计费可叠加。',
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <ModelConditionalRulesEditor
+                        rules={selectedModel.conditionalRules || []}
+                        onChange={handleConditionalRulesChange}
+                        dimensions={conditionalDimensions}
+                        compact
+                      />
                     </Card>
                   </>
                 )}

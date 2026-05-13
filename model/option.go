@@ -67,6 +67,10 @@ func InitOptionMap() {
 	// 默认 JSON 此时已经包含所有已注册族(import 链触发了各 register.go)。
 	common.OptionMap["ConditionalRatios"] = common.ConditionalRatioDefaultJSON()
 	common.SetConditionalRatios(common.OptionMap["ConditionalRatios"])
+	// v2 通用条件分价: admin 可在前端为"任意模型"按"维度组合"自由配价,无需后端编译。
+	// 维度由各 adapter 通过 common.RegisterDimension 在 init() 注册;
+	// 默认配置为禁用 + 空规则集,首次开启后由 admin 自助填入规则。
+	common.OptionMap["ConditionalRatiosV2"] = ratio_setting.ConditionalRatiosV2JSONString()
 	// 首页 4 个 option 的默认值。先写入 common.X 变量,再镜像到 OptionMap。
 	// 这样 service 层读 common.X 即可拿到默认值;DB 有覆盖时由 loadOptionsFromDatabase 改 common.X。
 	common.HomeTestimonials = defaultHomeTestimonialsJSON()
@@ -652,6 +656,10 @@ func updateOptionMap(key string, value string) (err error) {
 		}
 	case "ConditionalRatios":
 		common.SetConditionalRatios(value)
+	case "ConditionalRatiosV2":
+		if err := ratio_setting.UpdateConditionalRatiosV2ByJSONString(value); err != nil {
+			common.SysError("ConditionalRatiosV2 parse failed: " + err.Error())
+		}
 	case "HomeStatsSLA":
 		common.HomeStatsSLA = value
 	case "HomeTestimonials":

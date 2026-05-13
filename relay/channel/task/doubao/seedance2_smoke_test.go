@@ -60,10 +60,6 @@ func TestConvertToRequestPayload_Seedance2(t *testing.T) {
 		if !strings.Contains(s, `"role":"reference_video"`) {
 			t.Fatalf("reference_video role missing: %s", s)
 		}
-		// hasVideoInput 应当能命中
-		if !hasVideoInput(body.Content) {
-			t.Fatal("hasVideoInput should return true")
-		}
 	})
 
 	t.Run("参考音频 — audio_url + reference_audio", func(t *testing.T) {

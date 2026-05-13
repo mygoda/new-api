@@ -29,6 +29,10 @@ export const EMPTY_MODEL = {
   },
   tieredEnabled: false,
   tiers: [],
+  // 条件分价 v2(per-request 任务模型按维度组合切档)。
+  // rules: [{ conditions: {dim: value}, price_rmb_per_million: number, label?: string }]
+  // 非空即视为启用 (后端 ApplyConditionalRatiosV2 在规则集为空时返回 nil)。
+  conditionalRules: [],
   hasConflict: false,
 };
 
@@ -87,6 +91,29 @@ export const parseOptionJSON = (rawValue) => {
   }
 };
 
+// parseConditionalRatiosV2 把全局 v2 配置 (含 enabled + models 列表) 转成
+// {[modelPattern]: rules[]} 形式,方便 buildModelState 按模型名取规则。
+// 不展开通配 pattern (xxx-*),前端编辑器对通配模型仍展示为整体规则集。
+export const parseConditionalRatiosV2 = (rawValue) => {
+  if (!rawValue || rawValue.trim() === '') return {};
+  try {
+    const obj = JSON.parse(rawValue);
+    if (!obj || typeof obj !== 'object' || !Array.isArray(obj.models)) {
+      return {};
+    }
+    const out = {};
+    for (const m of obj.models) {
+      if (m && typeof m.model_pattern === 'string' && m.model_pattern.trim()) {
+        out[m.model_pattern] = Array.isArray(m.rules) ? m.rules : [];
+      }
+    }
+    return out;
+  } catch (e) {
+    console.error('ConditionalRatiosV2 解析错误:', e);
+    return {};
+  }
+};
+
 const ratioToBasePrice = (ratio) => {
   const num = toNumberOrNull(ratio);
   if (num === null) return '';
@@ -127,6 +154,15 @@ export const buildModelState = (name, sourceMaps) => {
     inputPriceNumber !== null && hasValue(audioRatio)
       ? formatNumber(inputPriceNumber * Number(audioRatio))
       : '';
+
+  // 条件分价 v2: 从 ConditionalRatiosV2 全局配置里抠出本模型的规则集。
+  // 数据格式: { enabled:bool, models:[{model_pattern, rules:[...]}] }
+  // 这里按 model_pattern 精确匹配,通配规则(xxx-*)在前端不展开。
+  const conditionalRules = Array.isArray(
+    sourceMaps.ConditionalRatiosV2?.[name],
+  )
+    ? sourceMaps.ConditionalRatiosV2[name]
+    : [];
 
   const tieredRaw = sourceMaps.ModelRatioTiered?.[name];
   const tiers = Array.isArray(tieredRaw)
@@ -206,6 +242,7 @@ export const buildModelState = (name, sourceMaps) => {
     },
     tieredEnabled: tiers.length > 0,
     tiers,
+    conditionalRules,
     hasConflict:
       hasValue(fixedPrice) &&
       [
@@ -678,6 +715,7 @@ export function useModelPricingEditorState({
       AudioRatio: parseOptionJSON(options.AudioRatio),
       AudioCompletionRatio: parseOptionJSON(options.AudioCompletionRatio),
       ModelRatioTiered: parseOptionJSON(options.ModelRatioTiered),
+      ConditionalRatiosV2: parseConditionalRatiosV2(options.ConditionalRatiosV2),
     };
 
     const names = new Set([
@@ -692,6 +730,7 @@ export function useModelPricingEditorState({
       ...Object.keys(sourceMaps.AudioRatio),
       ...Object.keys(sourceMaps.AudioCompletionRatio),
       ...Object.keys(sourceMaps.ModelRatioTiered),
+      ...Object.keys(sourceMaps.ConditionalRatiosV2),
     ]);
 
     const nextModels = Array.from(names)
@@ -912,6 +951,16 @@ export function useModelPricingEditorState({
     }));
   };
 
+  // 设置当前模型的「条件分价 v2」规则集。
+  // newRules 直接覆盖当前 conditionalRules,空数组表示该模型不启用条件分价。
+  const handleConditionalRulesChange = (newRules) => {
+    if (!selectedModel) return;
+    upsertModel(selectedModel.name, (model) => ({
+      ...model,
+      conditionalRules: Array.isArray(newRules) ? newRules : [],
+    }));
+  };
+
   const handleTieredToggle = (checked) => {
     if (!selectedModel) return;
     upsertModel(selectedModel.name, (model) => {
@@ -1129,10 +1178,38 @@ export function useModelPricingEditorState({
         });
       }
 
+      // 条件分价 v2: 把所有模型的非空规则集合并为单一 option JSON。
+      // 与其它 per-model option (map) 不同, v2 是 {enabled, models: list} 形态,
+      // 这里独立组装并 PUT。
+      const v2Models = [];
+      for (const model of models) {
+        const rules = Array.isArray(model.conditionalRules)
+          ? model.conditionalRules.filter(
+              (r) =>
+                r &&
+                typeof r.price_rmb_per_million === 'number' &&
+                r.price_rmb_per_million > 0,
+            )
+          : [];
+        if (rules.length > 0) {
+          v2Models.push({
+            model_pattern: model.name,
+            rules,
+          });
+        }
+      }
+      const v2Payload = { enabled: true, models: v2Models };
+
       const requestQueue = Object.entries(output).map(([key, value]) =>
         API.put('/api/option/', {
           key,
           value: JSON.stringify(value, null, 2),
+        }),
+      );
+      requestQueue.push(
+        API.put('/api/option/', {
+          key: 'ConditionalRatiosV2',
+          value: JSON.stringify(v2Payload, null, 2),
         }),
       );
 
@@ -1180,6 +1257,7 @@ export function useModelPricingEditorState({
     handleDeleteTier,
     handleTierFieldChange,
     handleTierEndThresholdChange,
+    handleConditionalRulesChange,
     handleSubmit,
     addModel,
     deleteModel,
