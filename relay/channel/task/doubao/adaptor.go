@@ -25,20 +25,32 @@ import (
 // Request / Response structures
 // ============================
 
+// ContentItem 对应 PDF "content" 数组中的一项。
+// 单项最多承载一个媒体字段(image_url / video_url / audio_url / draft_task)。
 type ContentItem struct {
-	Type     string          `json:"type"`                // "text", "image_url" or "video"
-	Text     string          `json:"text,omitempty"`      // for text type
-	ImageURL *ImageURL       `json:"image_url,omitempty"` // for image_url type
-	Video    *VideoReference `json:"video,omitempty"`     // for video (sample) type
-	Role     string          `json:"role,omitempty"`      // reference_image / first_frame / last_frame
+	Type      string     `json:"type"`                  // text / image_url / video_url / audio_url / draft_task
+	Text      string     `json:"text,omitempty"`        // type=text
+	ImageURL  *MediaURL  `json:"image_url,omitempty"`   // type=image_url
+	VideoURL  *MediaURL  `json:"video_url,omitempty"`   // type=video_url (Seedance 2.0)
+	AudioURL  *MediaURL  `json:"audio_url,omitempty"`   // type=audio_url (Seedance 2.0)
+	DraftTask *DraftTask `json:"draft_task,omitempty"`  // type=draft_task (Seedance 1.5 pro)
+	Role      string     `json:"role,omitempty"`        // first_frame / last_frame / reference_image / reference_video / reference_audio
 }
 
-type ImageURL struct {
+// MediaURL 统一承载 image_url / video_url / audio_url 对象。
+// 字段语义对齐 PDF：url 可以是公网 URL、Base64 编码或 asset://<ID>。
+type MediaURL struct {
 	URL string `json:"url"`
 }
 
-type VideoReference struct {
-	URL string `json:"url"` // Draft video URL
+// DraftTask 用于 Seedance 1.5 pro 基于样片任务 ID 生成正式视频。
+type DraftTask struct {
+	ID string `json:"id"`
+}
+
+// Tool 配置 Seedance 2.0 系列支持的工具调用(目前仅 web_search)。
+type Tool struct {
+	Type string `json:"type"`
 }
 
 type requestPayload struct {
@@ -50,6 +62,8 @@ type requestPayload struct {
 	ExecutionExpiresAfter dto.IntValue   `json:"execution_expires_after,omitempty"`
 	GenerateAudio         *dto.BoolValue `json:"generate_audio,omitempty"`
 	Draft                 *dto.BoolValue `json:"draft,omitempty"`
+	Tools                 []Tool         `json:"tools,omitempty"`             // Seedance 2.0 系列
+	SafetyIdentifier      string         `json:"safety_identifier,omitempty"` // Seedance 2.0 系列
 	Resolution            string         `json:"resolution,omitempty"`
 	Ratio                 string         `json:"ratio,omitempty"`
 	Duration              dto.IntValue   `json:"duration,omitempty"`
@@ -236,7 +250,7 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 		Content: []ContentItem{},
 	}
 
-	// Add text prompt
+	// 1. text
 	if req.Prompt != "" {
 		r.Content = append(r.Content, ContentItem{
 			Type: "text",
@@ -244,25 +258,50 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 		})
 	}
 
-	// Add images if present
+	// 2. images (含 role:first_frame / last_frame / reference_image,role 可空,由调用方按需指定)
 	if req.HasImage() {
-		for _, imgURL := range req.Images {
+		for i, imgURL := range req.Images {
+			role := ""
+			if i < len(req.ImageRoles) {
+				role = req.ImageRoles[i]
+			}
 			r.Content = append(r.Content, ContentItem{
-				Type: "image_url",
-				ImageURL: &ImageURL{
-					URL: imgURL,
-				},
+				Type:     "image_url",
+				ImageURL: &MediaURL{URL: imgURL},
+				Role:     role,
 			})
 		}
 	}
 
-	// 先把 metadata 里的字段塞进 r,再用顶层字段做兜底覆盖。
-	// 兜底原因:前端 normalizer 在 body 顶层有 duration / seed,而历史上这些没进
-	// metadata,旧版 adapter 因此漏掉这两个字段。fall back 保证两端都能用。
+	// 3. videos — Seedance 2.0 系列参考视频,role 固定 reference_video
+	for _, vURL := range req.Videos {
+		r.Content = append(r.Content, ContentItem{
+			Type:     "video_url",
+			VideoURL: &MediaURL{URL: vURL},
+			Role:     "reference_video",
+		})
+	}
+
+	// 4. audios — Seedance 2.0 系列参考音频,role 固定 reference_audio
+	for _, aURL := range req.Audios {
+		r.Content = append(r.Content, ContentItem{
+			Type:     "audio_url",
+			AudioURL: &MediaURL{URL: aURL},
+			Role:     "reference_audio",
+		})
+	}
+
+	// 5. metadata 整段反序列化覆盖。
+	//    保留原有契约:用户可在 metadata 里传入完整 content 数组 / tools / safety_identifier
+	//    等 PDF 字段以覆盖上面默认装配的内容。
+	//    先把 metadata 里的字段塞进 r,再用顶层字段做兜底覆盖。
 	metadata := req.Metadata
 	if err := taskcommon.UnmarshalMetadata(metadata, &r); err != nil {
 		return nil, errors.Wrap(err, "unmarshal metadata failed")
 	}
+
+	// 6. duration 兜底:前端 normalizer 在 body 顶层有 duration,而历史上这字段
+	//    未必进 metadata。fall back 保证两端都能用。
 	if req.Duration != 0 && r.Duration == 0 {
 		r.Duration = dto.IntValue(req.Duration)
 	}

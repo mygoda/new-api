@@ -676,6 +676,9 @@ type TaskSubmitReq struct {
 	Mode           string                 `json:"mode,omitempty"`
 	Image          string                 `json:"image,omitempty"`
 	Images         []string               `json:"images,omitempty"`
+	ImageRoles     []string               `json:"image_roles,omitempty"` // 与 Images 等长可选,用于 Seedance 首尾帧 / 参考图区分 role
+	Videos         []string               `json:"videos,omitempty"`      // 参考视频 URL,Seedance 2.0 系列支持
+	Audios         []string               `json:"audios,omitempty"`      // 参考音频 URL,Seedance 2.0 系列支持
 	Size           string                 `json:"size,omitempty"`
 	Duration       int                    `json:"duration,omitempty"`
 	Seconds        string                 `json:"seconds,omitempty"`
