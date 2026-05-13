@@ -204,8 +204,27 @@ func RMBPriceToRatio(priceRMBPerMillion float64) float64 {
 	return priceRMBPerMillion / (USD2RMB * 2)
 }
 
+// ConditionalRatioV2Match 描述本次请求命中的 v2 规则元数据,
+// 供 BaseBilling.AdjustBillingOnSubmit 写入 PriceData.OtherInfo,最终到日志展示。
+type ConditionalRatioV2Match struct {
+	ModelPattern       string
+	RuleLabel          string
+	Conditions         map[string]any
+	PriceRMBPerMillion float64
+	Multiplier         float64
+	BaseRatio          float64
+	TargetRatio        float64
+	// Snapshot 是本次请求所有可提取维度的完整快照(不只是命中规则用到的),
+	// 让日志详情展示"实际请求是 480p/720p/1080p,是否含视频/音频"等完整上下文,
+	// 帮助运营快速确认计费来源是否正确。
+	Snapshot map[string]any
+}
+
 // ApplyConditionalRatiosV2 由 BaseBilling.AdjustBillingOnSubmit 调用。
 // 返回 OtherRatios map (key 任意,框架按 ∏ 乘进 quota);未命中或未启用时返回 nil。
+//
+// 同时通过 match (out 参数) 回填命中规则的可读化元数据,供日志展示。
+// 调用方可传 nil match 表示不需要详情。
 //
 // 工作流程:
 //  1. 检查 v2 总开关
@@ -217,11 +236,18 @@ func RMBPriceToRatio(priceRMBPerMillion float64) float64 {
 // 关键点: 我们计算的是"目标 ratio / 模型基准 ratio"作为乘子,因为框架已经
 // 用 modelRatio 算了 baseQuota,这里只能用乘子修正,无法直接覆盖 modelRatio。
 func ApplyConditionalRatiosV2(modelName string, taskBody []byte) map[string]float64 {
+	ratios, _ := ApplyConditionalRatiosV2WithMatch(modelName, taskBody)
+	return ratios
+}
+
+// ApplyConditionalRatiosV2WithMatch 与上面同语义,同时返回命中规则元数据。
+// 调用方拿到 match 后可写到 PriceData.OtherInfo 以便日志展示。
+func ApplyConditionalRatiosV2WithMatch(modelName string, taskBody []byte) (map[string]float64, *ConditionalRatioV2Match) {
 	v2ConfigMu.RLock()
 	cfg := v2Config
 	v2ConfigMu.RUnlock()
 	if cfg == nil || !cfg.Enabled || len(cfg.Models) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// 1. 找模型规则集
@@ -243,7 +269,7 @@ func ApplyConditionalRatiosV2(modelName string, taskBody []byte) map[string]floa
 		}
 	}
 	if modelRules == nil || len(modelRules.Rules) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// 2. 提取维度快照
@@ -252,21 +278,42 @@ func ApplyConditionalRatiosV2(modelName string, taskBody []byte) map[string]floa
 	// 3. 选最具体的规则
 	rule, ok := selectBestRule(modelRules.Rules, snapshot)
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
 	// 4. 计算目标 ratio 与基准 ratio 的比值作为乘子
 	baseRatio, baseOK, _ := GetModelRatio(modelName)
 	if !baseOK || baseRatio <= 0 {
-		return nil
+		return nil, nil
 	}
 	targetRatio := RMBPriceToRatio(rule.PriceRMBPerMillion)
 	if targetRatio <= 0 {
-		return nil
+		return nil, nil
 	}
 	multiplier := targetRatio / baseRatio
 	if multiplier <= 0 {
-		return nil
+		return nil, nil
 	}
-	return map[string]float64{"conditional_v2": multiplier}
+
+	// 复制 conditions 避免并发读
+	condCopy := make(map[string]any, len(rule.Conditions))
+	for k, v := range rule.Conditions {
+		condCopy[k] = v
+	}
+	// 复制完整维度快照,便于日志展示"实际请求长什么样"
+	snapCopy := make(map[string]any, len(snapshot))
+	for k, v := range snapshot {
+		snapCopy[k] = v
+	}
+	match := &ConditionalRatioV2Match{
+		ModelPattern:       modelRules.ModelPattern,
+		RuleLabel:          rule.Label,
+		Conditions:         condCopy,
+		PriceRMBPerMillion: rule.PriceRMBPerMillion,
+		Multiplier:         multiplier,
+		BaseRatio:          baseRatio,
+		TargetRatio:        targetRatio,
+		Snapshot:           snapCopy,
+	}
+	return map[string]float64{"conditional_v2": multiplier}, match
 }

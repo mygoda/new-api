@@ -21,6 +21,10 @@ type PriceData struct {
 	AudioRatio           float64
 	AudioCompletionRatio float64
 	OtherRatios          map[string]float64
+	// OtherInfo 任意元数据(字符串值),由 adaptor / 计费扩展写入,
+	// 最终镜像到 task BillingContext + 日志 other 字段,供运维查清楚扣费由来。
+	// 例如条件分价 v2 命中规则的 label/conditions/price 等。
+	OtherInfo            map[string]string
 	UsePrice             bool
 	Quota                int // 按次计费的最终额度（MJ / Task）
 	QuotaToPreConsume    int // 按量计费的预消耗额度
@@ -41,6 +45,17 @@ func (p *PriceData) AddOtherRatio(key string, ratio float64) {
 		return
 	}
 	p.OtherRatios[key] = ratio
+}
+
+// AddOtherInfo 追加一个字符串元数据条目,用于日志可读化展示。
+func (p *PriceData) AddOtherInfo(key, value string) {
+	if value == "" {
+		return
+	}
+	if p.OtherInfo == nil {
+		p.OtherInfo = make(map[string]string)
+	}
+	p.OtherInfo[key] = value
 }
 
 func (p *PriceData) ToSetting() string {

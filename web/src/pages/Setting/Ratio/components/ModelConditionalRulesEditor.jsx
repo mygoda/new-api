@@ -208,21 +208,21 @@ export default function ModelConditionalRulesEditor({
               );
             })}
 
+            {/* 加条件:用 optionList 数据驱动而非 children,避免 dimensions
+                异步加载完成后 Select children 不刷新的兼容问题 */}
             <Select
               size='small'
               placeholder={t('+ 加条件')}
               value={null}
               onChange={(val) => addCondition(idx, val)}
-              style={{ width: 200 }}
-            >
-              {filteredDimensions
+              style={{ width: 220 }}
+              optionList={filteredDimensions
                 .filter((d) => !(d.key in (rule.conditions || {})))
-                .map((d) => (
-                  <Select.Option key={d.key} value={d.key}>
-                    {d.label} ({d.key})
-                  </Select.Option>
-                ))}
-            </Select>
+                .map((d) => ({
+                  value: d.key,
+                  label: `${d.label} (${d.key})`,
+                }))}
+            />
           </div>
 
           {/* 价格 */}

@@ -113,13 +113,24 @@ func taskAdjustTokenQuota(ctx context.Context, task *model.Task, delta int) {
 }
 
 // taskBillingOther 从 task 的 BillingContext 构建日志 Other 字段。
+// 输出尽量完整(基准 model_ratio / 各类乘子 / 命中规则元数据),便于
+// 运营在使用日志详情里一眼看清扣费由来。
 func taskBillingOther(task *model.Task) map[string]interface{} {
 	other := make(map[string]interface{})
 	if bc := task.PrivateData.BillingContext; bc != nil {
 		other["model_price"] = bc.ModelPrice
 		other["group_ratio"] = bc.GroupRatio
+		if bc.ModelRatio > 0 {
+			other["model_ratio"] = bc.ModelRatio
+		}
 		if len(bc.OtherRatios) > 0 {
 			for k, v := range bc.OtherRatios {
+				other[k] = v
+			}
+		}
+		// 任意元数据(条件分价命中规则等),让日志能直接看到"为什么扣这么多"
+		if len(bc.OtherInfo) > 0 {
+			for k, v := range bc.OtherInfo {
 				other[k] = v
 			}
 		}

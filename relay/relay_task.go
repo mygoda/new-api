@@ -376,7 +376,13 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 		return
 	}
 
-	isOpenAIVideoAPI := strings.HasPrefix(c.Request.RequestURI, "/v1/videos/")
+	// OpenAI Video API 路径: 同时支持 `/v1/videos/...` (OpenAI 官方 list/get) 与
+	// `/v1/video/generations/...` (本项目创作中心轮询所用,单数 video)。
+	// 缺一会导致 RelayTaskFetch 走通用 TaskDto 分支,前端拿不到 status=completed
+	// 与 metadata.url,任务终态识别失败、视频不展示。
+	uri := c.Request.RequestURI
+	isOpenAIVideoAPI := strings.HasPrefix(uri, "/v1/videos/") ||
+		strings.HasPrefix(uri, "/v1/video/generations/")
 
 	// Gemini/Vertex 支持实时查询：用户 fetch 时直接从上游拉取最新状态
 	if realtimeResp := tryRealtimeFetch(originTask, isOpenAIVideoAPI); len(realtimeResp) > 0 {
