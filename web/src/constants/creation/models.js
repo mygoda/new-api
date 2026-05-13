@@ -360,7 +360,7 @@ export const VIDEO_MODELS = [
     modality: 'video',
     protocol: 'openai-video',
     endpoint: '/v1/video/generations',
-    modes: ['t2v', 'i2v'],
+    modes: ['t2v', 'i2v', 'keyframes', 'refs'],
     fields: {
       duration: {
         type: FIELD.segmented,
@@ -401,13 +401,27 @@ export const VIDEO_MODELS = [
         label: '返回尾帧图',
         help: '开启后查询接口可拿到本视频的尾帧 PNG,可作为下一段视频的首帧,实现长视频拼接。',
       },
+      tools_web_search: {
+        type: FIELD.switch,
+        default: false,
+        group: PARAM_GROUP.advanced,
+        label: '启用联网搜索',
+        help: 'Seedance 2.0 系列独有。开启后模型可在生成时自主联网搜索(如商品/天气),提升时效性但会增加时延。',
+      },
+      safety_identifier: {
+        type: FIELD.textarea,
+        default: '',
+        group: PARAM_GROUP.advanced,
+        label: '终端用户标识',
+        help: '可选。建议传用户 ID / 邮箱的哈希值(英文,≤64 字),便于平台溯源违规用户。',
+      },
       service_tier: {
         type: FIELD.segmented,
-        options: ['default', 'flex'],
+        options: ['default'],
         default: 'default',
         group: PARAM_GROUP.advanced,
         label: '服务等级',
-        help: 'default = 在线推理(快);flex = 离线推理(慢但价格 50%)。Seedance 2.0 不支持 flex。',
+        help: 'Seedance 2.0 不支持 flex 离线推理,固定 default。',
       },
       watermark: {
         type: FIELD.switch,

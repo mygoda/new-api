@@ -13,6 +13,8 @@ import PromptComposer from '../../components/creation/PromptComposer';
 import ParamPanel from '../../components/creation/ParamPanel';
 import AssetCard from '../../components/creation/AssetCard';
 import ImageSlot from '../../components/creation/ImageSlot';
+import VideoSlot from '../../components/creation/VideoSlot';
+import AudioSlot from '../../components/creation/AudioSlot';
 import PresetGrid from '../../components/creation/PresetGrid';
 import CreationDebugPanel from '../../components/creation/CreationDebugPanel';
 import ModelFilterInfo from '../../components/creation/ModelFilterInfo';
@@ -91,6 +93,158 @@ function formatDayLabel(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// 多模态参考槽位面板:管理 1~9 图 / 0~3 视频 / 0~3 音频。
+// 内部按 PDF 上限做软约束;后端 normalizer 再做硬校验。
+const RefSlotPanel = ({
+  t,
+  imagesRef,
+  setImagesRef,
+  videosRef,
+  setVideosRef,
+  audiosRef,
+  setAudiosRef,
+}) => {
+  const MAX_IMG = 9;
+  const MAX_VID = 3;
+  const MAX_AUD = 3;
+
+  const updateAt = (list, setter, idx, val) => {
+    const next = [...list];
+    next[idx] = val;
+    if (!val) {
+      // 删除时压缩数组,避免空位散落
+      const cleaned = next.filter(Boolean);
+      setter(cleaned);
+    } else {
+      setter(next);
+    }
+  };
+
+  const addSlot = (list, setter, max) => {
+    if (list.length >= max) return;
+    setter([...list, '']);
+  };
+
+  return (
+    <div className='space-y-3 max-w-2xl'>
+      {/* 参考图(1~9) */}
+      <div className='space-y-1.5'>
+        <div className='flex items-center justify-between'>
+          <span className='text-xs font-medium text-gray-700'>
+            {t('参考图')}
+            <span className='text-gray-400 ml-1.5'>
+              ({imagesRef.length}/{MAX_IMG})
+            </span>
+          </span>
+          {imagesRef.length < MAX_IMG && (
+            <button
+              type='button'
+              onClick={() => addSlot(imagesRef, setImagesRef, MAX_IMG)}
+              className='text-[11px] text-blue-500 hover:text-blue-700'
+            >
+              + {t('加一张')}
+            </button>
+          )}
+        </div>
+        {imagesRef.length === 0 ? (
+          <div className='grid grid-cols-3 gap-2'>
+            <ImageSlot
+              value=''
+              onChange={(v) => v && setImagesRef([v])}
+            />
+          </div>
+        ) : (
+          <div className='grid grid-cols-3 gap-2'>
+            {imagesRef.map((url, i) => (
+              <ImageSlot
+                key={i}
+                value={url}
+                onChange={(v) => updateAt(imagesRef, setImagesRef, i, v)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 参考视频(0~3) */}
+      <div className='space-y-1.5'>
+        <div className='flex items-center justify-between'>
+          <span className='text-xs font-medium text-gray-700'>
+            {t('参考视频')}
+            <span className='text-gray-400 ml-1.5'>
+              ({videosRef.length}/{MAX_VID})
+            </span>
+          </span>
+          {videosRef.length < MAX_VID && (
+            <button
+              type='button'
+              onClick={() => addSlot(videosRef, setVideosRef, MAX_VID)}
+              className='text-[11px] text-blue-500 hover:text-blue-700'
+            >
+              + {t('加一段')}
+            </button>
+          )}
+        </div>
+        {videosRef.length === 0 ? (
+          <div className='grid grid-cols-3 gap-2'>
+            <VideoSlot
+              value=''
+              onChange={(v) => v && setVideosRef([v])}
+            />
+          </div>
+        ) : (
+          <div className='grid grid-cols-3 gap-2'>
+            {videosRef.map((url, i) => (
+              <VideoSlot
+                key={i}
+                value={url}
+                onChange={(v) => updateAt(videosRef, setVideosRef, i, v)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 参考音频(0~3) */}
+      <div className='space-y-1.5'>
+        <div className='flex items-center justify-between'>
+          <span className='text-xs font-medium text-gray-700'>
+            {t('参考音频')}
+            <span className='text-gray-400 ml-1.5'>
+              ({audiosRef.length}/{MAX_AUD})
+            </span>
+          </span>
+          {audiosRef.length < MAX_AUD && (
+            <button
+              type='button'
+              onClick={() => addSlot(audiosRef, setAudiosRef, MAX_AUD)}
+              className='text-[11px] text-blue-500 hover:text-blue-700'
+            >
+              + {t('加一段')}
+            </button>
+          )}
+        </div>
+        {audiosRef.length === 0 ? (
+          <AudioSlot
+            value=''
+            onChange={(v) => v && setAudiosRef([v])}
+          />
+        ) : (
+          <div className='space-y-2'>
+            {audiosRef.map((url, i) => (
+              <AudioSlot
+                key={i}
+                value={url}
+                onChange={(v) => updateAt(audiosRef, setAudiosRef, i, v)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const VideoTab = () => {
   const { t } = useTranslation();
   const { models, loading: modelsLoading, getSchemaFor } = useDynamicModels(MODALITY);
@@ -103,6 +257,17 @@ const VideoTab = () => {
   const [mode, setMode] = useState(initial.mode || 't2v');
   const [imageFirst, setImageFirst] = useState(initial.image_first || '');
   const [imageLast, setImageLast] = useState(initial.image_last || '');
+  // refs 模式:多模态参考输入(Seedance 2.0)。数组,每个元素是 URL 字符串。
+  // 删除某槽时用 '' 占位,提交时由 normalizer 过滤掉空值。
+  const [imagesRef, setImagesRef] = useState(
+    Array.isArray(initial.images_ref) ? initial.images_ref : [],
+  );
+  const [videosRef, setVideosRef] = useState(
+    Array.isArray(initial.videos_ref) ? initial.videos_ref : [],
+  );
+  const [audiosRef, setAudiosRef] = useState(
+    Array.isArray(initial.audios_ref) ? initial.audios_ref : [],
+  );
   const [submitting, setSubmitting] = useState(false);
   const [assets, setAssets] = useState(loadAssets);
   const debug = useDebugState();
@@ -143,6 +308,9 @@ const VideoTab = () => {
       setMode('t2v');
       setImageFirst('');
       setImageLast('');
+      setImagesRef([]);
+      setVideosRef([]);
+      setAudiosRef([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model]);
@@ -192,8 +360,28 @@ const VideoTab = () => {
   }, []);
 
   useEffect(() => {
-    saveConfig(MODALITY, { model, params, prompt, mode, image_first: imageFirst, image_last: imageLast });
-  }, [model, params, prompt, mode, imageFirst, imageLast]);
+    saveConfig(MODALITY, {
+      model,
+      params,
+      prompt,
+      mode,
+      image_first: imageFirst,
+      image_last: imageLast,
+      images_ref: imagesRef,
+      videos_ref: videosRef,
+      audios_ref: audiosRef,
+    });
+  }, [
+    model,
+    params,
+    prompt,
+    mode,
+    imageFirst,
+    imageLast,
+    imagesRef,
+    videosRef,
+    audiosRef,
+  ]);
 
   useEffect(() => {
     if (!schema || !prompt) {
@@ -206,6 +394,9 @@ const VideoTab = () => {
           model, prompt, mode,
           image_first: imageFirst || undefined,
           image_last: imageLast || undefined,
+          images_ref: imagesRef.filter(Boolean),
+          videos_ref: videosRef.filter(Boolean),
+          audios_ref: audiosRef.filter(Boolean),
           ...params,
         },
         schema,
@@ -215,7 +406,7 @@ const VideoTab = () => {
       debug.setPreview(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schema, model, params, prompt, mode, imageFirst, imageLast]);
+  }, [schema, model, params, prompt, mode, imageFirst, imageLast, imagesRef, videosRef, audiosRef]);
 
   const switchModel = useCallback((next) => {
     const nextSchema = getSchemaFor(next);
@@ -300,6 +491,9 @@ const VideoTab = () => {
       mode,
       image_first: imageFirst || undefined,
       image_last: imageLast || undefined,
+      images_ref: imagesRef.filter(Boolean),
+      videos_ref: videosRef.filter(Boolean),
+      audios_ref: audiosRef.filter(Boolean),
       ...params,
     };
     const errs = validate(unified, schema);
@@ -544,6 +738,7 @@ const VideoTab = () => {
                     { key: 't2v', label: '文生视频' },
                     { key: 'i2v', label: '图生视频' },
                     { key: 'keyframes', label: '首尾帧' },
+                    { key: 'refs', label: '多模态参考' },
                   ]
                     .filter((m) => supportedModes.includes(m.key))
                     .map((m) => (
@@ -578,6 +773,18 @@ const VideoTab = () => {
                   <ImageSlot label='尾帧' value={imageLast} onChange={setImageLast} />
                 )}
               </div>
+            )}
+
+            {mode === 'refs' && (
+              <RefSlotPanel
+                t={t}
+                imagesRef={imagesRef}
+                setImagesRef={setImagesRef}
+                videosRef={videosRef}
+                setVideosRef={setVideosRef}
+                audiosRef={audiosRef}
+                setAudiosRef={setAudiosRef}
+              />
             )}
 
             <PromptComposer

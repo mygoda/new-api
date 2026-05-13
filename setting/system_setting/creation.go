@@ -65,11 +65,19 @@ type CreationSetting struct {
 }
 
 var defaultCreationSetting = CreationSetting{
-	Enabled:                  true,
-	UploadDriver:             "local",
-	UploadMaxFileMB:          10,
-	UploadAllowedMimeTypes:   []string{"image/jpeg", "image/png", "image/webp", "image/gif"},
-	UploadDailyQuotaMB:       200,
+	Enabled:         true,
+	UploadDriver:    "local",
+	UploadMaxFileMB: 50,
+	UploadAllowedMimeTypes: []string{
+		// 图片
+		"image/jpeg", "image/png", "image/webp", "image/gif",
+		"image/bmp", "image/tiff", "image/heic", "image/heif",
+		// 视频(Seedance 2.0 参考视频)
+		"video/mp4", "video/quicktime",
+		// 音频(Seedance 2.0 参考音频)
+		"audio/mpeg", "audio/wav", "audio/x-wav", "audio/wave",
+	},
+	UploadDailyQuotaMB:       2000,
 	LocalUploadPath:          "./data/uploads",
 	LocalPublicBaseURL:       "",
 	S3Endpoint:               "",

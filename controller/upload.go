@@ -207,6 +207,22 @@ func normalizeExt(filename, mime string) string {
 		return ".webp"
 	case "image/gif":
 		return ".gif"
+	case "image/bmp":
+		return ".bmp"
+	case "image/tiff":
+		return ".tiff"
+	case "image/heic":
+		return ".heic"
+	case "image/heif":
+		return ".heif"
+	case "video/mp4":
+		return ".mp4"
+	case "video/quicktime":
+		return ".mov"
+	case "audio/mpeg":
+		return ".mp3"
+	case "audio/wav", "audio/x-wav", "audio/wave":
+		return ".wav"
 	}
 	return ""
 }

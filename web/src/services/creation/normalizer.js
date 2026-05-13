@@ -159,7 +159,68 @@ function toOpenAIVideo(p, schema) {
   if (p.seed != null && p.seed >= 0) body.seed = p.seed;
   if (p.n) body.n = p.n;
   if (p.fps) body.fps = p.fps;
-  if (p.image_first) body.image = p.image_first;
+
+  // 多模态参考输入(Seedance 2.0 主战场)。
+  // 按 mode 装配 images[] + image_roles[] + videos[] + audios[],由后端
+  // TaskSubmitReq 顶层接收,convertToRequestPayload 按下标分发并自动填
+  // first_frame / last_frame / reference_image / reference_video / reference_audio role。
+  //
+  // 兼容旧 OpenAI 风格:无新协议字段时退化为 body.image = image_first(Sora 等)。
+  const refImages = [];
+  const refImageRoles = [];
+  const refVideos = [];
+  const refAudios = [];
+
+  switch (p.mode) {
+    case 'keyframes': {
+      // 首尾帧:严格两张图,role 强制 first_frame / last_frame
+      if (p.image_first) {
+        refImages.push(p.image_first);
+        refImageRoles.push('first_frame');
+      }
+      if (p.image_last) {
+        refImages.push(p.image_last);
+        refImageRoles.push('last_frame');
+      }
+      break;
+    }
+    case 'refs': {
+      // 多模态参考:图 1~9 + 视频 0~3 + 音频 0~3(Seedance 2.0)
+      if (Array.isArray(p.images_ref)) {
+        for (const u of p.images_ref) {
+          if (u) {
+            refImages.push(u);
+            refImageRoles.push('reference_image');
+          }
+        }
+      }
+      if (Array.isArray(p.videos_ref)) {
+        for (const u of p.videos_ref) {
+          if (u) refVideos.push(u);
+        }
+      }
+      if (Array.isArray(p.audios_ref)) {
+        for (const u of p.audios_ref) {
+          if (u) refAudios.push(u);
+        }
+      }
+      break;
+    }
+    case 'i2v':
+    default: {
+      // 单图首帧:走旧 OpenAI 风格 body.image,后端 ValidateBasicTaskRequest
+      // 会把 image(单数) 合并到 Images[]。保留旧路径以兼容 Sora。
+      if (p.image_first) body.image = p.image_first;
+      break;
+    }
+  }
+
+  if (refImages.length > 0) {
+    body.images = refImages;
+    if (refImageRoles.some((r) => r)) body.image_roles = refImageRoles;
+  }
+  if (refVideos.length > 0) body.videos = refVideos;
+  if (refAudios.length > 0) body.audios = refAudios;
 
   // 上游特定字段都收进 metadata；后端各 adapter 自行从 metadata 取
   const metadata = stripUndefined({
@@ -187,11 +248,16 @@ function toOpenAIVideo(p, schema) {
       p.service_tier && p.service_tier !== 'default'
         ? p.service_tier
         : undefined,
+    // Seedance 2.0 新增:tools / safety_identifier。
+    // 后端 requestPayload 已有同名字段,经 UnmarshalMetadata 落入。
+    tools: p.tools_web_search === true ? [{ type: 'web_search' }] : undefined,
+    safety_identifier:
+      typeof p.safety_identifier === 'string' &&
+      p.safety_identifier.trim() !== ''
+        ? p.safety_identifier.trim()
+        : undefined,
     prompt_optimizer: p.prompt_optimizer,
     fast_pretreatment: p.fast_pretreatment,
-    image_last: p.image_last,
-    images_ref: p.images_ref,
-    subject_image: p.subject_image,
     aspect_ratio: p.aspect_ratio,
     resolution: p.resolution,
     ratio: p.ratio,
@@ -264,6 +330,29 @@ export function validate(params, schema) {
         field: 'image_last',
         msg: '首尾帧模式需要同时上传首帧和尾帧',
       });
+    if (params.mode === 'refs') {
+      const imgs = (params.images_ref || []).filter(Boolean);
+      const vids = (params.videos_ref || []).filter(Boolean);
+      const auds = (params.audios_ref || []).filter(Boolean);
+      if (imgs.length + vids.length === 0) {
+        errs.push({
+          field: 'images_ref',
+          msg: '多模态参考至少上传 1 张图片或 1 段参考视频',
+        });
+      }
+      if (imgs.length > 9)
+        errs.push({ field: 'images_ref', msg: '参考图最多 9 张' });
+      if (vids.length > 3)
+        errs.push({ field: 'videos_ref', msg: '参考视频最多 3 段' });
+      if (auds.length > 3)
+        errs.push({ field: 'audios_ref', msg: '参考音频最多 3 段' });
+      if (auds.length > 0 && imgs.length + vids.length === 0) {
+        errs.push({
+          field: 'audios_ref',
+          msg: '不能仅传音频,需至少 1 个图片或视频参考',
+        });
+      }
+    }
   }
 
   if (schema?.modality === 'image-to-image' && !params.image_first) {
