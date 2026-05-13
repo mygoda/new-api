@@ -93,7 +93,7 @@ var defaultCreationSetting = CreationSetting{
 	MirrorUpstreamUrls:       false,
 	MirrorDownloadTimeoutSec: 60,
 	MirrorMaxFileMB:          100,
-	CloudGalleryEnabled:      false,
+	CloudGalleryEnabled:      true,
 }
 
 func init() {

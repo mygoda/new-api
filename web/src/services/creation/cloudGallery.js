@@ -63,6 +63,37 @@ export async function deleteCloudAsset(id) {
   if (!res?.data?.success) throw new Error(res?.data?.message || 'Failed to delete');
 }
 
+// findCloudAssetByTaskId 按 task_id 在云端查找对应作品(避免重复创建)。
+// 返回 null 表示未找到。
+export async function findCloudAssetByTaskId(taskId) {
+  if (!taskId) return null;
+  try {
+    const data = await listCloudAssets({ size: 200 });
+    const items = data?.items || [];
+    return items.find((it) => it.task_id === taskId) || null;
+  } catch {
+    return null;
+  }
+}
+
+// upsertCloudAssetByTaskId 按 task_id 插入或更新云端作品。
+// 第一次提交任务时调用 (status=in_progress, taskId 已知,assetUrl 空);
+// 后续轮询更新时再次调用 (status=success, assetUrl 已知),自动走 update。
+//
+// 返回 cloud asset 记录(含自增 id)。失败抛错。
+export async function upsertCloudAssetByTaskId(asset) {
+  if (!asset.taskId) {
+    // 没有 taskId 的同步任务直接 create
+    return createCloudAsset(asset);
+  }
+  const existing = await findCloudAssetByTaskId(asset.taskId);
+  if (existing) {
+    await updateCloudAsset(existing.id, asset);
+    return { ...existing, ...asset, id: existing.id };
+  }
+  return createCloudAsset(asset);
+}
+
 // 一次性迁移：把 localStorage 里的作品批量上传到云端
 export async function migrateLocalToCloud() {
   try {

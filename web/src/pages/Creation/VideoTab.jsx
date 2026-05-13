@@ -21,6 +21,11 @@ import ModelFilterInfo from '../../components/creation/ModelFilterInfo';
 
 import { normalize, validate } from '../../services/creation/normalizer';
 import {
+  upsertCloudAssetByTaskId,
+  updateCloudAsset,
+  listCloudAssets,
+} from '../../services/creation/cloudGallery';
+import {
   loadConfig,
   saveConfig,
   loadAssets,
@@ -315,6 +320,63 @@ const VideoTab = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model]);
 
+  // 挂载时从云端拉作品库,合并到本地状态(taskId 相同视为同一条作品,
+  // 云端字段覆盖 localStorage 旧字段,避免 localStorage 卡在错误的"卡死"态)。
+  // 失败/未启用云作品库时静默回退。
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await listCloudAssets({ size: 200, modality: MODALITY });
+        if (cancelled) return;
+        const items = data?.items || [];
+        if (items.length === 0) return;
+        setAssets((prev) => {
+          const byTask = new Map();
+          for (const a of prev) {
+            if (a.taskId) byTask.set(a.taskId, a);
+          }
+          const merged = [...prev];
+          for (const c of items) {
+            const local = c.task_id ? byTask.get(c.task_id) : null;
+            const cloudShape = {
+              id: local?.id || `cloud-${c.id}`,
+              cloudId: c.id,
+              modality: c.modality,
+              modelName: c.model_name,
+              prompt: c.prompt,
+              params: (() => {
+                try {
+                  return c.params ? JSON.parse(c.params) : {};
+                } catch {
+                  return {};
+                }
+              })(),
+              status: c.status,
+              assetUrl: c.asset_url || '',
+              taskId: c.task_id || undefined,
+              createdAt: new Date(c.created_at).getTime() || Date.now(),
+            };
+            if (local) {
+              // 已有本地条目,合并云端字段(以云端为准,因为 task_polling 会回写)
+              const idx = merged.findIndex((a) => a.id === local.id);
+              if (idx >= 0)
+                merged[idx] = { ...local, ...cloudShape, id: local.id };
+            } else {
+              merged.push(cloudShape);
+            }
+          }
+          return merged;
+        });
+      } catch (err) {
+        console.warn('[creation] cloud gallery load failed', err?.message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const active = loadActiveTasks();
     if (active.length === 0) return;
@@ -502,22 +564,33 @@ const VideoTab = () => {
     const rawStatus = data.status;
     const normalizedStatus =
       rawStatus === 'completed' || rawStatus === 'SUCCESS' ? 'success' : rawStatus;
+    let cloudId;
     setAssets((prev) =>
-      prev.map((a) =>
-        a.id === assetId
-          ? {
-              ...a,
-              status: normalizedStatus || a.status,
-              progress: data.progress ?? a.progress,
-              assetUrl: incomingUrl || a.assetUrl,
-            }
-          : a,
-      ),
+      prev.map((a) => {
+        if (a.id !== assetId) return a;
+        cloudId = a.cloudId;
+        return {
+          ...a,
+          status: normalizedStatus || a.status,
+          progress: data.progress ?? a.progress,
+          assetUrl: incomingUrl || a.assetUrl,
+        };
+      }),
     );
     if (normalizedStatus) {
       const patch = { status: normalizedStatus, progress: data.progress };
       if (incomingUrl) patch.assetUrl = incomingUrl;
       updateAsset(assetId, patch);
+      // 同步回云端:即使后端 task_polling 也会回写,前端这一路是「补丁」,
+      // 让作品库实时反映 UI 状态(避免延迟)。无 cloudId 时跳过。
+      if (cloudId && (incomingUrl || normalizedStatus !== 'in_progress')) {
+        updateCloudAsset(cloudId, {
+          assetUrl: incomingUrl || undefined,
+          status: normalizedStatus,
+        }).catch((err) => {
+          console.warn('[creation] cloud asset update failed', err?.message);
+        });
+      }
     }
   }, []);
 
@@ -540,10 +613,24 @@ const VideoTab = () => {
           errorMessage:
             data?.error?.message || (data.status === 'timeout' ? '任务超时' : '生成失败'),
         };
+    let cloudId;
     setAssets((prev) =>
-      prev.map((a) => (a.id === assetId ? { ...a, ...patch } : a)),
+      prev.map((a) => {
+        if (a.id !== assetId) return a;
+        cloudId = a.cloudId;
+        return { ...a, ...patch };
+      }),
     );
     updateAsset(assetId, patch);
+    // 终态写回云端(前端兜底,即使后端 task_polling 还没写也能即时同步)
+    if (cloudId) {
+      updateCloudAsset(cloudId, {
+        assetUrl: patch.assetUrl,
+        status: patch.status,
+      }).catch((err) => {
+        console.warn('[creation] cloud asset terminal write failed', err?.message);
+      });
+    }
     const taskId = (assets.find((a) => a.id === assetId) || {}).taskId;
     if (taskId) untrackActiveTask(taskId);
   }, [assets]);
@@ -616,6 +703,32 @@ const VideoTab = () => {
         createdAt: Date.now(),
         modality: MODALITY,
       });
+      // 同步到云作品库:第一次以 in_progress 入库,绑定 task_id,
+      // 后续轮询会按 task_id 把 asset_url+status 回写。
+      // 失败不阻塞主流程(后端轮询终态时也会自动回写)。
+      upsertCloudAssetByTaskId({
+        modality: MODALITY,
+        modelName: model,
+        prompt,
+        params: { ...params },
+        taskId,
+        status: 'in_progress',
+        assetUrl: '',
+      })
+        .then((cloudAsset) => {
+          if (cloudAsset?.id) {
+            const cloudPatch = { cloudId: cloudAsset.id };
+            setAssets((prev) =>
+              prev.map((a) =>
+                a.id === placeholderId ? { ...a, ...cloudPatch } : a,
+              ),
+            );
+            updateAsset(placeholderId, cloudPatch);
+          }
+        })
+        .catch((err) => {
+          console.warn('[creation] cloud asset create failed', err?.message);
+        });
       Toast.info(t('任务已提交，开始生成…'));
     } catch (e) {
       const msg =

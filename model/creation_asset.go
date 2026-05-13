@@ -52,3 +52,33 @@ func (a *CreationAsset) SetParams(m map[string]interface{}) error {
 	a.Params = string(b)
 	return nil
 }
+
+// UpdateCreationAssetByTaskID 按 task_id 回写作品状态/URL。
+//
+// 由 task 轮询终态时调用,实现"前端关闭也能自动更新作品库"。
+// 找不到对应记录(用户未启用云作品库 / 任务通过 API 直传未在前端建条目)
+// 时静默返回 nil,不影响主流程。
+//
+// 字段语义:
+//   - assetURL  != "" -> 更新 asset_url(原 URL 优先)
+//   - status    != "" -> 更新 status (success / failed / in_progress)
+//
+// 用 GORM .Model().Updates() 只改非零字段;TaskID/UserID 不变。
+func UpdateCreationAssetByTaskID(taskID, assetURL, status string) error {
+	if taskID == "" {
+		return nil
+	}
+	updates := map[string]interface{}{}
+	if assetURL != "" {
+		updates["asset_url"] = assetURL
+	}
+	if status != "" {
+		updates["status"] = status
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	return DB.Model(&CreationAsset{}).
+		Where("task_id = ?", taskID).
+		Updates(updates).Error
+}

@@ -504,6 +504,26 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		RefundTaskQuota(ctx, task, task.FailReason)
 	}
 
+	// 任务终态(成功/失败)时,自动把状态 + 结果 URL 回写到云作品库。
+	// 这样即使用户的浏览器/前端已经关闭,作品库下次打开会看到最新视频。
+	// 找不到对应 creation_assets 记录(用户走 API 直传未在创作中心建条目)时
+	// 静默返回 nil。
+	if isDone {
+		var cloudStatus string
+		switch task.Status {
+		case model.TaskStatusSuccess:
+			cloudStatus = "success"
+		case model.TaskStatusFailure:
+			cloudStatus = "failed"
+		}
+		if cloudStatus != "" {
+			resultURL := task.GetResultURL()
+			if err := model.UpdateCreationAssetByTaskID(task.TaskID, resultURL, cloudStatus); err != nil {
+				logger.LogWarn(ctx, fmt.Sprintf("UpdateCreationAssetByTaskID failed for %s: %s", task.TaskID, err.Error()))
+			}
+		}
+	}
+
 	return nil
 }
 
