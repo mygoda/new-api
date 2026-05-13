@@ -82,7 +82,8 @@ type responseTask struct {
 	Model   string `json:"model"`
 	Status  string `json:"status"`
 	Content struct {
-		VideoURL string `json:"video_url"`
+		VideoURL     string `json:"video_url"`
+		LastFrameURL string `json:"last_frame_url,omitempty"` // 仅 return_last_frame=true 时返回
 	} `json:"content"`
 	Seed            int    `json:"seed"`
 	Resolution      string `json:"resolution"`
@@ -93,6 +94,12 @@ type responseTask struct {
 	Usage           struct {
 		CompletionTokens int `json:"completion_tokens"`
 		TotalTokens      int `json:"total_tokens"`
+		// 仅 Seedance 2.0 + 启用 web_search 工具时返回;0 表示未实际触发搜索。
+		// PDF 第 12 页:"实际搜索次数可通过查询视频生成任务 API 返回的
+		// usage.tool_usage.web_search 字段获取"。
+		ToolUsage struct {
+			WebSearch int `json:"web_search,omitempty"`
+		} `json:"tool_usage,omitempty"`
 	} `json:"usage"`
 	CreatedAt int64 `json:"created_at"`
 	UpdatedAt int64 `json:"updated_at"`
@@ -353,6 +360,16 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 	openAIVideo.Status = originTask.Status.ToVideoStatus()
 	openAIVideo.SetProgressStr(originTask.Progress)
 	openAIVideo.SetMetadata("url", dResp.Content.VideoURL)
+	// Seedance 扩展字段:return_last_frame=true 时上游回 last_frame_url,
+	// 暴露给前端便于长视频拼接(下一段视频用本段尾帧做首帧)。
+	if dResp.Content.LastFrameURL != "" {
+		openAIVideo.SetMetadata("last_frame_url", dResp.Content.LastFrameURL)
+	}
+	// 联网搜索实际命中次数(仅 Seedance 2.0 + 启用 web_search 时);PDF 计费用,
+	// 同时也方便用户回看是否真的触发了搜索。
+	if dResp.Usage.ToolUsage.WebSearch > 0 {
+		openAIVideo.SetMetadata("web_search_count", dResp.Usage.ToolUsage.WebSearch)
+	}
 	openAIVideo.CreatedAt = originTask.CreatedAt
 	openAIVideo.CompletedAt = originTask.UpdatedAt
 	openAIVideo.Model = originTask.Properties.OriginModelName

@@ -256,6 +256,14 @@ function toOpenAIVideo(p, schema) {
       p.safety_identifier.trim() !== ''
         ? p.safety_identifier.trim()
         : undefined,
+    // frames:小数秒视频,优先级高于 duration。0/undefined 不传保持默认。
+    frames: typeof p.frames === 'number' && p.frames > 0 ? p.frames : undefined,
+    // execution_expires_after:任务超时秒,0/undefined 不传走上游默认 48h。
+    execution_expires_after:
+      typeof p.execution_expires_after === 'number' &&
+      p.execution_expires_after > 0
+        ? p.execution_expires_after
+        : undefined,
     prompt_optimizer: p.prompt_optimizer,
     fast_pretreatment: p.fast_pretreatment,
     aspect_ratio: p.aspect_ratio,

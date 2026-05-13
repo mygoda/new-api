@@ -415,6 +415,24 @@ export const VIDEO_MODELS = [
         label: '终端用户标识',
         help: '可选。建议传用户 ID / 邮箱的哈希值(英文,≤64 字),便于平台溯源违规用户。',
       },
+      frames: {
+        type: FIELD.number,
+        min: 0,
+        max: 289,
+        default: 0,
+        group: PARAM_GROUP.advanced,
+        label: '帧数(小数秒)',
+        help: '0 表示不传(用 duration 控制时长)。设置后优先级高于 duration,可生成小数秒视频。Seedance 2.0 暂不支持,需要等模型更新。仅 Seedance 1.5 pro 不支持。',
+      },
+      execution_expires_after: {
+        type: FIELD.number,
+        min: 3600,
+        max: 259200,
+        default: 0,
+        group: PARAM_GROUP.advanced,
+        label: '任务超时(秒)',
+        help: '0 表示用上游默认(48 小时=172800 秒)。建议根据业务场景调整,超过此时间任务自动标记为 expired。范围 3600~259200 秒。',
+      },
       service_tier: {
         type: FIELD.segmented,
         options: ['default'],
@@ -616,10 +634,12 @@ export function inferModelSchema(modelInfo) {
       return tpl ? { ...tpl, modelName, displayName: modelName } : null;
     }
     if (vendor === 'doubao' || /seedance|doubao/.test(lowerName)) {
-      // Seedance 2.0 与 1.x 参数集略有差异(2.0 多 generate_audio,duration 选项更细)
-      // 按版本号匹配,默认走 1.0 pro
-      const isV2 = /seedance-2|2-0-260128|2-0-fast/.test(lowerName);
-      const targetName = isV2
+      // Seedance 1.5 pro 与 2.0 系列共享同一参数集模板(generate_audio /
+      // return_last_frame / draft 等);1.0 pro / fast / lite 走简化模板。
+      const isV15Plus = /seedance-(1-5|2)|2-0-260128|2-0-fast|1-5-pro/.test(
+        lowerName,
+      );
+      const targetName = isV15Plus
         ? 'doubao-seedance-2-0-260128'
         : 'doubao-seedance-1-0-pro-250528';
       const tpl = VIDEO_MODELS.find((m) => m.modelName === targetName);
