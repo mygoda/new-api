@@ -277,9 +277,24 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 		finalGroupRatio = groupRatio
 	}
 
-	// 计算实际应扣费额度: totalTokens * modelRatio * groupRatio
-	actualQuota := int(float64(totalTokens) * modelRatio * finalGroupRatio)
+	// 应用预扣阶段写入 BillingContext 的 OtherRatios(包括条件分价 v2 乘子)。
+	// 不应用会导致 v2 乘子在结算时被丢弃,实际扣费回退到基准 modelRatio,
+	// 与预扣口径不一致(预扣多/少的差额会被退回/补扣到错的值上)。
+	multiplier := 1.0
+	if bc := task.PrivateData.BillingContext; bc != nil {
+		for _, r := range bc.OtherRatios {
+			if r > 0 {
+				multiplier *= r
+			}
+		}
+	}
 
-	reason := fmt.Sprintf("token重算：tokens=%d, modelRatio=%.2f, groupRatio=%.2f", totalTokens, modelRatio, finalGroupRatio)
+	// 计算实际应扣费额度: totalTokens * modelRatio * multiplier * groupRatio
+	actualQuota := int(float64(totalTokens) * modelRatio * multiplier * finalGroupRatio)
+
+	reason := fmt.Sprintf(
+		"token重算：tokens=%d, modelRatio=%.2f, multiplier=%.4f, groupRatio=%.2f",
+		totalTokens, modelRatio, multiplier, finalGroupRatio,
+	)
 	RecalculateTaskQuota(ctx, task, actualQuota, reason)
 }

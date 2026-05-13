@@ -163,6 +163,9 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	if err != nil {
 		return nil, err
 	}
+	// 把最终请求体字节落到 RelayInfo,供 BaseBilling.AdjustBillingOnSubmit
+	// 的条件分价 v2 维度提取(resolution / has_video_input / ...)读取。
+	info.UpstreamRequestBody = data
 	return bytes.NewReader(data), nil
 }
 

@@ -105,6 +105,11 @@ type RelayInfo struct {
 	RequestHeaders         map[string]string
 	ShouldIncludeUsage     bool
 	DisablePing            bool // 是否禁止向下游发送自定义 Ping
+	// UpstreamRequestBody 由 task adaptor 在 BuildRequestBody 中把最终发往上游的
+	// 请求体字节落到这里,供 AdjustBillingOnSubmit 的「条件分价 v2」维度提取使用。
+	// 老 AdjustBillingOnSubmit 接收的 taskBody 实际是 DoResponse 返回值(上游响应),
+	// 拿不到 resolution / has_video_input 等"请求侧"维度,因此引入此字段做正确数据源。
+	UpstreamRequestBody []byte
 	ClientWs               *websocket.Conn
 	TargetWs               *websocket.Conn
 	InputAudioFormat       string

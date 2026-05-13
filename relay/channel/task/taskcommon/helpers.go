@@ -90,10 +90,17 @@ func (BaseBilling) EstimateBilling(_ *gin.Context, _ *relaycommon.RelayInfo) map
 // 自动让所有继承 BaseBilling 的 task adaptor (doubao / kling / sora / vidu / ...)
 // 都支持 admin 在「价格配置」中按维度自助配置规则,无需 adaptor 重写本方法。
 //
+// 数据源:优先 info.UpstreamRequestBody (BuildRequestBody 时落下的上游请求字节),
+// 缺省时退化到 taskBody (实际是 DoResponse 的响应体,通常无法用于"请求侧"维度)。
+//
 // 若某 adaptor 需要在 v2 之上叠加自定义乘子(例如 token-based 计费的 channel-specific
 // 修正),可以重写此方法并自行合并 v2 结果。
 func (BaseBilling) AdjustBillingOnSubmit(info *relaycommon.RelayInfo, taskBody []byte) map[string]float64 {
-	return ratio_setting.ApplyConditionalRatiosV2(info.OriginModelName, taskBody)
+	src := info.UpstreamRequestBody
+	if len(src) == 0 {
+		src = taskBody
+	}
+	return ratio_setting.ApplyConditionalRatiosV2(info.OriginModelName, src)
 }
 
 // AdjustBillingOnComplete returns 0 (keep pre-charged amount).
