@@ -359,6 +359,56 @@ const VideoTab = () => {
     });
   }, []);
 
+  // 修复:挂载时主动补拉"已成功但 assetUrl 缺失"的 task。
+  // 触发场景:浏览器切走页面没收到 onTerminal、polling 中途网络异常、
+  // 或后端协议升级前的旧 asset 卡在 localStorage 里。直接调 /v1/video/generations/{id}
+  // 拿 metadata.url 回填,作品库和时间轴都能正确展示。
+  useEffect(() => {
+    const needBackfill = assets.filter(
+      (a) =>
+        a.modality === MODALITY &&
+        a.taskId &&
+        !a.assetUrl &&
+        (a.status === 'success' ||
+          a.status === 'completed' ||
+          a.status === 'SUCCESS'),
+    );
+    if (needBackfill.length === 0) return undefined;
+    let cancelled = false;
+    (async () => {
+      for (const a of needBackfill) {
+        if (cancelled) return;
+        try {
+          const res = await API.get(
+            `/v1/video/generations/${encodeURIComponent(a.taskId)}`,
+            { headers: tokenAuthHeader() },
+          );
+          const payload = res?.data?.data ?? res?.data;
+          const url =
+            payload?.metadata?.url ||
+            payload?.metadata?.proxy_url ||
+            payload?.url ||
+            '';
+          if (cancelled) return;
+          if (url) {
+            const patch = { status: 'success', assetUrl: url, progress: 100 };
+            setAssets((prev) =>
+              prev.map((it) => (it.id === a.id ? { ...it, ...patch } : it)),
+            );
+            updateAsset(a.id, patch);
+          }
+        } catch (e) {
+          // task 可能已过期/删除,静默
+          console.warn('[creation] backfill failed', a.taskId, e?.message);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     saveConfig(MODALITY, {
       model,
@@ -443,18 +493,32 @@ const VideoTab = () => {
   }, [schema, params, prompt]);
 
   const handleTaskUpdate = useCallback((assetId, data) => {
+    // 每次轮询都尝试写入视频 URL,不只依赖 onTerminal 那一次触发。
+    // 这样即使 polling 中途页面切走/网络抖动,只要有一次拿到 url 就能落地;
+    // 终态切换为 'completed' 时 AssetCard 会自动用 assetUrl 渲染 video。
+    const incomingUrl =
+      data?.metadata?.url || data?.metadata?.proxy_url || data?.url || '';
+    // 把 OpenAI 风格的 'completed' 归一化为 'success',与作品库/卡片识别保持一致。
+    const rawStatus = data.status;
+    const normalizedStatus =
+      rawStatus === 'completed' || rawStatus === 'SUCCESS' ? 'success' : rawStatus;
     setAssets((prev) =>
       prev.map((a) =>
         a.id === assetId
           ? {
               ...a,
-              status: data.status || a.status,
+              status: normalizedStatus || a.status,
               progress: data.progress ?? a.progress,
+              assetUrl: incomingUrl || a.assetUrl,
             }
           : a,
       ),
     );
-    if (data.status) updateAsset(assetId, { status: data.status, progress: data.progress });
+    if (normalizedStatus) {
+      const patch = { status: normalizedStatus, progress: data.progress };
+      if (incomingUrl) patch.assetUrl = incomingUrl;
+      updateAsset(assetId, patch);
+    }
   }, []);
 
   const handleTaskTerminal = useCallback((assetId, data) => {
