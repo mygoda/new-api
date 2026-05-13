@@ -25,6 +25,11 @@ import ModelFilterInfo from '../../components/creation/ModelFilterInfo';
 
 import { normalize, validate } from '../../services/creation/normalizer';
 import {
+  createCloudAsset,
+  updateCloudAsset,
+  listCloudAssets,
+} from '../../services/creation/cloudGallery';
+import {
   loadConfig,
   saveConfig,
   loadAssets,
@@ -166,6 +171,50 @@ const ImageToImageTab = () => {
   useEffect(() => {
     saveConfig(MODALITY, { model, params, prompt, imageRef });
   }, [model, params, prompt, imageRef]);
+
+  // 挂载时拉云端作品库,与本地状态合并(按 cloudId/asset_url 去重)。
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await listCloudAssets({ size: 200, modality: MODALITY });
+        if (cancelled) return;
+        const items = data?.items || [];
+        if (items.length === 0) return;
+        setAssets((prev) => {
+          const byUrl = new Set(prev.map((a) => a.assetUrl).filter(Boolean));
+          const merged = [...prev];
+          for (const c of items) {
+            if (c.asset_url && byUrl.has(c.asset_url)) continue;
+            merged.push({
+              id: `cloud-${c.id}`,
+              cloudId: c.id,
+              modality: c.modality,
+              modelName: c.model_name,
+              prompt: c.prompt,
+              params: (() => {
+                try {
+                  return c.params ? JSON.parse(c.params) : {};
+                } catch {
+                  return {};
+                }
+              })(),
+              status: c.status,
+              assetUrl: c.asset_url || '',
+              taskId: c.task_id || undefined,
+              createdAt: new Date(c.created_at).getTime() || Date.now(),
+            });
+          }
+          return merged;
+        });
+      } catch (err) {
+        console.warn('[creation] i2i cloud gallery load failed', err?.message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!schema || !prompt) {
@@ -325,6 +374,31 @@ const ImageToImageTab = () => {
           );
         } catch {}
         return next;
+      });
+
+      // 同步写云作品库:图生图同步出图,每张图直接 createCloudAsset。
+      created.forEach((a) => {
+        createCloudAsset({
+          modality: a.modality,
+          modelName: a.modelName,
+          prompt: a.prompt,
+          params: a.params,
+          assetUrl: a.assetUrl,
+          status: 'success',
+          taskId: '',
+        })
+          .then((cloudAsset) => {
+            if (cloudAsset?.id) {
+              setAssets((prev) =>
+                prev.map((it) =>
+                  it.id === a.id ? { ...it, cloudId: cloudAsset.id } : it,
+                ),
+              );
+            }
+          })
+          .catch((err) => {
+            console.warn('[creation] i2i cloud create failed', err?.message);
+          });
       });
       Toast.success(t('生成成功'));
     } catch (e) {

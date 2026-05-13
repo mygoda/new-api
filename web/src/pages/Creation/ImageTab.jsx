@@ -21,6 +21,12 @@ import ModelFilterInfo from '../../components/creation/ModelFilterInfo';
 
 import { normalize, validate } from '../../services/creation/normalizer';
 import {
+  createCloudAsset,
+  upsertCloudAssetByTaskId,
+  updateCloudAsset,
+  listCloudAssets,
+} from '../../services/creation/cloudGallery';
+import {
   loadConfig,
   saveConfig,
   loadAssets,
@@ -145,6 +151,68 @@ const ImageTab = () => {
   }, [modelsLoading, models]);
 
   // 恢复活跃任务
+  // 挂载时从云端拉作品库,与本地状态合并(taskId 或 cloud asset url 作为去重 key)。
+  // 失败/未启用静默回退到 localStorage。
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await listCloudAssets({ size: 200, modality: MODALITY });
+        if (cancelled) return;
+        const items = data?.items || [];
+        if (items.length === 0) return;
+        setAssets((prev) => {
+          const byTask = new Map();
+          const byUrl = new Set();
+          for (const a of prev) {
+            if (a.taskId) byTask.set(a.taskId, a);
+            if (a.assetUrl) byUrl.add(a.assetUrl);
+          }
+          const merged = [...prev];
+          for (const c of items) {
+            // 异步图:按 taskId 命中本地条目;同步图:按 asset_url 去重
+            const local = c.task_id
+              ? byTask.get(c.task_id)
+              : c.asset_url && byUrl.has(c.asset_url)
+                ? prev.find((p) => p.assetUrl === c.asset_url)
+                : null;
+            const cloudShape = {
+              id: local?.id || `cloud-${c.id}`,
+              cloudId: c.id,
+              modality: c.modality,
+              modelName: c.model_name,
+              prompt: c.prompt,
+              params: (() => {
+                try {
+                  return c.params ? JSON.parse(c.params) : {};
+                } catch {
+                  return {};
+                }
+              })(),
+              status: c.status,
+              assetUrl: c.asset_url || '',
+              taskId: c.task_id || undefined,
+              createdAt: new Date(c.created_at).getTime() || Date.now(),
+            };
+            if (local) {
+              const idx = merged.findIndex((a) => a.id === local.id);
+              if (idx >= 0)
+                merged[idx] = { ...local, ...cloudShape, id: local.id };
+            } else {
+              merged.push(cloudShape);
+            }
+          }
+          return merged;
+        });
+      } catch (err) {
+        console.warn('[creation] image cloud gallery load failed', err?.message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const active = loadActiveTasks();
     if (active.length === 0) return;
@@ -247,18 +315,36 @@ const ImageTab = () => {
   }, [schema, params, prompt]);
 
   const handleTaskUpdate = useCallback((assetId, data) => {
+    const incomingUrl =
+      data?.metadata?.url || data?.metadata?.proxy_url || data?.url || '';
+    const rawStatus = data.status;
+    const normalizedStatus =
+      rawStatus === 'completed' || rawStatus === 'SUCCESS' ? 'success' : rawStatus;
+    let cloudId;
     setAssets((prev) =>
-      prev.map((a) =>
-        a.id === assetId
-          ? {
-              ...a,
-              status: data.status || a.status,
-              progress: data.progress ?? a.progress,
-            }
-          : a,
-      ),
+      prev.map((a) => {
+        if (a.id !== assetId) return a;
+        cloudId = a.cloudId;
+        return {
+          ...a,
+          status: normalizedStatus || a.status,
+          progress: data.progress ?? a.progress,
+          assetUrl: incomingUrl || a.assetUrl,
+        };
+      }),
     );
-    if (data.status) updateAsset(assetId, { status: data.status, progress: data.progress });
+    if (normalizedStatus) {
+      const patch = { status: normalizedStatus, progress: data.progress };
+      if (incomingUrl) patch.assetUrl = incomingUrl;
+      updateAsset(assetId, patch);
+      // 异步图(MJ): 轮询时同步回写云端,前端 UI 与作品库实时一致
+      if (cloudId && (incomingUrl || normalizedStatus !== 'in_progress')) {
+        updateCloudAsset(cloudId, {
+          assetUrl: incomingUrl || undefined,
+          status: normalizedStatus,
+        }).catch(() => {});
+      }
+    }
   }, []);
 
   const handleTaskTerminal = useCallback((assetId, data) => {
@@ -267,10 +353,21 @@ const ImageTab = () => {
     const patch = isSuccess
       ? { status: 'success', assetUrl: url, progress: 100 }
       : { status: 'failed', errorMessage: data?.error?.message || '生成失败' };
+    let cloudId;
     setAssets((prev) =>
-      prev.map((a) => (a.id === assetId ? { ...a, ...patch } : a)),
+      prev.map((a) => {
+        if (a.id !== assetId) return a;
+        cloudId = a.cloudId;
+        return { ...a, ...patch };
+      }),
     );
     updateAsset(assetId, patch);
+    if (cloudId) {
+      updateCloudAsset(cloudId, {
+        assetUrl: patch.assetUrl,
+        status: patch.status,
+      }).catch(() => {});
+    }
     const taskId = (assets.find((a) => a.id === assetId) || {}).taskId;
     if (taskId) untrackActiveTask(taskId);
   }, [assets]);
@@ -335,6 +432,35 @@ const ImageTab = () => {
           createdAt: Date.now(),
           modality: MODALITY,
         });
+        // 异步图(MJ 等)同 VideoTab: 提交即入云作品库,绑定 task_id;
+        // 后端 task_polling 终态会自动回写 asset_url + status。
+        upsertCloudAssetByTaskId({
+          modality: MODALITY,
+          modelName: model,
+          prompt,
+          params: { ...params },
+          taskId,
+          status: 'in_progress',
+          assetUrl: '',
+        })
+          .then((cloudAsset) => {
+            if (cloudAsset?.id) {
+              setAssets((prev) =>
+                prev.map((a) =>
+                  a.id === placeholderId
+                    ? { ...a, cloudId: cloudAsset.id }
+                    : a,
+                ),
+              );
+              updateAsset(placeholderId, { cloudId: cloudAsset.id });
+            }
+          })
+          .catch((err) => {
+            console.warn(
+              '[creation] async image cloud create failed',
+              err?.message,
+            );
+          });
         Toast.info(t('任务已提交，开始生成…'));
       } else {
         const items = res?.data?.data || [];
@@ -366,6 +492,36 @@ const ImageTab = () => {
           } catch {}
           return next;
         });
+
+        // 同步写云作品库:同步图无 task_id,N 张图各写一条 success 记录。
+        // 失败静默(本地 localStorage 仍可用),拿到云端 id 后回填 asset.cloudId。
+        created.forEach((a) => {
+          createCloudAsset({
+            modality: a.modality,
+            modelName: a.modelName,
+            prompt: a.prompt,
+            params: a.params,
+            assetUrl: a.assetUrl,
+            status: 'success',
+            taskId: '',
+          })
+            .then((cloudAsset) => {
+              if (cloudAsset?.id) {
+                setAssets((prev) =>
+                  prev.map((it) =>
+                    it.id === a.id ? { ...it, cloudId: cloudAsset.id } : it,
+                  ),
+                );
+              }
+            })
+            .catch((err) => {
+              console.warn(
+                '[creation] image cloud create failed',
+                err?.message,
+              );
+            });
+        });
+
         Toast.success(t('生成成功'));
       }
     } catch (e) {

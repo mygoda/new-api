@@ -16,11 +16,15 @@ import { useTranslation } from 'react-i18next';
 import { API, showError, showSuccess } from '../../../../helpers';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 import { PriceInput } from '../../../../pages/Setting/Ratio/components/ModelPricingEditor';
+import ModelConditionalRulesEditor, {
+  useConditionalDimensions,
+} from '../../../../pages/Setting/Ratio/components/ModelConditionalRulesEditor';
 import {
   EMPTY_TIER,
   buildModelState,
   serializeModel,
   parseOptionJSON,
+  parseConditionalRatiosV2,
   hasValue,
   buildOptionalFieldToggles,
   getModelWarnings,
@@ -117,6 +121,7 @@ const buildSourceMaps = (options) => ({
   AudioRatio: parseOptionJSON(options.AudioRatio),
   AudioCompletionRatio: parseOptionJSON(options.AudioCompletionRatio),
   ModelRatioTiered: parseOptionJSON(options.ModelRatioTiered),
+  ConditionalRatiosV2: parseConditionalRatiosV2(options.ConditionalRatiosV2),
 });
 
 export default function ConfigurePriceModal({
@@ -131,6 +136,7 @@ export default function ConfigurePriceModal({
   const [saving, setSaving] = useState(false);
   const [modelState, setModelState] = useState(null);
   const [toggles, setToggles] = useState({});
+  const { dimensions: conditionalDimensions } = useConditionalDimensions();
 
   const loadPricingData = useCallback(async () => {
     if (!modelName) return;
@@ -184,6 +190,15 @@ export default function ConfigurePriceModal({
 
   const handleBillingModeChange = useCallback((value) => {
     setModelState((prev) => (prev ? { ...prev, billingMode: value } : prev));
+  }, []);
+
+  // 条件分价 v2 规则集编辑(per-model),与「价格设置」编辑器保持一致体验
+  const handleConditionalRulesChange = useCallback((nextRules) => {
+    setModelState((prev) =>
+      prev
+        ? { ...prev, conditionalRules: Array.isArray(nextRules) ? nextRules : [] }
+        : prev,
+    );
   }, []);
 
   const isOptionalFieldEnabled = useCallback(
@@ -348,6 +363,56 @@ export default function ConfigurePriceModal({
           showError(saveRes.data.message || `${t('保存失败')}: ${key}`);
           return;
         }
+      }
+
+      // 条件分价 v2: 与「价格设置」逻辑对齐——读全局 JSON,替换本模型规则,写回。
+      // 规则为空表示删除本模型的 entry,避免遗留空对象。
+      const v2Raw = options['ConditionalRatiosV2'] || '';
+      let v2Cfg = { enabled: true, models: [] };
+      if (v2Raw.trim() !== '') {
+        try {
+          const parsed = JSON.parse(v2Raw);
+          if (parsed && typeof parsed === 'object') {
+            v2Cfg = {
+              enabled: parsed.enabled !== false,
+              models: Array.isArray(parsed.models) ? parsed.models : [],
+            };
+          }
+        } catch {
+          // 损坏时新建
+        }
+      }
+      const cleanRules = Array.isArray(modelState.conditionalRules)
+        ? modelState.conditionalRules.filter(
+            (r) =>
+              r &&
+              typeof r.price_rmb_per_million === 'number' &&
+              r.price_rmb_per_million > 0,
+          )
+        : [];
+      const existingIdx = v2Cfg.models.findIndex(
+        (m) => m.model_pattern === modelName,
+      );
+      if (cleanRules.length > 0) {
+        const entry = { model_pattern: modelName, rules: cleanRules };
+        if (existingIdx >= 0) {
+          v2Cfg.models[existingIdx] = {
+            ...v2Cfg.models[existingIdx],
+            ...entry,
+          };
+        } else {
+          v2Cfg.models.push(entry);
+        }
+      } else if (existingIdx >= 0) {
+        v2Cfg.models.splice(existingIdx, 1);
+      }
+      const v2SaveRes = await API.put('/api/option/', {
+        key: 'ConditionalRatiosV2',
+        value: JSON.stringify(v2Cfg),
+      });
+      if (!v2SaveRes.data.success) {
+        showError(v2SaveRes.data.message || `${t('保存失败')}: ConditionalRatiosV2`);
+        return;
       }
 
       showSuccess(t('保存价格配置成功'));
@@ -806,6 +871,38 @@ export default function ConfigurePriceModal({
               </Card>
             </>
           )}
+
+          {/* 条件分价 v2 — 与「分组与模型定价设置 → 价格设置」体验一致 */}
+          <Card
+            bodyStyle={{ padding: 16 }}
+            style={{
+              marginBottom: 16,
+              background: 'var(--semi-color-fill-0)',
+            }}
+          >
+            <div className='mb-3 flex items-start justify-between gap-3'>
+              <div>
+                <div className='font-medium'>
+                  {t('条件分价')}
+                  <Tag color='violet' size='small' className='!ml-2'>
+                    {(modelState.conditionalRules || []).length}{' '}
+                    {t('条规则')}
+                  </Tag>
+                </div>
+                <div className='text-xs text-gray-500 mt-1'>
+                  {t(
+                    '按请求维度组合切换不同档位的价格(如分辨率/是否含视频)。后端在 BaseBilling.AdjustBillingOnSubmit 自动应用,以"元/百万 token"输入。规则集非空即生效,与阶梯计费可叠加。',
+                  )}
+                </div>
+              </div>
+            </div>
+            <ModelConditionalRulesEditor
+              rules={modelState.conditionalRules || []}
+              onChange={handleConditionalRulesChange}
+              dimensions={conditionalDimensions}
+              compact
+            />
+          </Card>
 
           <Card
             bodyStyle={{ padding: 16 }}
