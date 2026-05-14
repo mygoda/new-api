@@ -419,6 +419,253 @@ wscat -c "${(serverAddress || '').replace(/^https?:/, 'wss:').replace(/^http:/, 
         },
       ],
     },
+    {
+      key: 'ref-seedance',
+      label: t('Seedance 2.0'),
+      intro: (
+        <div className='space-y-3'>
+          <Banner
+            type='info'
+            closeIcon={null}
+            description={
+              <div className='space-y-1 text-sm'>
+                <div>
+                  {t(
+                    '火山方舟 Doubao Seedance 2.0 系列(2.0 / 2.0-fast / 1.5-pro / 1.0-pro 等)接入,统一走 /v1/video/generations 异步任务,兼容 OpenAI Video 协议。',
+                  )}
+                </div>
+                <div>
+                  {t('支持')}
+                  <Text code>{t('文生视频')}</Text>
+                  {t(' / ')}
+                  <Text code>{t('图生视频(首帧)')}</Text>
+                  {t(' / ')}
+                  <Text code>{t('首尾帧')}</Text>
+                  {t(' / ')}
+                  <Text code>{t('多模态参考(1~9 图 + 0~3 视频 + 0~3 音频)')}</Text>
+                  {t('。')}
+                </div>
+              </div>
+            }
+          />
+          <Card bodyStyle={{ padding: 12 }}>
+            <Title heading={6} className='!mb-2'>
+              {t('请求字段速查')}
+            </Title>
+            <div className='overflow-auto'>
+              <table className='w-full text-xs'>
+                <thead className='text-left text-semi-color-text-2'>
+                  <tr>
+                    <th className='py-1 pr-3'>{t('字段')}</th>
+                    <th className='py-1 pr-3'>{t('类型')}</th>
+                    <th className='py-1'>{t('说明')}</th>
+                  </tr>
+                </thead>
+                <tbody className='[&>tr]:border-t [&>tr]:border-semi-color-border [&>tr>td]:py-1.5 [&>tr>td]:pr-3'>
+                  <tr><td><Text code>model</Text></td><td>string</td><td>{t('如 doubao-seedance-2-0-260128 或 Dreamina-Seedance-2.0(别名)')}</td></tr>
+                  <tr><td><Text code>prompt</Text></td><td>string</td><td>{t('文本提示词。中/英/日/印尼/西/葡;中文建议 ≤500 字')}</td></tr>
+                  <tr><td><Text code>image</Text></td><td>string</td><td>{t('单图首帧 URL/Base64。i2v 模式使用')}</td></tr>
+                  <tr><td><Text code>images[]</Text></td><td>string[]</td><td>{t('多张图(首尾帧或参考图,1~9 张),配合 image_roles 用')}</td></tr>
+                  <tr><td><Text code>image_roles[]</Text></td><td>string[]</td><td>{t('与 images 等长。first_frame / last_frame / reference_image')}</td></tr>
+                  <tr><td><Text code>videos[]</Text></td><td>string[]</td><td>{t('参考视频 URL,0~3 段,总时长 ≤15s。Seedance 2.0 系列')}</td></tr>
+                  <tr><td><Text code>audios[]</Text></td><td>string[]</td><td>{t('参考音频 URL,0~3 段,总时长 ≤15s。Seedance 2.0 系列')}</td></tr>
+                  <tr><td><Text code>metadata.resolution</Text></td><td>string</td><td>{t('480p / 720p(默认) / 1080p(2.0-fast 不支持 1080p)')}</td></tr>
+                  <tr><td><Text code>metadata.ratio</Text></td><td>string</td><td>{t('16:9 / 9:16 / 1:1 / 4:3 / 3:4 / 21:9 / adaptive(默认)')}</td></tr>
+                  <tr><td><Text code>metadata.duration</Text></td><td>int</td><td>{t('时长(秒)。Seedance 2.0 [4,15] 或 -1 智能;1.5/1.0 [2,12]')}</td></tr>
+                  <tr><td><Text code>metadata.frames</Text></td><td>int</td><td>{t('帧数(优先级高于 duration)。25+4n 格式,范围 [29,289]。Seedance 2.0/1.5 暂不支持')}</td></tr>
+                  <tr><td><Text code>metadata.seed</Text></td><td>int</td><td>{t('随机种子,-1=随机,[-1, 2^32-1]')}</td></tr>
+                  <tr><td><Text code>metadata.generate_audio</Text></td><td>bool</td><td>{t('生成同步音频。Seedance 2.0/1.5 pro 默认 true')}</td></tr>
+                  <tr><td><Text code>metadata.return_last_frame</Text></td><td>bool</td><td>{t('返回尾帧 PNG。可作下一段视频首帧实现长视频拼接')}</td></tr>
+                  <tr><td><Text code>metadata.draft</Text></td><td>bool</td><td>{t('样片模式(仅 1.5 pro)。生成低画质预览,价格更低')}</td></tr>
+                  <tr><td><Text code>metadata.camera_fixed</Text></td><td>bool</td><td>{t('固定镜头。参考图场景 / Seedance 2.0 不支持')}</td></tr>
+                  <tr><td><Text code>metadata.watermark</Text></td><td>bool</td><td>{t('生成视频是否带水印,默认 false')}</td></tr>
+                  <tr><td><Text code>metadata.tools[]</Text></td><td>object[]</td><td>{t('工具调用,目前仅 [{"type":"web_search"}]。仅 Seedance 2.0 系列')}</td></tr>
+                  <tr><td><Text code>metadata.safety_identifier</Text></td><td>string</td><td>{t('终端用户唯一标识(≤64 字符英文),便于平台溯源')}</td></tr>
+                  <tr><td><Text code>metadata.execution_expires_after</Text></td><td>int</td><td>{t('任务超时秒数,默认 172800(48h),范围 [3600,259200]')}</td></tr>
+                  <tr><td><Text code>callback_url</Text></td><td>string</td><td>{t('回调通知 URL,任务状态变化时 POST 推送')}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      ),
+      endpoints: [
+        {
+          id: 'seedance-t2v',
+          title: t('① 文生视频 (Text → Video)'),
+          method: 'POST',
+          path: '/v1/video/generations',
+          desc: t('纯文本生成视频。最常用,无需上传素材。'),
+          body: `{
+  "model": "doubao-seedance-2-0-260128",
+  "prompt": "小猫对着镜头打哈欠,温暖阳光氛围,慢镜头",
+  "metadata": {
+    "resolution": "720p",
+    "ratio": "16:9",
+    "duration": 5,
+    "generate_audio": true,
+    "watermark": false,
+    "seed": -1
+  }
+}`,
+        },
+        {
+          id: 'seedance-i2v',
+          title: t('② 图生视频 - 单图首帧'),
+          method: 'POST',
+          path: '/v1/video/generations',
+          desc: t('基于一张图作首帧生成视频。images=[首帧URL],image_roles=["first_frame"](可省略,默认即首帧)。'),
+          body: `{
+  "model": "doubao-seedance-2-0-260128",
+  "prompt": "镜头从静止变为推近,主角缓缓抬头",
+  "images": ["https://your-cdn.com/first.png"],
+  "image_roles": ["first_frame"],
+  "metadata": {
+    "resolution": "720p",
+    "ratio": "16:9",
+    "duration": 5
+  }
+}`,
+        },
+        {
+          id: 'seedance-keyframes',
+          title: t('③ 首尾帧 (First + Last Frame)'),
+          method: 'POST',
+          path: '/v1/video/generations',
+          desc: t('两张图分别作首尾帧,模型补全中间过渡。仅 Seedance 1.5 pro 与 2.0 系列支持。'),
+          body: `{
+  "model": "doubao-seedance-2-0-260128",
+  "prompt": "猫从地面跃起,优雅落地",
+  "images": [
+    "https://your-cdn.com/first.png",
+    "https://your-cdn.com/last.png"
+  ],
+  "image_roles": ["first_frame", "last_frame"],
+  "metadata": {
+    "resolution": "1080p",
+    "duration": 5
+  }
+}`,
+        },
+        {
+          id: 'seedance-refs',
+          title: t('④ 多模态参考 (1~9 图 + 0~3 视频 + 0~3 音频)'),
+          method: 'POST',
+          path: '/v1/video/generations',
+          desc: t('Seedance 2.0 独有。混合上传参考素材;参考图 role=reference_image,视频 role 自动 reference_video,音频自动 reference_audio。不可仅上传音频。'),
+          body: `{
+  "model": "doubao-seedance-2-0-260128",
+  "prompt": "结合参考素材,镜头慢推",
+  "images": [
+    "https://your-cdn.com/ref-a.png",
+    "https://your-cdn.com/ref-b.png"
+  ],
+  "image_roles": ["reference_image", "reference_image"],
+  "videos": ["https://your-cdn.com/ref.mp4"],
+  "audios": ["https://your-cdn.com/voice.wav"],
+  "metadata": {
+    "resolution": "720p",
+    "ratio": "adaptive",
+    "duration": 5
+  }
+}`,
+        },
+        {
+          id: 'seedance-tools',
+          title: t('⑤ 联网搜索 + 安全标识 + 回调'),
+          method: 'POST',
+          path: '/v1/video/generations',
+          desc: t('启用联网搜索增强时效性(仅 Seedance 2.0 系列);safety_identifier 上报终端用户便于平台风控;callback_url 接收任务状态变化推送。'),
+          body: `{
+  "model": "doubao-seedance-2-0-260128",
+  "prompt": "今天上海的天气与天际线,实拍质感",
+  "callback_url": "https://your-server.com/seedance/callback",
+  "metadata": {
+    "resolution": "720p",
+    "duration": 5,
+    "tools": [{"type": "web_search"}],
+    "safety_identifier": "sha256(user-12345)",
+    "execution_expires_after": 7200,
+    "return_last_frame": true
+  }
+}`,
+        },
+        {
+          id: 'seedance-fetch',
+          title: t('⑥ 查询任务状态与结果'),
+          method: 'GET',
+          path: '/v1/video/generations/{task_id}',
+          urlPath: '/v1/video/generations/task_xxxxxxxxxxxx',
+          desc: t('返回 OpenAI Video 格式;status=completed 时 metadata.url 即视频地址,metadata.last_frame_url 是尾帧(如开启),metadata.web_search_count 是联网搜索实际次数(如启用 tools)。'),
+        },
+      ],
+      outro: (
+        <div className='mt-4 space-y-3'>
+          <Card bodyStyle={{ padding: 12 }}>
+            <Title heading={6} className='!mb-2'>
+              {t('查询响应示例 (status=completed)')}
+            </Title>
+            <CodeBlock>{`{
+  "id": "task_xxxxxxxxxxxx",
+  "task_id": "task_xxxxxxxxxxxx",
+  "object": "video",
+  "model": "doubao-seedance-2-0-260128",
+  "status": "completed",
+  "progress": 100,
+  "created_at": 1778681488,
+  "completed_at": 1778681597,
+  "metadata": {
+    "url": "https://...mp4?X-Tos-...",
+    "last_frame_url": "https://...png?X-Tos-...",
+    "web_search_count": 2
+  }
+}`}</CodeBlock>
+            <Paragraph type='tertiary' size='small' className='!mt-2 !mb-0'>
+              {t('上游返回的 URL 含临时签名(默认 24h 过期);如需长期持有请尽快下载或开启「镜像上游 URL」让 new-api 自动镜像到对象存储。')}
+            </Paragraph>
+          </Card>
+
+          <Card bodyStyle={{ padding: 12 }}>
+            <Title heading={6} className='!mb-2'>
+              {t('素材限制')}
+            </Title>
+            <div className='text-xs space-y-1 text-semi-color-text-1'>
+              <div>{t('• 单图: jpeg/png/webp/bmp/tiff/gif(+ Seedance 1.5 pro & 2.0 支持 heic/heif);宽高 [300,6000] px;宽高比 [0.4, 2.5];≤30 MB(URL/Base64)')}</div>
+              <div>{t('• 单视频: mp4/mov,分辨率 480p/720p/1080p,时长 [2,15]s,总时长 ≤15s,单文件 ≤50 MB')}</div>
+              <div>{t('• 单音频: wav/mp3,时长 [2,15]s,总时长 ≤15s,单文件 ≤15 MB')}</div>
+              <div>{t('• 请求体总和 ≤64 MB(Base64 编码场景);URL 方式无此限制')}</div>
+              <div>{t('• 多模态参考最多 9 图 + 3 视频 + 3 音频,不可仅传音频')}</div>
+            </div>
+          </Card>
+
+          <Card bodyStyle={{ padding: 12 }}>
+            <Title heading={6} className='!mb-2'>
+              {t('计费(按 token,新 API 已统一换算)')}
+            </Title>
+            <div className='text-xs space-y-1 text-semi-color-text-1'>
+              <div>{t('token = (输入视频时长 + 输出视频时长) × 宽 × 高 × 24 / 1024,以上游 usage.completion_tokens 为准。')}</div>
+              <div>{t('• Seedance 2.0:480p/720p 无视频 46 元/M;含视频 28 元/M;1080p 无视频 51 元/M;1080p 含视频 31 元/M')}</div>
+              <div>{t('• Seedance 2.0-fast:无视频 37 元/M;含视频 22 元/M(不支持 1080p)')}</div>
+              <div>{t('• Seedance 1.5-pro:有声 16 元/M;无声 8 元/M;Draft 折算 0.6(有声) / 0.35(无声)')}</div>
+              <div>{t('• 仅对成功生成的视频计费,失败/审核未通过不扣费')}</div>
+              <div>{t('• admin 可在「分组与模型定价设置 → 价格设置」内按维度组合配条件分价')}</div>
+            </div>
+          </Card>
+
+          <Card bodyStyle={{ padding: 12 }}>
+            <Title heading={6} className='!mb-2'>
+              {t('快速三步上手')}
+            </Title>
+            <div className='text-xs space-y-1 text-semi-color-text-1'>
+              <div>{t('1. POST /v1/video/generations 创建任务,拿到 task_id')}</div>
+              <div>{t('2. 客户端轮询 GET /v1/video/generations/{task_id},或者监听 callback_url 推送(避免轮询)')}</div>
+              <div>{t('3. status=completed 时从 metadata.url 下载视频')}</div>
+            </div>
+          </Card>
+        </div>
+      ),
+      endpoints_help: '',
+    },
   ];
 
   const renderApiPanel = (ep) => {
@@ -442,8 +689,8 @@ ${ep.formData.map((f) => `  -F "${f}"`).join(' \\\n')}`;
 
     return (
       <Collapse.Panel
-        key={ep.path}
-        itemKey={ep.path}
+        key={ep.id || ep.path}
+        itemKey={ep.id || ep.path}
         header={
           <div className='flex items-start gap-3 w-full'>
             <Tag
@@ -454,6 +701,11 @@ ${ep.formData.map((f) => `  -F "${f}"`).join(' \\\n')}`;
               {ep.method}
             </Tag>
             <div className='flex-1 min-w-0'>
+              {ep.title && (
+                <div className='font-semibold text-[13px] mb-0.5'>
+                  {ep.title}
+                </div>
+              )}
               <Text code className='!text-[13px] break-all'>
                 {ep.path}
               </Text>
@@ -746,9 +998,15 @@ console.log(response.choices[0].message.content);`}
                   tab={section.label}
                   itemKey={section.key}
                 >
+                  {section.intro && (
+                    <div className='mb-3'>{section.intro}</div>
+                  )}
                   <Collapse className='!mt-3' keepDOM={false}>
                     {section.endpoints.map((ep) => renderApiPanel(ep))}
                   </Collapse>
+                  {section.outro && (
+                    <div className='mt-4'>{section.outro}</div>
+                  )}
                 </TabPane>
               ))}
             </Tabs>
