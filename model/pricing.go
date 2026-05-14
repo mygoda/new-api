@@ -3,6 +3,7 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"sync"
@@ -417,10 +418,12 @@ func GetModelVideoInputRatio(modelName string) float64 {
 // 装进 PricingConditional 返回。模型不属于任何 family 或总开关关闭时返回 nil,
 // 客户端凭 omitempty 决定是否显示。
 //
-// 注意:GetConditionalRatio 在总开关关闭时直接返回 ok=false,这里我们想区分
-// 「总开关关闭(整体不渲染)」和「单条 disabled(渲染但标灰)」。所以同时调
-// ConditionalRatioEnabled() + ListConditionalRatioFamilies()。
+// 优先走 v2 (admin 在「价格设置」per-model 自助配的规则);v1 framework 作为
+// fallback 保留向后兼容(目前 family 注册表为空,不会命中)。
 func buildPricingConditional(modelName string) *PricingConditional {
+	if v2 := buildPricingConditionalFromV2(modelName); v2 != nil {
+		return v2
+	}
 	if !common.ConditionalRatioEnabled() {
 		return nil
 	}
@@ -447,4 +450,129 @@ func buildPricingConditional(modelName string) *PricingConditional {
 		BaseHint:    family.BaseHint,
 		Conditions:  entries,
 	}
+}
+
+// buildPricingConditionalFromV2 把 v2 (per-model 自助配置)的规则转成展示结构。
+// 模型未匹配到规则集 / 规则集为空时返回 nil。
+//
+// 公式:
+//   - 目标 ratio = price_rmb_per_million / (USD2RMB × 2)
+//   - 乘子 = 目标 ratio / 模型基础 ratio (即「相对基础价的倍数」)
+//
+// 维度 key (resolution / has_video_input / ...) 通过 common.ListDimensions()
+// 翻译为中文 label,布尔值翻译为 是 / 否,生成人话 Match 字符串供前端展示。
+func buildPricingConditionalFromV2(modelName string) *PricingConditional {
+	cfg := ratio_setting.GetConditionalRatiosV2Copy()
+	if cfg == nil || !cfg.Enabled || len(cfg.Models) == 0 {
+		return nil
+	}
+
+	// 优先精确匹配,其次前缀通配 (xxx-*)
+	var matched *ratio_setting.ModelRulesV2
+	for i := range cfg.Models {
+		if cfg.Models[i].ModelPattern == modelName {
+			matched = &cfg.Models[i]
+			break
+		}
+	}
+	if matched == nil {
+		for i := range cfg.Models {
+			p := cfg.Models[i].ModelPattern
+			if strings.HasSuffix(p, "*") &&
+				strings.HasPrefix(modelName, strings.TrimSuffix(p, "*")) {
+				matched = &cfg.Models[i]
+				break
+			}
+		}
+	}
+	if matched == nil || len(matched.Rules) == 0 {
+		return nil
+	}
+
+	// 拉维度元数据,把英文 key 翻译成中文 label
+	dimLabels := map[string]string{}
+	for _, d := range common.ListDimensions() {
+		if d.Label != "" {
+			dimLabels[d.Key] = d.Label
+		}
+	}
+
+	baseRatio, _, _ := ratio_setting.GetModelRatio(modelName)
+	entries := make([]PricingConditionalEntry, 0, len(matched.Rules))
+	for _, r := range matched.Rules {
+		match := formatV2ConditionsForDisplay(r.Conditions, dimLabels)
+		if match == "" {
+			match = "默认档(无条件)"
+		}
+		mul := 0.0
+		if baseRatio > 0 && r.PriceRMBPerMillion > 0 {
+			target := ratio_setting.RMBPriceToRatio(r.PriceRMBPerMillion)
+			mul = target / baseRatio
+		}
+		label := r.Label
+		if label == "" {
+			label = match
+		}
+		entries = append(entries, PricingConditionalEntry{
+			Key:        match,
+			Label:      label,
+			Match:      match,
+			Hint:       fmt.Sprintf("%.2f 元/百万 token", r.PriceRMBPerMillion),
+			Multiplier: mul,
+			Enabled:    r.PriceRMBPerMillion > 0,
+		})
+	}
+
+	familyLabel := matched.Label
+	if familyLabel == "" {
+		familyLabel = "条件分价"
+	}
+	baseHint := ""
+	if baseRatio > 0 {
+		basePriceRMB := baseRatio * 2 * ratio_setting.USD2RMB
+		baseHint = fmt.Sprintf("基准: %.2f 元/百万 token (倍率 %.4f)", basePriceRMB, baseRatio)
+	}
+	return &PricingConditional{
+		FamilyKey:   matched.ModelPattern,
+		FamilyLabel: familyLabel,
+		BaseHint:    baseHint,
+		Conditions:  entries,
+	}
+}
+
+// formatV2ConditionsForDisplay 把 {dim_key:value} 渲染成中文段落,
+// e.g. "输出分辨率=1080p, 输入包含视频=是"。
+// 与日志输出口径一致 (see taskcommon helpers)。
+func formatV2ConditionsForDisplay(conds map[string]any, dimLabels map[string]string) string {
+	if len(conds) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(conds))
+	for k := range conds {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		label := dimLabels[k]
+		if label == "" {
+			label = k
+		}
+		v := conds[k]
+		var s string
+		switch x := v.(type) {
+		case bool:
+			if x {
+				s = "是"
+			} else {
+				s = "否"
+			}
+		case string:
+			s = x
+		default:
+			s = fmt.Sprintf("%v", v)
+		}
+		parts = append(parts, fmt.Sprintf("%s=%s", label, s))
+	}
+	return strings.Join(parts, ", ")
 }

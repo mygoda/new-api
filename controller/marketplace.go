@@ -29,6 +29,9 @@ type MarketplaceModelInfo struct {
 	CachedPrice     *float64          `json:"cached_price,omitempty"`
 	CacheCreatePrice *float64         `json:"cache_create_price,omitempty"`
 	Tiers           []PublicTierPrice `json:"tiers,omitempty"`
+	// ConditionalPricing 当模型存在条件分价规则时填充,前端 PricingTableColumns
+	// 凭此渲染「条件分价」徽章 + 详情面板。
+	ConditionalPricing *model.PricingConditional `json:"conditional_pricing,omitempty"`
 	PricePerRequest float64           `json:"price_per_request,omitempty"`
 	Currency        string            `json:"currency"`
 	Unit            string            `json:"unit"`
@@ -149,6 +152,8 @@ func buildMarketplaceModelInfo(p model.Pricing, meta *model.Model) MarketplaceMo
 			info.Tiers = append(info.Tiers, tier)
 		}
 	}
+	// 条件分价(v2)透传给模型广场,前端凭 omitempty 显示「条件分价」徽章 + 详情
+	info.ConditionalPricing = p.ConditionalPricing
 	return info
 }
 

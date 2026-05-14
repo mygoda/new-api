@@ -75,6 +75,9 @@ type PublicModelInfo struct {
 	OutputPrice     float64            `json:"output_price,omitempty"`
 	CachedPrice     *float64           `json:"cached_price,omitempty"`
 	Tiers           []PublicTierPrice  `json:"tiers,omitempty"`
+	// ConditionalPricing 仅当模型存在条件分价规则(admin 在「价格设置」配)时填充,
+	// 客户端凭 omitempty 决定是否展示「条件分价」徽章 + 详情。
+	ConditionalPricing *model.PricingConditional `json:"conditional_pricing,omitempty"`
 	PricePerRequest float64            `json:"price_per_request,omitempty"`
 	Currency        string             `json:"currency"`
 	Unit            string             `json:"unit"`
@@ -137,6 +140,8 @@ func GetPublicModels(c *gin.Context) {
 				}
 			}
 		}
+		// 条件分价(v2)透传:同时适用于按 token 与按次计费的模型
+		info.ConditionalPricing = p.ConditionalPricing
 		list = append(list, info)
 	}
 
