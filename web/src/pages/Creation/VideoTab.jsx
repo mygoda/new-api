@@ -636,6 +636,9 @@ const VideoTab = () => {
   }, [assets]);
 
   const handleSubmit = async () => {
+    // 重入保护:按钮 onClick + PromptComposer Ctrl+Enter + 用户手快双击
+    // 任意组合都可能在 submitting 切到 true 之前再次进入,导致同一提交发两次请求。
+    if (submitting) return;
     const unified = {
       model,
       prompt,
@@ -989,7 +992,7 @@ const VideoTab = () => {
                   icon={<Send size={15} />}
                   loading={submitting}
                   onClick={handleSubmit}
-                  disabled={!model || !prompt.trim()}
+                  disabled={submitting || !model || !prompt.trim()}
                   className='!px-6'
                 >
                   {t('生成视频')}

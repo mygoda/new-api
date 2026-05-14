@@ -262,6 +262,7 @@ const ImageToImageTab = () => {
   }, [schema, params, prompt]);
 
   const handleSubmit = async () => {
+    if (submitting) return; // 重入保护,防止 onClick + Ctrl+Enter / 用户连点
     const unified = { model, prompt, image_first: imageRef, ...params };
     const errs = validate(unified, schema);
     if (errs.length) {
@@ -649,7 +650,7 @@ const ImageToImageTab = () => {
                   icon={<Send size={15} />}
                   loading={submitting}
                   onClick={handleSubmit}
-                  disabled={!model || !prompt.trim() || !imageRef}
+                  disabled={submitting || !model || !prompt.trim() || !imageRef}
                   className='!px-6'
                 >
                   {t('生成图像')}
