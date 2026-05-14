@@ -62,6 +62,7 @@ func InitOptionMap() {
 	common.OptionMap["FeishuAlertRelay5xxWindowSeconds"] = strconv.Itoa(common.FeishuAlertRelay5xxWindowSeconds)
 	common.OptionMap["FeishuAlertRelay5xxThreshold"] = strconv.Itoa(common.FeishuAlertRelay5xxThreshold)
 	common.OptionMap["FeishuAlertHeartbeatFailureLimit"] = strconv.Itoa(common.FeishuAlertHeartbeatFailureLimit)
+	common.OptionMap["AlertEmailReceivers"] = common.AlertEmailReceivers
 	// 通用模型条件分价配置(JSON,admin 在「价格配置」UI 编辑)
 	// family 由各 adapter 通过 common.RegisterConditionalRatioFamily 在 init() 注册,
 	// 默认 JSON 此时已经包含所有已注册族(import 链触发了各 register.go)。
@@ -654,6 +655,8 @@ func updateOptionMap(key string, value string) (err error) {
 		if v, err := strconv.Atoi(value); err == nil && v > 0 {
 			common.FeishuAlertHeartbeatFailureLimit = v
 		}
+	case "AlertEmailReceivers":
+		common.AlertEmailReceivers = value
 	case "ConditionalRatios":
 		common.SetConditionalRatios(value)
 	case "ConditionalRatiosV2":

@@ -124,6 +124,11 @@ var FeishuAlertDedupSeconds = 120
 var FeishuAlertEventMask = "" // 逗号分隔启用的 kind;空=全部启用
 var FeishuAlertRelay5xxWindowSeconds = 60
 var FeishuAlertRelay5xxThreshold = 10
+
+// AlertEmailReceivers 告警邮件收件人(逗号分隔多个邮箱)。
+// 非空时,SendFeishuAlert 内部会同时通过 SMTP 把同一封告警发邮件。
+// SMTP 服务器使用现有 SMTPServer/SMTPAccount/SMTPToken 配置。
+var AlertEmailReceivers = ""
 var FeishuAlertHeartbeatFailureLimit = 30
 
 // ConditionalRatios — 通用「模型条件分价」配置(JSON 字符串)。

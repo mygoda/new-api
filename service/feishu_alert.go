@@ -103,11 +103,16 @@ func levelLabel(l AlertLevel) string {
 // (webhook and/or app mode). All filtering (enabled flag, event mask, dedup)
 // happens here once; callers can fire-and-forget. If both modes are configured
 // the same alert is sent to both targets but counted as a single dedup event.
+//
+// 同时支持邮件通道:若 AlertEmailReceivers 非空,会通过 common.SendEmail 把
+// 同一封告警发到配置的邮箱列表,与飞书共享同一份 dedup 计数。
 func SendFeishuAlert(ev AlertEvent) {
-	if !common.FeishuAlertEnabled {
+	// 总开关:FeishuAlertEnabled 显式启用 OR 至少配置了邮件接收人
+	// (配了邮件等同于运营意图启用,避免要 admin 在两处都开)。
+	if !common.FeishuAlertEnabled && !alertEmailConfigured() {
 		return
 	}
-	if !feishuWebhookConfigured() && !feishuAppConfigured() {
+	if !feishuWebhookConfigured() && !feishuAppConfigured() && !alertEmailConfigured() {
 		return
 	}
 	if !eventEnabled(ev.Kind) {
@@ -130,8 +135,8 @@ func SendFeishuAlert(ev AlertEvent) {
 // so that the API response can surface the actual webhook reply. It bypasses dedup
 // and the enabled flag — callers should validate at least one mode is configured.
 func SendFeishuAlertSync(ev AlertEvent) error {
-	if !feishuWebhookConfigured() && !feishuAppConfigured() {
-		return fmt.Errorf("既未配置 webhook url，也未配置 app id/secret/receive_id")
+	if !feishuWebhookConfigured() && !feishuAppConfigured() && !alertEmailConfigured() {
+		return fmt.Errorf("既未配置 webhook url,也未配置 app id/secret/receive_id,也未配置告警邮箱")
 	}
 	var firstErr error
 	if feishuWebhookConfigured() {
@@ -142,6 +147,11 @@ func SendFeishuAlertSync(ev AlertEvent) error {
 	if feishuAppConfigured() {
 		if err := sendFeishuViaApp(ev); err != nil && firstErr == nil {
 			firstErr = fmt.Errorf("app: %w", err)
+		}
+	}
+	if alertEmailConfigured() {
+		if err := sendAlertViaEmail(ev); err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("email: %w", err)
 		}
 	}
 	return firstErr
@@ -158,6 +168,11 @@ func dispatchFeishuAlert(ev AlertEvent) {
 			common.SysLog(fmt.Sprintf("feishu app send failed kind=%s: %s", ev.Kind, err.Error()))
 		}
 	}
+	if alertEmailConfigured() {
+		if err := sendAlertViaEmail(ev); err != nil {
+			common.SysLog(fmt.Sprintf("alert email send failed kind=%s: %s", ev.Kind, err.Error()))
+		}
+	}
 }
 
 func feishuWebhookConfigured() bool {
@@ -168,6 +183,79 @@ func feishuAppConfigured() bool {
 	return strings.TrimSpace(common.FeishuAlertAppId) != "" &&
 		strings.TrimSpace(common.FeishuAlertAppSecret) != "" &&
 		strings.TrimSpace(common.FeishuAlertReceiveId) != ""
+}
+
+// ---- Email mode ----
+
+func alertEmailConfigured() bool {
+	return strings.TrimSpace(common.AlertEmailReceivers) != ""
+}
+
+// parseAlertEmailReceivers 把"逗号/分号/换行"分隔的多邮箱字符串解析成 trim 后的切片。
+func parseAlertEmailReceivers() []string {
+	raw := common.AlertEmailReceivers
+	if raw == "" {
+		return nil
+	}
+	rep := strings.NewReplacer(";", ",", "\n", ",", "\r", ",", " ", ",")
+	parts := strings.Split(rep.Replace(raw), ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func sendAlertViaEmail(ev AlertEvent) error {
+	receivers := parseAlertEmailReceivers()
+	if len(receivers) == 0 {
+		return nil
+	}
+	subject := strings.TrimSpace(levelEmoji(ev.Level) + " " + ev.Title)
+	body := buildAlertEmailHTML(ev)
+	var firstErr error
+	for _, r := range receivers {
+		if err := common.SendEmail(subject, r, body); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+// buildAlertEmailHTML 把 AlertEvent 渲染成简洁 HTML(SMTP 默认 Content-Type 已是 text/html)。
+// 字段顺序保留 ev.Fields 原顺序,便于排查时定位。
+func buildAlertEmailHTML(ev AlertEvent) string {
+	var b strings.Builder
+	b.WriteString(`<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1f2937;line-height:1.55">`)
+	b.WriteString(fmt.Sprintf(`<h2 style="margin:0 0 12px;font-size:16px">%s %s</h2>`, levelEmoji(ev.Level), htmlEscape(ev.Title)))
+	if len(ev.Fields) > 0 {
+		b.WriteString(`<table style="border-collapse:collapse;font-size:13px;width:100%;max-width:600px">`)
+		for _, f := range ev.Fields {
+			b.WriteString(fmt.Sprintf(
+				`<tr><td style="padding:6px 12px;color:#6b7280;border-bottom:1px solid #e5e7eb;width:28%%;vertical-align:top">%s</td>`+
+					`<td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;word-break:break-all">%s</td></tr>`,
+				htmlEscape(f.Label), htmlEscape(f.Value),
+			))
+		}
+		b.WriteString(`</table>`)
+	}
+	b.WriteString(fmt.Sprintf(`<p style="margin-top:16px;font-size:11px;color:#9ca3af">kind: %s · 来源: new-api</p>`, htmlEscape(ev.Kind)))
+	b.WriteString(`</div>`)
+	return b.String()
+}
+
+func htmlEscape(s string) string {
+	r := strings.NewReplacer(
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
+		`"`, "&quot;",
+		"'", "&#39;",
+	)
+	return r.Replace(s)
 }
 
 // ---- Webhook mode ----
