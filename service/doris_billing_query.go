@@ -116,6 +116,9 @@ func buildBillingWhere(filter BillingFilter) (string, []interface{}) {
 }
 
 func QueryBillingRecords(filter BillingFilter, page, pageSize int) (*BillingQueryResult, error) {
+	if !dorisAvailable() {
+		return queryBillingRecordsMySQL(filter, page, pageSize)
+	}
 	db, err := getDorisDB()
 	if err != nil {
 		return nil, fmt.Errorf("doris connection: %w", err)

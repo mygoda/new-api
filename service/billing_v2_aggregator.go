@@ -29,7 +29,11 @@ type BillingV2OverviewMetrics struct {
 
 // QueryBillingV2Overview 查询给定时间窗口内的聚合指标。
 // 上层(controller)负责调两次:本期、上一周期同期,做同比。
+// Doris 未启用时自动回退到 MySQL 实现，详见 billing_v2_mysql.go。
 func QueryBillingV2Overview(filter BillingFilter) (*BillingV2OverviewMetrics, error) {
+	if !dorisAvailable() {
+		return queryBillingV2OverviewMySQL(filter)
+	}
 	db, err := getDorisDB()
 	if err != nil {
 		return nil, fmt.Errorf("doris connection: %w", err)
@@ -60,7 +64,11 @@ type BillingV2BreakdownRow struct {
 }
 
 // QueryBillingV2Breakdown 按 dim(model | token)聚合,返回所有 group(由上层做 topN + others)。
+// Doris 未启用时自动回退到 MySQL 实现。
 func QueryBillingV2Breakdown(filter BillingFilter, dim string) ([]BillingV2BreakdownRow, int, error) {
+	if !dorisAvailable() {
+		return queryBillingV2BreakdownMySQL(filter, dim)
+	}
 	db, err := getDorisDB()
 	if err != nil {
 		return nil, 0, fmt.Errorf("doris connection: %w", err)
@@ -115,7 +123,11 @@ type BillingV2TimeseriesRow struct {
 
 // QueryBillingV2Timeseries 按 granularity(day | hour)切片聚合。
 // granularity=day 推荐用于 30 天范围,hour 用于 24-48 小时范围。
+// Doris 未启用时自动回退到 MySQL 实现。
 func QueryBillingV2Timeseries(filter BillingFilter, granularity string) ([]BillingV2TimeseriesRow, error) {
+	if !dorisAvailable() {
+		return queryBillingV2TimeseriesMySQL(filter, granularity)
+	}
 	db, err := getDorisDB()
 	if err != nil {
 		return nil, fmt.Errorf("doris connection: %w", err)
@@ -175,7 +187,11 @@ type BillingV2AnomalyRow struct {
 //
 // 实现:先单独查 P99 × 2 的阈值,再 WHERE quota > 阈值 列出 top N。
 // 如果窗口内总请求数 < 20,P99 不可信,直接返回空。
+// Doris 未启用时回退到 MySQL 近似算法（avg × 10）。
 func QueryBillingV2HighCostAnomalies(filter BillingFilter, limit int) ([]BillingV2AnomalyRow, int, error) {
+	if !dorisAvailable() {
+		return queryBillingV2HighCostAnomaliesMySQL(filter, limit)
+	}
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
