@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -102,10 +104,10 @@ func SyncChannelCache(frequency int) {
 	}
 }
 
-func GetRandomSatisfiedChannel(group string, model string, retry int) (*Channel, error) {
+func GetRandomSatisfiedChannel(group string, model string, retry int, allowedChannels map[int]struct{}) (*Channel, error) {
 	// if memory cache is disabled, get channel directly from database
 	if !common.MemoryCacheEnabled {
-		return GetChannel(group, model, retry)
+		return GetChannel(group, model, retry, allowedChannels)
 	}
 
 	channelSyncLock.RLock()
@@ -118,6 +120,18 @@ func GetRandomSatisfiedChannel(group string, model string, retry int) (*Channel,
 	if len(cachedAbilities) == 0 {
 		normalizedModel := ratio_setting.FormatMatchingModelName(model)
 		cachedAbilities = group2model2channels[group][normalizedModel]
+	}
+
+	// 应用用户级渠道白名单。allowedChannels=nil 视为不限制；非空时仅保留命中的候选。
+	// 性能：单个 (group, model) 桶通常 < 20 个候选，map[int]struct{} lookup ≈ ns 级。
+	if len(allowedChannels) > 0 {
+		filtered := make([]CachedAbility, 0, len(cachedAbilities))
+		for _, ca := range cachedAbilities {
+			if _, ok := allowedChannels[ca.ChannelId]; ok {
+				filtered = append(filtered, ca)
+			}
+		}
+		cachedAbilities = filtered
 	}
 
 	if len(cachedAbilities) == 0 {
@@ -265,4 +279,28 @@ func CacheUpdateChannel(channel *Channel) {
 	println("before:", channelsIDM[channel.Id].ChannelInfo.MultiKeyPollingIndex)
 	channelsIDM[channel.Id] = channel
 	println("after :", channelsIDM[channel.Id].ChannelInfo.MultiKeyPollingIndex)
+}
+
+// ParseAllowedChannels 把逗号分隔的渠道ID列表（"3,7,12"）解析成 lookup map。
+// 空字符串或全部条目无效时返回 nil，调用方以 nil 判定「不限制」。
+// 每次请求解析一次（开销 < 1µs），无需缓存。
+func ParseAllowedChannels(csv string) map[int]struct{} {
+	csv = strings.TrimSpace(csv)
+	if csv == "" {
+		return nil
+	}
+	out := make(map[int]struct{}, 4)
+	for _, part := range strings.Split(csv, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if id, err := strconv.Atoi(part); err == nil && id > 0 {
+			out[id] = struct{}{}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

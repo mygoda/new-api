@@ -69,6 +69,7 @@ const EditUserModal = (props) => {
   const [addAmountLocal, setAddAmountLocal] = useState('');
   const isMobile = useIsMobile();
   const [groupOptions, setGroupOptions] = useState([]);
+  const [channelOptions, setChannelOptions] = useState([]);
   const [bindingModalVisible, setBindingModalVisible] = useState(false);
   const [userModelRatios, setUserModelRatios] = useState('');
   const formApiRef = useRef(null);
@@ -92,6 +93,7 @@ const EditUserModal = (props) => {
     created_by: 0,
     user_ratio: 0,
     user_model_ratios: '',
+    allowed_channels: [],
   });
 
   const fetchGroups = async () => {
@@ -100,6 +102,24 @@ const EditUserModal = (props) => {
       setGroupOptions(res.data.data.map((g) => ({ label: g, value: g })));
     } catch (e) {
       showError(e.message);
+    }
+  };
+
+  // 渠道下拉选项：用于「可用渠道」白名单。一次拉够，多数实例渠道总数 < 500。
+  const fetchChannels = async () => {
+    try {
+      const res = await API.get(
+        `/api/channel/?p=1&page_size=1000&id_sort=true&tag_mode=false`,
+      );
+      const list = res.data?.data?.items || res.data?.data || [];
+      setChannelOptions(
+        list.map((ch) => ({
+          label: `#${ch.id} ${ch.name || ''}`,
+          value: ch.id,
+        })),
+      );
+    } catch (e) {
+      // 静默失败：渠道列表不可用时白名单字段表现为「无选项可选」，但不阻塞用户编辑
     }
   };
 
@@ -112,6 +132,13 @@ const EditUserModal = (props) => {
     const { success, message, data } = res.data;
     if (success) {
       data.password = '';
+      // 后端 allowed_channels 是 CSV，前端 Form.Select 多选用数组：转一下。
+      data.allowed_channels = data.allowed_channels
+        ? data.allowed_channels
+            .split(',')
+            .map((s) => parseInt(s.trim(), 10))
+            .filter((n) => !isNaN(n) && n > 0)
+        : [];
       formApiRef.current?.setValues({ ...getInitValues(), ...data });
       setUserModelRatios(data.user_model_ratios || '');
     } else {
@@ -122,7 +149,10 @@ const EditUserModal = (props) => {
 
   useEffect(() => {
     loadUser();
-    if (userId) fetchGroups();
+    if (userId) {
+      fetchGroups();
+      fetchChannels();
+    }
     setBindingModalVisible(false);
   }, [props.editingUser.id]);
 
@@ -147,6 +177,14 @@ const EditUserModal = (props) => {
     if (payload.user_ratio == null || isNaN(payload.user_ratio))
       payload.user_ratio = 0;
     payload.user_model_ratios = userModelRatios || '';
+    // allowed_channels: 数组 → CSV，空数组 = 不限制
+    if (Array.isArray(payload.allowed_channels)) {
+      payload.allowed_channels = payload.allowed_channels
+        .filter((v) => v != null && v !== '')
+        .join(',');
+    } else if (typeof payload.allowed_channels !== 'string') {
+      payload.allowed_channels = '';
+    }
     if (userId) {
       payload.id = parseInt(userId);
     }
@@ -381,6 +419,22 @@ const EditUserModal = (props) => {
                             modelsEndpoint='/api/channel/models_enabled'
                           />
                         </Form.Slot>
+                      </Col>
+
+                      <Col span={24}>
+                        <Form.Select
+                          field='allowed_channels'
+                          label={t('可用渠道')}
+                          placeholder={t('不选 = 不限制，可用所有渠道')}
+                          multiple
+                          filter
+                          showClear
+                          optionList={channelOptions}
+                          style={{ width: '100%' }}
+                          extraText={t(
+                            '仅允许该用户使用所选渠道；留空则按原分组逻辑选渠道。',
+                          )}
+                        />
                       </Col>
                     </Row>
                   </Card>

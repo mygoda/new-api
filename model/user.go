@@ -55,6 +55,7 @@ type User struct {
 	UserModelRatios  string         `json:"user_model_ratios" gorm:"type:text;column:user_model_ratios"`
 	DealerRemark     string         `json:"dealer_remark,omitempty" gorm:"type:varchar(255);column:dealer_remark"`
 	CreatedBy        int            `json:"created_by" gorm:"type:int;default:0;column:created_by;index"`
+	AllowedChannels  string         `json:"allowed_channels" gorm:"type:text;column:allowed_channels"` // 渠道白名单，逗号分隔渠道ID（如 "3,7,12"），空字符串=不限制
 
 	CreatedByUsername string `json:"created_by_username,omitempty" gorm:"-:all"`
 }
@@ -70,6 +71,7 @@ func (user *User) ToBaseUser() *UserBase {
 		Email:           user.Email,
 		UserRatio:       user.UserRatio,
 		UserModelRatios: user.UserModelRatios,
+		AllowedChannels: user.AllowedChannels,
 	}
 	return cache
 }
@@ -772,6 +774,7 @@ func (user *User) Edit(updatePassword bool) error {
 		"remark":            newUser.Remark,
 		"user_ratio":        newUser.UserRatio,
 		"user_model_ratios": newUser.UserModelRatios,
+		"allowed_channels":  newUser.AllowedChannels,
 	}
 	if updatePassword {
 		updates["password"] = newUser.Password

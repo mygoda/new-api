@@ -108,7 +108,7 @@ func getChannelQuery(group string, model string, retry int) (*gorm.DB, error) {
 	return channelQuery, nil
 }
 
-func GetChannel(group string, model string, retry int) (*Channel, error) {
+func GetChannel(group string, model string, retry int, allowedChannels map[int]struct{}) (*Channel, error) {
 	var abilities []Ability
 
 	var err error = nil
@@ -123,6 +123,16 @@ func GetChannel(group string, model string, retry int) (*Channel, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	// 应用用户级渠道白名单（DB 路径与 cache 路径语义保持一致）。
+	if len(allowedChannels) > 0 {
+		filtered := make([]Ability, 0, len(abilities))
+		for _, a := range abilities {
+			if _, ok := allowedChannels[a.ChannelId]; ok {
+				filtered = append(filtered, a)
+			}
+		}
+		abilities = filtered
 	}
 	channel := Channel{}
 	if len(abilities) > 0 {

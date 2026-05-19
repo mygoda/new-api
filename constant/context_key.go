@@ -77,4 +77,7 @@ const (
 	/* per-user pricing overrides */
 	ContextKeyUserRatio       ContextKey = "user_ratio"
 	ContextKeyUserModelRatios ContextKey = "user_model_ratios"
+
+	/* per-user channel whitelist (comma-separated channel ids, "" = no restriction) */
+	ContextKeyUserAllowedChannels ContextKey = "user_allowed_channels"
 )

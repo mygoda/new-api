@@ -129,11 +129,13 @@ func Distribute() func(c *gin.Context) {
 				}
 
 				if channel == nil {
+					allowedChannels := model.ParseAllowedChannels(common.GetContextKeyString(c, constant.ContextKeyUserAllowedChannels))
 					channel, selectGroup, err = service.CacheGetRandomSatisfiedChannel(&service.RetryParam{
-						Ctx:        c,
-						ModelName:  modelRequest.Model,
-						TokenGroup: usingGroup,
-						Retry:      common.GetPointer(0),
+						Ctx:             c,
+						ModelName:       modelRequest.Model,
+						TokenGroup:      usingGroup,
+						Retry:           common.GetPointer(0),
+						AllowedChannels: allowedChannels,
 					})
 					if err != nil {
 						showGroup := usingGroup
