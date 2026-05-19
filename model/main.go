@@ -205,6 +205,7 @@ func InitDB() (err error) {
 		err = migrateDB()
 		if err == nil {
 			migrateDealerRatioToUserRatio()
+			SeedDefaultVendorDiscounts()
 		}
 		return err
 	} else {

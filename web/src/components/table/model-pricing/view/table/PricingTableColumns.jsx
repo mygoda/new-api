@@ -385,11 +385,32 @@ export const getPricingTableColumns = ({
         : getPriceData(record);
       const priceItems = getModelPriceItems(priceData, t, siteDisplayType);
 
+      const rawDiscount = Number(record.vendor_discount);
+      const hasDiscount =
+        Number.isFinite(rawDiscount) && rawDiscount > 0 && rawDiscount < 1 &&
+        siteDisplayType !== 'TOKENS'; // 倍率视图不展示折扣
+      const discountText = hasDiscount
+        ? formatDiscountText(rawDiscount, t)
+        : null;
+
       return (
         <div className='space-y-1'>
+          {hasDiscount && discountText && (
+            <Tag color='red' size='small' shape='circle' className='mb-1'>
+              {discountText}
+            </Tag>
+          )}
           {priceItems.map((item) => (
             <div key={item.key} className='text-gray-700'>
-              {item.label} {item.value}
+              {item.label}{' '}
+              {item.originalValue && (
+                <span className='line-through text-gray-400 mr-1'>
+                  {item.originalValue}
+                </span>
+              )}
+              <span className={item.originalValue ? 'text-red-600 font-medium' : ''}>
+                {item.value}
+              </span>
               {item.suffix}
             </div>
           ))}

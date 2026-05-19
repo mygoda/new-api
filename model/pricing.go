@@ -21,6 +21,9 @@ type Pricing struct {
 	Icon                   string                  `json:"icon,omitempty"`
 	Tags                   string                  `json:"tags,omitempty"`
 	VendorID               int                     `json:"vendor_id,omitempty"`
+	// VendorDiscount 来自供应商配置（vendors.discount），仅供模型广场「展示」折扣价使用,不影响计费。
+	// 0 = 不打折；0<x<1 = 折扣倍率（如 0.7 = 7 折）。
+	VendorDiscount         float64                 `json:"vendor_discount,omitempty"`
 	ContextLength          string                  `json:"context_length,omitempty"`
 	QuotaType              int                     `json:"quota_type"`
 	ModelRatio             float64                 `json:"model_ratio"`
@@ -66,10 +69,12 @@ type PricingConditionalEntry struct {
 }
 
 type PricingVendor struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Icon        string `json:"icon,omitempty"`
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description,omitempty"`
+	Icon        string  `json:"icon,omitempty"`
+	// Discount 模型广场展示用折扣。0 = 不打折；0<x<1 = 折扣倍率。
+	Discount    float64 `json:"discount,omitempty"`
 }
 
 var (
@@ -214,6 +219,7 @@ func updatePricing() {
 			Name:        v.Name,
 			Description: v.Description,
 			Icon:        v.Icon,
+			Discount:    v.Discount,
 		})
 	}
 
@@ -334,6 +340,10 @@ func updatePricing() {
 			pricing.VendorID = meta.VendorID
 			pricing.ContextLength = string(meta.ContextLength)
 			pricing.VideoInputRatio = meta.VideoInputRatio
+			// 透传供应商折扣（仅用于模型广场展示，不影响计费）
+			if v, ok := vendorMap[meta.VendorID]; ok && v != nil {
+				pricing.VendorDiscount = v.Discount
+			}
 		}
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
 		if findPrice {

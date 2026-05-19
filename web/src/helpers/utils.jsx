@@ -721,6 +721,14 @@ export const calculateModelPrice = ({
       ? formatTokenPrice(inputRatioPriceUSD * Number(record.audio_ratio))
       : null;
 
+    // 供应商展示折扣（仅 UI；不影响计费）：0 / >=1 视作不打折。
+    const rawDiscount = Number(record.vendor_discount);
+    const hasDiscount =
+      Number.isFinite(rawDiscount) && rawDiscount > 0 && rawDiscount < 1;
+    const vendorDiscount = hasDiscount ? rawDiscount : 0;
+    const applyDiscount = (price) =>
+      hasDiscount ? formatTokenPrice(price * vendorDiscount) : null;
+
     const tieredPriceItems = Array.isArray(record.model_ratio_tiers)
       ? record.model_ratio_tiers.map((tier) => {
           const tierBaseUSD = Number(tier.model_ratio) * 2 * usedGroupRatio;
@@ -738,22 +746,47 @@ export const calculateModelPrice = ({
       : null;
 
     return {
-      inputPrice,
+      inputPrice: hasDiscount ? applyDiscount(inputRatioPriceUSD) : inputPrice,
+      originalInputPrice: hasDiscount ? inputPrice : null,
       completionPrice: formatTokenPrice(
-        inputRatioPriceUSD * Number(record.completion_ratio),
+        inputRatioPriceUSD * Number(record.completion_ratio) * (hasDiscount ? vendorDiscount : 1),
       ),
+      originalCompletionPrice: hasDiscount
+        ? formatTokenPrice(inputRatioPriceUSD * Number(record.completion_ratio))
+        : null,
       cachePrice: hasRatioValue(record.cache_ratio)
+        ? formatTokenPrice(inputRatioPriceUSD * Number(record.cache_ratio) * (hasDiscount ? vendorDiscount : 1))
+        : null,
+      originalCachePrice: hasDiscount && hasRatioValue(record.cache_ratio)
         ? formatTokenPrice(inputRatioPriceUSD * Number(record.cache_ratio))
         : null,
       createCachePrice: hasRatioValue(record.create_cache_ratio)
+        ? formatTokenPrice(inputRatioPriceUSD * Number(record.create_cache_ratio) * (hasDiscount ? vendorDiscount : 1))
+        : null,
+      originalCreateCachePrice: hasDiscount && hasRatioValue(record.create_cache_ratio)
         ? formatTokenPrice(inputRatioPriceUSD * Number(record.create_cache_ratio))
         : null,
       imagePrice: hasRatioValue(record.image_ratio)
+        ? formatTokenPrice(inputRatioPriceUSD * Number(record.image_ratio) * (hasDiscount ? vendorDiscount : 1))
+        : null,
+      originalImagePrice: hasDiscount && hasRatioValue(record.image_ratio)
         ? formatTokenPrice(inputRatioPriceUSD * Number(record.image_ratio))
         : null,
-      audioInputPrice,
+      audioInputPrice: hasDiscount && audioInputPrice
+        ? applyDiscount(inputRatioPriceUSD * Number(record.audio_ratio))
+        : audioInputPrice,
+      originalAudioInputPrice: hasDiscount ? audioInputPrice : null,
       audioOutputPrice:
         audioInputPrice && hasRatioValue(record.audio_completion_ratio)
+          ? formatTokenPrice(
+              inputRatioPriceUSD *
+                Number(record.audio_ratio) *
+                Number(record.audio_completion_ratio) *
+                (hasDiscount ? vendorDiscount : 1),
+            )
+          : null,
+      originalAudioOutputPrice:
+        hasDiscount && audioInputPrice && hasRatioValue(record.audio_completion_ratio)
           ? formatTokenPrice(
               inputRatioPriceUSD *
                 Number(record.audio_ratio) *
@@ -766,20 +799,28 @@ export const calculateModelPrice = ({
       isTokensDisplay: false,
       usedGroup,
       usedGroupRatio,
+      vendorDiscount,
     };
   }
 
   if (record.quota_type === 1) {
     // 按次计费
     const priceUSD = parseFloat(record.model_price) * usedGroupRatio;
-    const displayVal = displayPrice(priceUSD);
+    const rawDiscount = Number(record.vendor_discount);
+    const hasDiscount =
+      Number.isFinite(rawDiscount) && rawDiscount > 0 && rawDiscount < 1;
+    const vendorDiscount = hasDiscount ? rawDiscount : 0;
+    const displayVal = displayPrice(hasDiscount ? priceUSD * vendorDiscount : priceUSD);
+    const originalDisplay = hasDiscount ? displayPrice(priceUSD) : null;
 
     return {
       price: displayVal,
+      originalPrice: originalDisplay,
       isPerToken: false,
       isTokensDisplay: false,
       usedGroup,
       usedGroupRatio,
+      vendorDiscount,
     };
   }
 
@@ -915,42 +956,49 @@ export const getModelPriceItems = (
         key: 'input',
         label: t('输入价格'),
         value: priceData.inputPrice,
+        originalValue: priceData.originalInputPrice,
         suffix: unitSuffix,
       },
       {
         key: 'completion',
         label: t('补全价格'),
         value: priceData.completionPrice,
+        originalValue: priceData.originalCompletionPrice,
         suffix: unitSuffix,
       },
       {
         key: 'cache',
         label: t('缓存读取价格'),
         value: priceData.cachePrice,
+        originalValue: priceData.originalCachePrice,
         suffix: unitSuffix,
       },
       {
         key: 'create-cache',
         label: t('缓存创建价格'),
         value: priceData.createCachePrice,
+        originalValue: priceData.originalCreateCachePrice,
         suffix: unitSuffix,
       },
       {
         key: 'image',
         label: t('图片输入价格'),
         value: priceData.imagePrice,
+        originalValue: priceData.originalImagePrice,
         suffix: unitSuffix,
       },
       {
         key: 'audio-input',
         label: t('音频输入价格'),
         value: priceData.audioInputPrice,
+        originalValue: priceData.originalAudioInputPrice,
         suffix: unitSuffix,
       },
       {
         key: 'audio-output',
         label: t('音频补全价格'),
         value: priceData.audioOutputPrice,
+        originalValue: priceData.originalAudioOutputPrice,
         suffix: unitSuffix,
       },
     ].filter((item) => item.value !== null && item.value !== undefined && item.value !== '');

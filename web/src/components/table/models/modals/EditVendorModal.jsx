@@ -38,6 +38,7 @@ const EditVendorModal = ({ visible, handleClose, refresh, editingVendor }) => {
     description: '',
     icon: '',
     status: true,
+    discount: 0,
   });
 
   const handleCancel = () => {
@@ -83,9 +84,14 @@ const EditVendorModal = ({ visible, handleClose, refresh, editingVendor }) => {
     setLoading(true);
     try {
       // 转换 status 为数字
+      let discount = parseFloat(values.discount);
+      if (!Number.isFinite(discount) || discount < 0 || discount >= 1) {
+        discount = 0; // 0 / 非法 / >=1 都视作「不打折」
+      }
       const submitData = {
         ...values,
         status: values.status ? 1 : 0,
+        discount,
       };
 
       if (isEdit) {
@@ -172,6 +178,21 @@ const EditVendorModal = ({ visible, handleClose, refresh, editingVendor }) => {
                 </span>
               }
               showClear
+            />
+          </Col>
+          <Col span={24}>
+            <Form.InputNumber
+              field='discount'
+              label={t('模型广场展示折扣')}
+              placeholder={t('0 = 不打折；0.7 = 7 折；0.85 = 85 折')}
+              min={0}
+              max={0.99}
+              step={0.05}
+              precision={4}
+              style={{ width: '100%' }}
+              extraText={t(
+                '仅用于模型广场展示「划线原价 + 折扣价 + N 折」徽章，不影响实际计费。0 = 关闭。',
+              )}
             />
           </Col>
           <Col span={24}>

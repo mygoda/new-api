@@ -18,6 +18,10 @@ type Vendor struct {
 	Description string         `json:"description,omitempty" gorm:"type:text"`
 	Icon        string         `json:"icon,omitempty" gorm:"type:varchar(128)"`
 	Status      int            `json:"status" gorm:"default:1"`
+	// Discount 仅用于模型广场「展示」折扣价（不影响计费）。
+	// 语义：0 = 不打折，按原价展示；0<x<1 = 折扣倍率（如 0.7 表示 7 折）。
+	// >=1 也按 0 处理（不打折）。
+	Discount    float64        `json:"discount" gorm:"type:double;default:0"`
 	CreatedTime int64          `json:"created_time" gorm:"bigint"`
 	UpdatedTime int64          `json:"updated_time" gorm:"bigint"`
 	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index;uniqueIndex:uk_vendor_name_delete_at,priority:2"`
@@ -85,4 +89,23 @@ func SearchVendors(keyword string, offset int, limit int) ([]*Vendor, int64, err
 		return nil, 0, err
 	}
 	return vendors, total, nil
+}
+
+// defaultVendorDiscounts 模型广场展示用的内置默认折扣（仅 UI 展示，不影响计费）。
+// 仅当对应供应商的 discount=0（即「未配置过」）时才会在启动时填入；管理员手动改过的值不会被覆盖。
+var defaultVendorDiscounts = map[string]float64{
+	"OpenAI":    0.7,  // GPT 7 折
+	"Anthropic": 0.85, // Claude 85 折
+	"Google":    0.8,  // Gemini 8 折
+}
+
+// SeedDefaultVendorDiscounts 启动时调用一次，幂等。
+// 仅对 discount=0 的目标供应商写入默认折扣；管理员后续置 0 也会再被填回 —— 这是「显式禁用」与「未配置」共用 0 的代价，权衡下取后者更友好。
+// 想要永久关闭某供应商的展示折扣，请把 discount 设为 1。
+func SeedDefaultVendorDiscounts() {
+	for name, d := range defaultVendorDiscounts {
+		_ = DB.Model(&Vendor{}).
+			Where("name = ? AND (discount IS NULL OR discount = 0)", name).
+			Update("discount", d).Error
+	}
 }

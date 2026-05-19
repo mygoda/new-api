@@ -35,6 +35,9 @@ type MarketplaceModelInfo struct {
 	PricePerRequest float64           `json:"price_per_request,omitempty"`
 	Currency        string            `json:"currency"`
 	Unit            string            `json:"unit"`
+	// VendorDiscount 来自 vendors.discount,模型广场前端用于展示「划线原价 + 折扣价 + N 折」徽章。
+	// 0 = 不打折,前端按原价渲染。不参与计费。
+	VendorDiscount  float64           `json:"vendor_discount,omitempty"`
 }
 
 // loadMarketplaceMetaMap 从 models 表加载模型广场展示所需的扩展字段
@@ -154,6 +157,8 @@ func buildMarketplaceModelInfo(p model.Pricing, meta *model.Model) MarketplaceMo
 	}
 	// 条件分价(v2)透传给模型广场,前端凭 omitempty 显示「条件分价」徽章 + 详情
 	info.ConditionalPricing = p.ConditionalPricing
+	// 供应商折扣（展示用）
+	info.VendorDiscount = p.VendorDiscount
 	return info
 }
 
