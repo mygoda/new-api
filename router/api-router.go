@@ -420,6 +420,7 @@ func SetApiRouter(router *gin.Engine) {
 			creationRoute.POST("/assets", controller.CreateCreationAsset)
 			creationRoute.PUT("/assets/:id", controller.UpdateCreationAsset)
 			creationRoute.DELETE("/assets/:id", controller.DeleteCreationAsset)
+			creationRoute.POST("/upload/volc-asset", controller.UploadCreationVolcAsset)
 		}
 
 		vendorRoute := apiRouter.Group("/vendors")

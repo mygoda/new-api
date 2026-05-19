@@ -5,9 +5,9 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 import React, { useRef, useState, useCallback } from 'react';
 import { Spin, Toast, Typography } from '@douyinfe/semi-ui';
-import { Film, X, Link as LinkIcon } from 'lucide-react';
+import { Film, X, Link as LinkIcon, Cloud } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { uploadVideo } from '../../services/creation/fileUpload';
+import { uploadVideo, uploadToVolcAsset } from '../../services/creation/fileUpload';
 
 const { Text } = Typography;
 
@@ -28,9 +28,11 @@ const VideoSlot = ({
   maxSizeMB = 50,
   minSeconds = 2,
   maxSeconds = 15,
+  volcAsset = '',
 }) => {
   const { t } = useTranslation();
   const fileRef = useRef(null);
+  const volcFileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
@@ -94,14 +96,42 @@ const VideoSlot = ({
   const handleUrlSubmit = () => {
     const v = urlText.trim();
     if (!v) return;
-    if (!/^https?:\/\//.test(v)) {
-      Toast.warning(t('请输入合法的 http(s) URL'));
+    if (!/^https?:\/\//.test(v) && !v.startsWith('asset://')) {
+      Toast.warning(t('请输入 http(s) 或 asset:// URL'));
       return;
     }
     onChange?.(v);
     setShowUrlInput(false);
     setUrlText('');
   };
+
+  // 上传到火山方舟 Files API,返回 asset://file-xxx
+  // 适用场景:含真人的参考视频(Seedance 2.0 不支持公网真人视频 URL,但接受 file_id)
+  const handleVolcUpload = useCallback(
+    async (file) => {
+      if (!file) return;
+      if (!ACCEPTED.split(',').includes(file.type)) {
+        Toast.warning(t('仅支持 MP4 / MOV'));
+        return;
+      }
+      if (file.size > 512 * 1024 * 1024) {
+        Toast.warning(t('文件超过 512 MB 上限'));
+        return;
+      }
+      setUploading(true);
+      try {
+        const data = await uploadToVolcAsset(file, volcAsset);
+        onChange?.(data.asset_url);
+        Toast.success(t('已上传到火山方舟(7 天有效): {{id}}', { id: data.id }));
+      } catch (e) {
+        const msg = e?.response?.data?.message || e?.message || t('火山方舟上传失败');
+        Toast.error(msg);
+      } finally {
+        setUploading(false);
+      }
+    },
+    [onChange, volcAsset, t],
+  );
 
   const isFilled = value && value.length > 0;
 
@@ -169,17 +199,33 @@ const VideoSlot = ({
             <Text type='tertiary' className='!text-[10px]'>
               MP4 / MOV · {minSeconds}~{maxSeconds}s · ≤{maxSizeMB}MB
             </Text>
-            <button
-              type='button'
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowUrlInput((v) => !v);
-              }}
-              className='inline-flex items-center gap-1 text-[11px] text-blue-500 hover:text-blue-700 mt-0.5'
-            >
-              <LinkIcon size={11} />
-              {t('或粘贴视频 URL')}
-            </button>
+            <div className='flex items-center gap-3'>
+              <button
+                type='button'
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowUrlInput((v) => !v);
+                }}
+                className='inline-flex items-center gap-1 text-[11px] text-blue-500 hover:text-blue-700 mt-0.5'
+              >
+                <LinkIcon size={11} />
+                {t('或粘贴 URL / asset')}
+              </button>
+              {volcAsset && (
+                <button
+                  type='button'
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    volcFileRef.current?.click();
+                  }}
+                  className='inline-flex items-center gap-1 text-[11px] text-violet-600 hover:text-violet-800 mt-0.5'
+                  title={t('上传到火山方舟,适用于含真人素材,默认 7 天有效')}
+                >
+                  <Cloud size={11} />
+                  {t('火山方舟上传')}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -190,7 +236,7 @@ const VideoSlot = ({
             type='text'
             value={urlText}
             onChange={(e) => setUrlText(e.target.value)}
-            placeholder='https://...'
+            placeholder='https://... 或 asset://file-xxx'
             className='flex-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:border-blue-400'
           />
           <button
@@ -209,6 +255,17 @@ const VideoSlot = ({
         accept={ACCEPTED}
         className='hidden'
         onChange={(e) => handleFile(e.target.files?.[0])}
+      />
+      <input
+        ref={volcFileRef}
+        type='file'
+        accept={ACCEPTED}
+        className='hidden'
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleVolcUpload(f);
+          e.target.value = '';
+        }}
       />
     </div>
   );

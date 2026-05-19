@@ -102,6 +102,7 @@ function formatDayLabel(d) {
 // 内部按 PDF 上限做软约束;后端 normalizer 再做硬校验。
 const RefSlotPanel = ({
   t,
+  model,
   imagesRef,
   setImagesRef,
   videosRef,
@@ -155,6 +156,7 @@ const RefSlotPanel = ({
           <div className='grid grid-cols-3 gap-2'>
             <ImageSlot
               value=''
+              volcAsset={model}
               onChange={(v) => v && setImagesRef([v])}
             />
           </div>
@@ -164,6 +166,7 @@ const RefSlotPanel = ({
               <ImageSlot
                 key={i}
                 value={url}
+                volcAsset={model}
                 onChange={(v) => updateAt(imagesRef, setImagesRef, i, v)}
               />
             ))}
@@ -194,6 +197,7 @@ const RefSlotPanel = ({
           <div className='grid grid-cols-3 gap-2'>
             <VideoSlot
               value=''
+              volcAsset={model}
               onChange={(v) => v && setVideosRef([v])}
             />
           </div>
@@ -203,6 +207,7 @@ const RefSlotPanel = ({
               <VideoSlot
                 key={i}
                 value={url}
+                volcAsset={model}
                 onChange={(v) => updateAt(videosRef, setVideosRef, i, v)}
               />
             ))}
@@ -232,6 +237,7 @@ const RefSlotPanel = ({
         {audiosRef.length === 0 ? (
           <AudioSlot
             value=''
+            volcAsset={model}
             onChange={(v) => v && setAudiosRef([v])}
           />
         ) : (
@@ -240,6 +246,7 @@ const RefSlotPanel = ({
               <AudioSlot
                 key={i}
                 value={url}
+                volcAsset={model}
                 onChange={(v) => updateAt(audiosRef, setAudiosRef, i, v)}
               />
             ))}
@@ -948,9 +955,9 @@ const VideoTab = () => {
                     : 'grid grid-cols-1 gap-3 max-w-xs'
                 }
               >
-                <ImageSlot label='首帧' value={imageFirst} onChange={setImageFirst} />
+                <ImageSlot label='首帧' value={imageFirst} onChange={setImageFirst} volcAsset={model} />
                 {mode === 'keyframes' && (
-                  <ImageSlot label='尾帧' value={imageLast} onChange={setImageLast} />
+                  <ImageSlot label='尾帧' value={imageLast} onChange={setImageLast} volcAsset={model} />
                 )}
               </div>
             )}
@@ -958,6 +965,7 @@ const VideoTab = () => {
             {mode === 'refs' && (
               <RefSlotPanel
                 t={t}
+                model={model}
                 imagesRef={imagesRef}
                 setImagesRef={setImagesRef}
                 videosRef={videosRef}
