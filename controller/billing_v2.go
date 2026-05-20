@@ -341,7 +341,11 @@ func GetBillingV2Details(c *gin.Context) {
 		pageSize = 50
 	}
 
-	res, err := service.QueryBillingRecords(userBillingFilter(c, start, end), page, pageSize)
+	filter := userBillingFilter(c, start, end)
+	// 默认仅展示成功计费记录;前端可显式传 ?include_failures=true 来查看失败请求。
+	filter.IncludeFailures = c.DefaultQuery("include_failures", "false") == "true"
+
+	res, err := service.QueryBillingRecords(filter, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
 		return

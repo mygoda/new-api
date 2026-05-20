@@ -58,9 +58,14 @@ func formatBillingTime(ts int64) string {
 }
 
 // applyBillingFilter 把 BillingFilter 翻译成 logs 表的 WHERE 链。
-// 强制 type=LogTypeConsume，只看成功消费。
+// 默认仅 type=LogTypeConsume(成功消费);若 f.IncludeFailures=true,扩展为
+// IN (LogTypeConsume, LogTypeError),让账单明细可以展示失败请求。
 func applyBillingFilter(tx *gorm.DB, f BillingFilter) *gorm.DB {
-	tx = tx.Where("type = ?", model.LogTypeConsume)
+	if f.IncludeFailures {
+		tx = tx.Where("type IN (?)", []int{model.LogTypeConsume, model.LogTypeError})
+	} else {
+		tx = tx.Where("type = ?", model.LogTypeConsume)
+	}
 	if f.UserId > 0 {
 		tx = tx.Where("user_id = ?", f.UserId)
 	} else if len(f.UserIds) > 0 {
@@ -322,7 +327,7 @@ func queryBillingRecordsMySQL(f BillingFilter, page, pageSize int) (*BillingQuer
 			ModelRatio:          modelRatio,
 			GroupRatio:          groupRatio,
 			ModelPrice:          modelPrice,
-			IsSuccess:           true,
+			IsSuccess:           l.Type == model.LogTypeConsume,
 			UseTimeMs:           int64(l.UseTime) * 1000,
 			CreatedAt:           formatBillingTime(l.CreatedAt),
 		})

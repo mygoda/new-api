@@ -20,6 +20,10 @@ type BillingFilter struct {
 	ChannelId  int
 	StartTime  string // "2006-01-02 15:04:05"
 	EndTime    string
+	// IncludeFailures 控制是否包含失败请求(is_success=false / LogTypeError)。
+	// 零值 false = 仅成功记录,与历史默认行为一致(MySQL 回退一直只查 LogTypeConsume)。
+	// 由控制器按 ?include_failures=true 显式开启。
+	IncludeFailures bool
 }
 
 type BillingQueryResult struct {
@@ -106,6 +110,10 @@ func buildBillingWhere(filter BillingFilter) (string, []interface{}) {
 	if filter.EndTime != "" {
 		conditions = append(conditions, "created_at <= ?")
 		args = append(args, filter.EndTime)
+	}
+	if !filter.IncludeFailures {
+		conditions = append(conditions, "is_success = ?")
+		args = append(args, true)
 	}
 
 	whereClause := ""

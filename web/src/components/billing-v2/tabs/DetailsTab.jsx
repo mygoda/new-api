@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 */
 
 import React, { useEffect, useState } from 'react';
-import { Card, Spin, Empty, Table, Tag } from '@douyinfe/semi-ui';
+import { Card, Spin, Empty, Table, Tag, Switch } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 
 import { API, showError } from '../../../helpers';
@@ -46,6 +46,8 @@ export default function DetailsTab({ queryParams }) {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  // 默认仅展示成功计费记录;切换开关后通过 include_failures=true 请求后端把失败请求也带回来。
+  const [includeFailures, setIncludeFailures] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -56,6 +58,7 @@ export default function DetailsTab({ queryParams }) {
           ...queryParams,
           page: String(page),
           page_size: String(pageSize),
+          ...(includeFailures ? { include_failures: 'true' } : {}),
         });
         const res = await API.get(`/api/billing/v2/details?${qs}`);
         if (!alive) return;
@@ -75,7 +78,7 @@ export default function DetailsTab({ queryParams }) {
     };
     // 用 JSON.stringify 稳定 object 依赖,避免引用变化触发死循环。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(queryParams), page, pageSize]);
+  }, [JSON.stringify(queryParams), page, pageSize, includeFailures]);
 
   const items = data?.items || [];
   const total = data?.total || 0;
@@ -184,9 +187,28 @@ export default function DetailsTab({ queryParams }) {
       </div>
     );
   }
+
+  const headerControls = (
+    <div className='flex items-center gap-2 text-xs text-slate-500'>
+      <span>{t('显示失败请求')}</span>
+      <Switch
+        size='small'
+        checked={includeFailures}
+        onChange={(v) => {
+          setIncludeFailures(v);
+          setPage(1);
+        }}
+      />
+    </div>
+  );
+
   if (!loading && !items.length) {
     return (
       <Card className='!rounded-2xl border-0' shadows='hover'>
+        <div className='mb-2 text-sm font-medium flex items-center justify-between'>
+          <span>{t('明细流水')}</span>
+          {headerControls}
+        </div>
         <Empty description={t('当前周期无消费记录')} />
       </Card>
     );
@@ -201,6 +223,7 @@ export default function DetailsTab({ queryParams }) {
             {t('共')} {total.toLocaleString()} {t('条')}
           </span>
         </span>
+        {headerControls}
       </div>
       <Spin spinning={loading} size='middle'>
         <Table
