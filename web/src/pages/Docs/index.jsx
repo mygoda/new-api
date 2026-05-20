@@ -1209,7 +1209,7 @@ console.log(response.choices[0].message.content);`}
 name = "${systemName || 'NewAPI'}"
 base_url = "${serverAddress}/v1"
 env_key = "NEWAPI_API_KEY"
-wire_api = "chat"
+wire_api = "responses"
 requires_openai_auth = false
 request_max_retries = 4
 stream_max_retries = 10
@@ -1222,7 +1222,7 @@ model_provider = "${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}
 name = "${systemName || 'NewAPI'}"
 base_url = "${serverAddress}/v1"
 env_key = "NEWAPI_API_KEY"
-wire_api = "chat"
+wire_api = "responses"
 requires_openai_auth = false
 request_max_retries = 4
 stream_max_retries = 10
@@ -1233,7 +1233,7 @@ model = "gpt-5-codex"
 model_provider = "${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}"`}
                 </CodeBlock>
                 <Paragraph type='tertiary' className='!mt-2'>
-                  {t('其中 model 可替换为本平台支持的任意 OpenAI 协议模型；wire_api 可选 chat 或 responses，建议先使用 chat。')}
+                  {t('其中 model 可替换为本平台支持的任意 OpenAI 协议模型；wire_api 使用 responses 协议以匹配 Codex CLI 的原生事件流。')}
                 </Paragraph>
               </StepCard>
 
