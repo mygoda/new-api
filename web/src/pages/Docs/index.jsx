@@ -1200,49 +1200,69 @@ console.log(response.choices[0].message.content);`}
               {t('OpenAI 官方 AI 编程代理，支持 GPT 系列与 o 系列模型。本平台 OpenAI 协议入口为')} <Text code>{`${serverAddress}/v1`}</Text>。
             </Paragraph>
 
-            <Tabs type='line' className='!mb-6'>
-              <TabPane tab={t('环境变量（推荐）')} itemKey='codex-env'>
-                <div className='mt-4'>
-                  <Paragraph type='tertiary' className='!mb-3'>
-                    {t('在终端中执行以下命令，或追加到')} <Text code>~/.bashrc</Text> / <Text code>~/.zshrc</Text> {t('中持久化：')}
-                  </Paragraph>
-                  <CodeBlock onCopy={() => handleCopy(`# ${t('设置 API 中转地址')}
-export OPENAI_BASE_URL=${serverAddress}/v1
+            <Card className='!mb-4'>
+              <StepCard step={1} title={<>{t('编辑配置文件')} <Text code>~/.codex/config.toml</Text></>}>
+                <Paragraph type='tertiary' className='!mb-2'>
+                  {t('添加自定义 model_provider 与 profile（如文件不存在请新建）：')}
+                </Paragraph>
+                <CodeBlock onCopy={() => handleCopy(`[model_providers.${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}]
+name = "${systemName || 'NewAPI'}"
+base_url = "${serverAddress}/v1"
+env_key = "NEWAPI_API_KEY"
+wire_api = "chat"
+requires_openai_auth = false
+request_max_retries = 4
+stream_max_retries = 10
+stream_idle_timeout_ms = 300000
 
-# ${t('设置 API 密钥')}
-export OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
+[profiles.${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}]
+model = "gpt-5-codex"
+model_provider = "${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}"`)}>
+                  {`[model_providers.${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}]
+name = "${systemName || 'NewAPI'}"
+base_url = "${serverAddress}/v1"
+env_key = "NEWAPI_API_KEY"
+wire_api = "chat"
+requires_openai_auth = false
+request_max_retries = 4
+stream_max_retries = 10
+stream_idle_timeout_ms = 300000
 
-# ${t('启动 Codex')}
-codex`)}>
-                    {`# ${t('设置 API 中转地址')}
-export OPENAI_BASE_URL=${serverAddress}/v1
+[profiles.${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}]
+model = "gpt-5-codex"
+model_provider = "${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}"`}
+                </CodeBlock>
+                <Paragraph type='tertiary' className='!mt-2'>
+                  {t('其中 model 可替换为本平台支持的任意 OpenAI 协议模型；wire_api 可选 chat 或 responses，建议先使用 chat。')}
+                </Paragraph>
+              </StepCard>
 
-# ${t('设置 API 密钥')}
-export OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
+              <StepCard step={2} title={t('导出 API Key 环境变量')}>
+                <Paragraph type='tertiary' className='!mb-2'>
+                  {t('env_key 指向的环境变量值即为本平台令牌，可写入')} <Text code>~/.bashrc</Text> / <Text code>~/.zshrc</Text> {t('持久化：')}
+                </Paragraph>
+                <CodeBlock onCopy={() => handleCopy(`export NEWAPI_API_KEY="sk-xxxxxxxxxxxxxxxx"`)}>
+                  {`export NEWAPI_API_KEY="sk-xxxxxxxxxxxxxxxx"`}
+                </CodeBlock>
+              </StepCard>
 
-# ${t('启动 Codex')}
-codex`}
-                  </CodeBlock>
-                </div>
-              </TabPane>
+              <StepCard step={3} title={t('启动 Codex CLI')}>
+                <Paragraph type='tertiary' className='!mb-2'>
+                  {t('使用上面定义的 profile 启动，或通过 -c 临时指定 provider：')}
+                </Paragraph>
+                <CodeBlock onCopy={() => handleCopy(`# ${t('使用 profile 启动（推荐）')}
+codex --profile ${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}
 
-              <TabPane tab={t('配置文件')} itemKey='codex-config'>
-                <div className='mt-4'>
-                  <Paragraph type='tertiary' className='!mb-3'>
-                    {t('编辑')} <Text code>~/.codex/config.json</Text>，{t('添加以下配置：')}
-                  </Paragraph>
-                  <CodeBlock onCopy={() => handleCopy(`{
-  "apiBaseUrl": "${serverAddress}/v1",
-  "apiKey": "sk-xxxxxxxxxxxxxxxx"
-}`)}>
-                    {`{
-  "apiBaseUrl": "${serverAddress}/v1",
-  "apiKey": "sk-xxxxxxxxxxxxxxxx"
-}`}
-                  </CodeBlock>
-                </div>
-              </TabPane>
-            </Tabs>
+# ${t('或临时指定 provider 与模型')}
+codex -c model_provider='"${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}"' -c model='"gpt-5-codex"'`)}>
+                  {`# ${t('使用 profile 启动（推荐）')}
+codex --profile ${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}
+
+# ${t('或临时指定 provider 与模型')}
+codex -c model_provider='"${(systemName || 'newapi').toLowerCase().replace(/\s+/g, '-')}"' -c model='"gpt-5-codex"'`}
+                </CodeBlock>
+              </StepCard>
+            </Card>
 
             {/* ── OpenCode ── */}
             <Title heading={4} className='!mb-3 !mt-10'>
