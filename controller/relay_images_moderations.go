@@ -34,15 +34,17 @@ import (
 //	  "asset_type": "Image"   // 可选,默认 Image
 //	}
 //
-// 流程:
-//  1. 校验 model + URL 列表(≤50 张,公网 http(s),受支持扩展名)
-//  2. 复用 distributor 已经按 model+group 选好的渠道,拿 base_url + key
-//  3. 并发(默认 8 并发)下载每张图,加 SSRF 防御 + 30MB 上限
-//  4. 每张图转发到 {base_url}/api/v3/files 入库,拿 file_id
-//  5. 按 cubicspaces 文档格式返回 {code, data:{items:[{source_url, asset_url, passed,...}]}}
+// 双模式路由(按渠道 base_url 判定):
 //
-// 单张失败不阻塞整批,只在该条目的 error 字段标注;整体 status 在全部 passed
-// 时为 approved,否则为 rejected。
+//   - **火山原生上游**(ark.cn-beijing.volces.com / ark.ap-southeast.bytepluses.com):
+//     由本服务自下载图片并转发到 {base_url}/api/v3/files 入库,拿 file_id 拼
+//     asset://<id> 后按 cubicspaces 格式包装返回。
+//   - **兼容网关上游**(其它任意域名,如另一台 new-api / cubicspaces):
+//     透传请求体到 {base_url}/v1/images/moderations,信任上游已实现该协议,
+//     原样回写其响应。
+//
+// 处理失败的 item 不阻塞整批,error 字段标注;整体 status 在全部 passed
+// 时为 approved,否则为 rejected (仅原生模式;透传模式以上游为准)。
 func RelayImagesModerations(c *gin.Context) {
 	var req imagesModerationsRequest
 	if err := common.UnmarshalBodyReusable(c, &req); err != nil {
@@ -74,6 +76,16 @@ func RelayImagesModerations(c *gin.Context) {
 		return
 	}
 
+	if isVolcArkUpstream(baseURL) {
+		moderationVolcNativeMode(c, baseURL, apiKey, urls)
+		return
+	}
+	moderationPassthroughMode(c, baseURL, apiKey)
+}
+
+// moderationVolcNativeMode 自下载 + /api/v3/files 上传,适用于 base_url 直接指向
+// 火山方舟 ark 域名的渠道。
+func moderationVolcNativeMode(c *gin.Context, baseURL, apiKey string, urls []string) {
 	items := make([]moderationItem, len(urls))
 	sem := make(chan struct{}, moderationConcurrency)
 	var wg sync.WaitGroup
@@ -128,6 +140,63 @@ func RelayImagesModerations(c *gin.Context) {
 			"items":           items,
 		},
 	})
+}
+
+// moderationPassthroughMode 把客户端原始 body 转发到上游
+// {base_url}/v1/images/moderations,信任上游已实现该协议。
+//
+// 上游可以是另一台 new-api / cubicspaces 等任意兼容网关。该模式下
+// 状态码、Content-Type、响应体均原样回写,不做格式化。
+func moderationPassthroughMode(c *gin.Context, baseURL, apiKey string) {
+	// 直接取原始 body(UnmarshalBodyReusable 已经把 body 缓存住了)
+	storage, err := common.GetBodyStorage(c)
+	if err != nil {
+		respondJSONError(c, http.StatusInternalServerError, "read_body_failed", err.Error())
+		return
+	}
+	bodyBytes, err := storage.Bytes()
+	if err != nil {
+		respondJSONError(c, http.StatusInternalServerError, "read_body_failed", err.Error())
+		return
+	}
+
+	upstreamURL := baseURL + "/v1/images/moderations"
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, upstreamURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		respondJSONError(c, http.StatusInternalServerError, "build_request_failed", err.Error())
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{Timeout: moderationItemTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		respondJSONError(c, http.StatusBadGateway, "upstream_failed", err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		respondJSONError(c, http.StatusBadGateway, "read_upstream_failed", err.Error())
+		return
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "application/json"
+	}
+	c.Data(resp.StatusCode, ct, respBody)
+}
+
+// isVolcArkUpstream 判定 base_url 是否指向火山方舟原生域名。仅在原生域名
+// 走自下载 + /api/v3/files 入库的双流程;其它域名(代理 / 兼容网关)统一透传。
+func isVolcArkUpstream(baseURL string) bool {
+	h := strings.ToLower(baseURL)
+	return strings.Contains(h, "volces.com") ||
+		strings.Contains(h, "bytepluses.com")
 }
 
 // ────────────────────────────────────────────────────────────────────────────
