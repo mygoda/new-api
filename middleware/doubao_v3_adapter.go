@@ -102,9 +102,32 @@ func DoubaoV3RequestConvert() func(c *gin.Context) {
 		// the OpenAI Video wrapper.
 		c.Set(common.KeyRelayPathStyle, common.RelayPathStyleDoubaoV3)
 
+		// Replace both the gin body reader AND the cached BodyStorage. We must
+		// refresh KeyBodyStorage explicitly because UnmarshalBodyReusable above
+		// already populated it from the original body; subsequent
+		// ValidateBasicTaskRequest reads from KeyBodyStorage and would still
+		// see the original (no top-level prompt) without this swap.
+		newStorage, err := common.CreateBodyStorage(jsonData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": gin.H{
+					"code":    "rewrap_body_failed",
+					"message": err.Error(),
+				},
+			})
+			c.Abort()
+			return
+		}
+		// Close the previous storage if one exists.
+		if prev, exists := c.Get(common.KeyBodyStorage); exists && prev != nil {
+			if bs, ok := prev.(common.BodyStorage); ok {
+				bs.Close()
+			}
+		}
+		c.Set(common.KeyBodyStorage, newStorage)
+		c.Set(common.KeyRequestBody, jsonData)
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(jsonData))
 		c.Request.ContentLength = int64(len(jsonData))
-		c.Set(common.KeyRequestBody, jsonData)
 
 		c.Next()
 	}
