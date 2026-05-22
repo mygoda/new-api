@@ -66,9 +66,22 @@ func DoubaoV3RequestConvert() func(c *gin.Context) {
 		// Build wrapped body: keep model at top level so distributor / model
 		// resolution work; stuff everything else into metadata so the existing
 		// doubao adaptor metadata-override branch handles passthrough.
+		//
+		// `prompt` 字段必须非空 — ValidateBasicTaskRequest 在统一管线里强制校验。
+		// v3 原生 body 的文本提示词在 content[*].text 内,这里把第一段抽出来
+		// 充当 prompt 占位;真正的 content 数组通过 metadata 透传给 doubao
+		// adaptor convertToRequestPayload 第 5 步覆盖落地,提取出来的 prompt
+		// 在适配器层不会被重复追加(因为 metadata.content 会整段覆盖)。
+		extractedPrompt := extractFirstText(originalReq["content"])
+		if extractedPrompt == "" {
+			// 没有 text content(纯图/视频/音频参考场景)。塞一个占位避免被
+			// validator 误拒;占位串不会进入上游请求体。
+			extractedPrompt = "(v3 native passthrough)"
+		}
+
 		unifiedReq := map[string]interface{}{
 			"model":    model,
-			"prompt":   "",
+			"prompt":   extractedPrompt,
 			"metadata": originalReq, // includes model (harmless; doubao adaptor reads model from request body separately)
 		}
 
@@ -102,4 +115,27 @@ func DoubaoV3RequestConvert() func(c *gin.Context) {
 func isDoubaoSeedanceModel(model string) bool {
 	m := strings.ToLower(model)
 	return strings.HasPrefix(m, "doubao-seedance-")
+}
+
+// extractFirstText 从 v3 content 数组里抽第一段 type=text 的 text 字段，
+// 作为通用管线 ValidateBasicTaskRequest 所需的 prompt 占位。
+// 找不到返回空串。
+func extractFirstText(raw interface{}) string {
+	arr, ok := raw.([]interface{})
+	if !ok {
+		return ""
+	}
+	for _, item := range arr {
+		obj, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if t, _ := obj["type"].(string); t != "text" {
+			continue
+		}
+		if text, ok := obj["text"].(string); ok && strings.TrimSpace(text) != "" {
+			return text
+		}
+	}
+	return ""
 }
