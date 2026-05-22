@@ -81,3 +81,11 @@ type TaskAdaptor interface {
 type OpenAIVideoConverter interface {
 	ConvertToOpenAIVideo(originTask *model.Task) ([]byte, error)
 }
+
+// DoubaoV3Converter 标识适配器支持把任务状态序列化为火山 Doubao
+// /api/v3/contents/generations/tasks 原生 v3 响应格式。
+// 当请求来自 /api/v3/contents/generations/tasks/{task_id} 时，
+// RelayTaskFetch 优先调用此接口，回避 OpenAI Video 包装。
+type DoubaoV3Converter interface {
+	ConvertToDoubaoV3(originTask *model.Task) ([]byte, error)
+}

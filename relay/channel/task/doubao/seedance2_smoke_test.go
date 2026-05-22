@@ -112,4 +112,54 @@ func TestConvertToRequestPayload_Seedance2(t *testing.T) {
 			t.Fatalf("metadata content override not respected: %+v", body.Content)
 		}
 	})
+
+	t.Run("v3 原生透传 — 模拟 DoubaoV3RequestConvert 中间件包裹后的形态", func(t *testing.T) {
+		// 中间件会把客户端发到 /api/v3/contents/generations/tasks 的 v3 原生 body
+		// 包成 {model, prompt:"", metadata: <原始 body>}，因此适配器看到的 req 是这样的：
+		req := &relaycommon.TaskSubmitReq{
+			Model:  "doubao-seedance-2-0-260128",
+			Prompt: "",
+			Metadata: map[string]interface{}{
+				"model": "doubao-seedance-2-0-260128",
+				"content": []map[string]interface{}{
+					{"type": "text", "text": "v3 native body"},
+					{
+						"type":      "image_url",
+						"image_url": map[string]string{"url": "asset://abc"},
+						"role":      "reference_image",
+					},
+				},
+				"ratio":          "16:9",
+				"duration":       5,
+				"camera_fixed":   true,
+				"watermark":      false,
+				"generate_audio": true,
+				"seed":           42,
+			},
+		}
+		body, err := a.convertToRequestPayload(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, _ := json.Marshal(body)
+		s := string(raw)
+		// content 数组应该来自 metadata,而不是从 prompt 自动装配
+		if !strings.Contains(s, `"text":"v3 native body"`) {
+			t.Fatalf("v3 content not passthrough: %s", s)
+		}
+		if !strings.Contains(s, `"role":"reference_image"`) {
+			t.Fatalf("v3 role not passthrough: %s", s)
+		}
+		// 顶层标量字段也应当从 metadata 一并落地
+		if !strings.Contains(s, `"ratio":"16:9"`) || !strings.Contains(s, `"duration":5`) {
+			t.Fatalf("v3 scalar fields not passthrough: %s", s)
+		}
+		if !strings.Contains(s, `"camera_fixed":true`) || !strings.Contains(s, `"generate_audio":true`) {
+			t.Fatalf("v3 bool fields not passthrough: %s", s)
+		}
+		// 不应该有 prompt 触发的空 text 项
+		if strings.Contains(s, `"text":""`) {
+			t.Fatalf("empty prompt should NOT inject a text content item: %s", s)
+		}
+	})
 }

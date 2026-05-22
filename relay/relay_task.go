@@ -383,10 +383,33 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 	uri := c.Request.RequestURI
 	isOpenAIVideoAPI := strings.HasPrefix(uri, "/v1/videos/") ||
 		strings.HasPrefix(uri, "/v1/video/generations/")
+	// 火山 Doubao v3 原生路径：返回上游 v3 任务对象格式，与 OpenAI Video 包装互斥。
+	isDoubaoV3API := strings.HasPrefix(uri, "/api/v3/contents/generations/tasks")
 
 	// Gemini/Vertex 支持实时查询：用户 fetch 时直接从上游拉取最新状态
 	if realtimeResp := tryRealtimeFetch(originTask, isOpenAIVideoAPI); len(realtimeResp) > 0 {
 		respBody = realtimeResp
+		return
+	}
+
+	// Doubao v3 原生路径优先：走各 adaptor 的 ConvertToDoubaoV3
+	if isDoubaoV3API {
+		adaptor := GetTaskAdaptor(originTask.Platform)
+		if adaptor == nil {
+			taskResp = service.TaskErrorWrapperLocal(fmt.Errorf("invalid channel id: %d", originTask.ChannelId), "invalid_channel_id", http.StatusBadRequest)
+			return
+		}
+		converter, ok := adaptor.(channel.DoubaoV3Converter)
+		if !ok {
+			taskResp = service.TaskErrorWrapperLocal(fmt.Errorf("doubao v3 converter not implemented for platform: %s", originTask.Platform), "not_implemented", http.StatusNotImplemented)
+			return
+		}
+		v3Body, err := converter.ConvertToDoubaoV3(originTask)
+		if err != nil {
+			taskResp = service.TaskErrorWrapper(err, "convert_to_doubao_v3_failed", http.StatusInternalServerError)
+			return
+		}
+		respBody = v3Body
 		return
 	}
 

@@ -31,6 +31,32 @@ func SetVideoRouter(router *gin.Engine) {
 		videoV1Router.GET("/videos/:task_id", controller.RelayTaskFetch)
 	}
 
+	// Doubao 原生 v3 视频任务路径:
+	//   POST /api/v3/contents/generations/tasks
+	//   GET  /api/v3/contents/generations/tasks/:task_id
+	// 与 /v1/video/generations 共用同一套 RelayTask / RelayTaskFetch 流水线，
+	// 区别在于:
+	//   1. POST 入口走 DoubaoV3RequestConvert 中间件,把 v3 原生 body
+	//      ({model, content[], ratio, ...}) 包成 new-api 内部 TaskSubmitReq 形态,
+	//      并校验 model 必须为 doubao-seedance-* 系列
+	//   2. 响应体由 doubao TaskAdaptor.DoResponse / ConvertToDoubaoV3 输出火山原生格式,
+	//      不做 OpenAI Video 包装
+	doubaoV3Router := router.Group("/api/v3/contents/generations/tasks")
+	doubaoV3Router.Use(middleware.RouteTag("relay"))
+	{
+		doubaoV3Router.POST("",
+			middleware.DoubaoV3RequestConvert(),
+			middleware.TokenAuth(),
+			middleware.Distribute(),
+			controller.RelayTask,
+		)
+		doubaoV3Router.GET("/:task_id",
+			middleware.TokenAuth(),
+			middleware.Distribute(),
+			controller.RelayTaskFetch,
+		)
+	}
+
 	klingV1Router := router.Group("/kling/v1")
 	klingV1Router.Use(middleware.RouteTag("relay"))
 	klingV1Router.Use(middleware.KlingRequestConvert(), middleware.TokenAuth(), middleware.Distribute())

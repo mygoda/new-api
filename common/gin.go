@@ -20,6 +20,16 @@ import (
 const KeyRequestBody = "key_request_body"
 const KeyBodyStorage = "key_body_storage"
 
+// KeyRelayPathStyle 用于在 gin.Context 内标识当前请求属于哪种「外部 API 路径风格」。
+// 例如 /api/v3/contents/generations/tasks 是 doubao_v3，
+// 而 /v1/video/generations 默认走 OpenAI Video 兼容协议。
+// 适配器在 DoResponse / fetch 阶段据此选择响应体格式（v3 原生 vs OpenAI Video 包装）。
+const KeyRelayPathStyle = "key_relay_path_style"
+
+const (
+	RelayPathStyleDoubaoV3 = "doubao_v3"
+)
+
 var ErrRequestBodyTooLarge = errors.New("request body too large")
 
 func IsRequestBodyTooLargeError(err error) bool {

@@ -202,6 +202,19 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 
+	// Path-aware response shaping:
+	// - /api/v3/contents/generations/tasks  → 火山原生格式，把上游 body 的 id 换成 new-api 内部 PublicTaskID
+	// - /v1/video/generations / /v1/videos  → OpenAI Video 兼容包装
+	if c.GetString(common.KeyRelayPathStyle) == common.RelayPathStyleDoubaoV3 {
+		v3Body, derr := remapV3SubmitResponse(responseBody, info.PublicTaskID, info.OriginModelName)
+		if derr != nil {
+			taskErr = service.TaskErrorWrapper(derr, "remap_v3_response_failed", http.StatusInternalServerError)
+			return
+		}
+		c.Data(http.StatusOK, "application/json; charset=utf-8", v3Body)
+		return dResp.ID, responseBody, nil
+	}
+
 	ov := dto.NewOpenAIVideo()
 	ov.ID = info.PublicTaskID
 	ov.TaskID = info.PublicTaskID
@@ -210,6 +223,21 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 
 	c.JSON(http.StatusOK, ov)
 	return dResp.ID, responseBody, nil
+}
+
+// remapV3SubmitResponse 把上游创建任务的原始响应里的 id 字段替换成 new-api 的
+// PublicTaskID，并补全 model 字段（部分上游版本不回 model）。其它字段透传，保留
+// 上游可能携带的 status / service_tier / execution_expires_after 等元数据。
+func remapV3SubmitResponse(upstreamBody []byte, publicTaskID, modelName string) ([]byte, error) {
+	var body map[string]interface{}
+	if err := common.Unmarshal(upstreamBody, &body); err != nil {
+		return nil, errors.Wrap(err, "unmarshal v3 submit body")
+	}
+	body["id"] = publicTaskID
+	if _, ok := body["model"]; !ok && modelName != "" {
+		body["model"] = modelName
+	}
+	return common.Marshal(body)
 }
 
 // FetchTask fetch task status
@@ -382,4 +410,76 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 	}
 
 	return common.Marshal(openAIVideo)
+}
+
+// ConvertToDoubaoV3 是 v3 路径（/api/v3/contents/generations/tasks/{task_id}）
+// 的查询响应组装器，输出火山原生 v3 任务对象格式：
+//
+//	{
+//	  "id": "task_xxx",
+//	  "model": "doubao-seedance-2-0-260128",
+//	  "status": "running|succeeded|failed|queued",
+//	  "content": { "video_url": "...", "last_frame_url": "..." },
+//	  "usage": { ... },
+//	  "created_at": ..., "updated_at": ...,
+//	  "error": { "code": "...", "message": "..." }   // 仅 failed
+//	}
+//
+// 上游原始响应（originTask.Data）已经是 v3 格式，这里只需要把 id 字段从上游
+// task_id 替换成 new-api 内部的 PublicTaskID，并补一份 status 同步。
+func (a *TaskAdaptor) ConvertToDoubaoV3(originTask *model.Task) ([]byte, error) {
+	var body map[string]interface{}
+	if err := common.Unmarshal(originTask.Data, &body); err != nil {
+		return nil, errors.Wrap(err, "unmarshal doubao task data failed")
+	}
+
+	// 替换 id 为 new-api 公开 ID。
+	body["id"] = originTask.TaskID
+
+	// 同步内部状态到 v3 status。上游 Data 里的 status 字段是首次提交时的快照；
+	// 若任务已通过 polling 推进过状态（originTask.Status 变化），需要覆盖。
+	body["status"] = mapTaskStatusToV3(originTask.Status)
+
+	// 补全 model 字段（防御性）。
+	if _, ok := body["model"]; !ok {
+		body["model"] = originTask.Properties.OriginModelName
+	}
+
+	if originTask.UpdatedAt > 0 {
+		body["updated_at"] = originTask.UpdatedAt
+	}
+	if originTask.CreatedAt > 0 {
+		body["created_at"] = originTask.CreatedAt
+	}
+
+	// 失败任务补一个 error 字段（如果上游已经回过 error，保留上游的；否则塞个兜底）。
+	if originTask.Status == model.TaskStatusFailure {
+		if _, has := body["error"]; !has {
+			reason := originTask.FailReason
+			if reason == "" {
+				reason = "task failed"
+			}
+			body["error"] = map[string]string{
+				"code":    "task_failed",
+				"message": reason,
+			}
+		}
+	}
+
+	return common.Marshal(body)
+}
+
+// mapTaskStatusToV3 将 new-api 内部 TaskStatus 映射回火山 v3 原生 status 串。
+func mapTaskStatusToV3(s model.TaskStatus) string {
+	switch s {
+	case model.TaskStatusQueued, model.TaskStatusNotStart:
+		return "queued"
+	case model.TaskStatusInProgress, model.TaskStatusSubmitted:
+		return "running"
+	case model.TaskStatusSuccess:
+		return "succeeded"
+	case model.TaskStatusFailure, model.TaskStatusUnknown:
+		return "failed"
+	}
+	return string(s)
 }
