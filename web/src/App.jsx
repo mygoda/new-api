@@ -291,7 +291,7 @@ function App() {
           }
         />
         <Route path='/about' element={lazyRoute(<About />, location.pathname)} />
-        <Route path='/docs' element={lazyRoute(<Docs />, location.pathname)} />
+        <Route path='/docs/*' element={lazyRoute(<Docs />, location.pathname)} />
         <Route
           path='/user-agreement'
           element={lazyRoute(<UserAgreement />, location.pathname)}
