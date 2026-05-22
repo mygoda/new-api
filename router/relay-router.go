@@ -163,6 +163,12 @@ func SetRelayRouter(router *gin.Engine) {
 			controller.Relay(c, types.RelayFormatOpenAI)
 		})
 
+		// Doubao Seedance 兼容的图片素材审核入库接口
+		// 客户端用法详见 /api/video Seedance 章节文档。
+		// 别名 /v1/assets/moderations 走同一份 handler。
+		httpRouter.POST("/images/moderations", controller.RelayImagesModerations)
+		httpRouter.POST("/assets/moderations", controller.RelayImagesModerations)
+
 		// not implemented
 		httpRouter.POST("/images/variations", controller.RelayNotImplemented)
 		httpRouter.GET("/files", controller.RelayNotImplemented)
