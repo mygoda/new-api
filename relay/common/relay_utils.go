@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -57,6 +58,9 @@ func createTaskError(err error, code string, statusCode int, localError bool) *d
 
 func storeTaskRequest(c *gin.Context, info *RelayInfo, action string, requestObj TaskSubmitReq) {
 	info.Action = action
+	if info.TaskRelayInfo != nil {
+		info.TaskRelayInfo.Prompt = TruncatePromptUTF8(requestObj.Prompt, MaxTaskPromptBytes)
+	}
 	c.Set("task_request", requestObj)
 }
 func GetTaskRequest(c *gin.Context) (TaskSubmitReq, error) {
@@ -219,4 +223,20 @@ func ValidateBasicTaskRequest(c *gin.Context, info *RelayInfo, action string) *d
 
 	storeTaskRequest(c, info, action, req)
 	return nil
+}
+
+// MaxTaskPromptBytes 是写入 task.Properties.Input 的 prompt 上限（字节）。
+// 超出部分按 utf-8 边界截断。
+const MaxTaskPromptBytes = 4096
+
+// TruncatePromptUTF8 在不破坏 utf-8 字符边界的前提下，把 s 截断到 max 字节内。
+func TruncatePromptUTF8(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	truncated := s[:max]
+	for !utf8.ValidString(truncated) && len(truncated) > 0 {
+		truncated = truncated[:len(truncated)-1]
+	}
+	return truncated
 }

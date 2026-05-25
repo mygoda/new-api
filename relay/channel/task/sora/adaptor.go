@@ -74,7 +74,7 @@ func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 	a.apiKey = info.ApiKey
 }
 
-func validateRemixRequest(c *gin.Context) *dto.TaskError {
+func validateRemixRequest(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskError {
 	var req relaycommon.TaskSubmitReq
 	if err := common.UnmarshalBodyReusable(c, &req); err != nil {
 		return service.TaskErrorWrapperLocal(err, "invalid_request", http.StatusBadRequest)
@@ -83,13 +83,16 @@ func validateRemixRequest(c *gin.Context) *dto.TaskError {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("field prompt is required"), "invalid_request", http.StatusBadRequest)
 	}
 	// 存储原始请求到 context，与 ValidateMultipartDirect 路径保持一致
+	if info != nil && info.TaskRelayInfo != nil {
+		info.TaskRelayInfo.Prompt = relaycommon.TruncatePromptUTF8(req.Prompt, relaycommon.MaxTaskPromptBytes)
+	}
 	c.Set("task_request", req)
 	return nil
 }
 
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) (taskErr *dto.TaskError) {
 	if info.Action == constant.TaskActionRemix {
-		return validateRemixRequest(c)
+		return validateRemixRequest(c, info)
 	}
 	return relaycommon.ValidateMultipartDirect(c, info)
 }

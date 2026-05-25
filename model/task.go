@@ -194,6 +194,11 @@ func InitTask(platform constant.TaskPlatform, relayInfo *commonRelay.RelayInfo) 
 		taskID = GenerateTaskID()
 	}
 
+	// 写入用户原始 prompt（已在 validate 阶段截断到 MaxTaskPromptBytes）
+	if relayInfo.TaskRelayInfo != nil && relayInfo.TaskRelayInfo.Prompt != "" {
+		properties.Input = relayInfo.TaskRelayInfo.Prompt
+	}
+
 	t := &Task{
 		TaskID:      taskID,
 		UserId:      relayInfo.UserId,

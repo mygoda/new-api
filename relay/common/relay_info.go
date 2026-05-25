@@ -666,6 +666,9 @@ type TaskRelayInfo struct {
 	// PublicTaskID 是提交时预生成的 task_xxxx 格式公开 ID，
 	// 供 DoResponse 在返回给客户端时使用（避免暴露上游真实 ID）。
 	PublicTaskID string
+	// Prompt 是用户原始 prompt（截断到 maxTaskPromptBytes），
+	// 由 validate 阶段写入，供 InitTask 写入 task.Properties.Input。
+	Prompt string
 
 	ConsumeQuota bool
 

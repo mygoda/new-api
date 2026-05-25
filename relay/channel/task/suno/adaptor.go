@@ -59,6 +59,16 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 	//}
 
 	info.Action = action
+	if info.TaskRelayInfo != nil && sunoRequest != nil {
+		p := sunoRequest.Prompt
+		if p == "" {
+			p = sunoRequest.GptDescriptionPrompt
+		}
+		if p == "" {
+			p = sunoRequest.Title
+		}
+		info.TaskRelayInfo.Prompt = relaycommon.TruncatePromptUTF8(p, relaycommon.MaxTaskPromptBytes)
+	}
 	c.Set("task_request", sunoRequest)
 	return nil
 }
