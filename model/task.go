@@ -446,6 +446,13 @@ func UpdateTaskResultURL(id int64, newURL string) error {
 		Update("private_data", t.PrivateData).Error
 }
 
+// UpdateTaskQuota 单字段更新 task.quota，用于异步任务差额结算后把 task.Quota
+// 同步到结算后的实际值，避免后续退款/审计仍按预扣值算。
+func UpdateTaskQuota(id int64, newQuota int) error {
+	return DB.Model(&Task{}).Where("id = ?", id).
+		UpdateColumn("quota", newQuota).Error
+}
+
 type TaskQuotaUsage struct {
 	Mode  string  `json:"mode"`
 	Count float64 `json:"count"`
