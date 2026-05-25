@@ -61,6 +61,9 @@ func formatUserLogs(logs []*Log, startIdx int) {
 			// Remove admin-only debug fields.
 			delete(otherMap, "admin_info")
 			delete(otherMap, "reject_reason")
+			// 普通用户看不到上游实际模型名，只看 ModelName（请求时声明的模型名）
+			delete(otherMap, "upstream_model_name")
+			delete(otherMap, "is_model_mapped")
 		}
 		logs[i].Other = common.MapToJsonStr(otherMap)
 		logs[i].Id = startIdx + i + 1
