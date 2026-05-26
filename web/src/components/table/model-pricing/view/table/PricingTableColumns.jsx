@@ -165,6 +165,7 @@ export const getPricingTableColumns = ({
   t,
   selectedGroup,
   groupRatio,
+  usableGroup,
   copyText,
   setModalImageUrl,
   setIsModalOpenurl,
@@ -302,13 +303,57 @@ export const getPricingTableColumns = ({
   };
 
   // marketplace 模式下：每行显示当前用户对该模型的有效倍率与折扣
+  // 多分组模型(enable_groups ∩ usableGroup > 1)按倍率升序逐行列出,
+  // 让用户一眼看到能拿到的最低价。
   const discountColumn = {
     title: t('折扣'),
     dataIndex: '_user_effective_ratio',
-    width: 130,
+    width: 160,
     sorter: (a, b) =>
       Number(a._user_effective_ratio || 1) - Number(b._user_effective_ratio || 1),
     render: (_v, record) => {
+      // 计算交集分组（模型 enable_groups ∩ 用户 usableGroup,去掉 auto/空)
+      const enableGroups = Array.isArray(record.enable_groups)
+        ? record.enable_groups
+        : [];
+      const usable = usableGroup || {};
+      const crossGroups = enableGroups
+        .filter((g) => g && g !== 'auto' && usable[g] !== undefined)
+        .map((g) => ({ name: g, ratio: Number(groupRatio?.[g]) || 1 }))
+        .sort((a, b) => a.ratio - b.ratio);
+
+      // 多分组：按倍率升序逐行列出
+      if (crossGroups.length > 1) {
+        return (
+          <div className='flex flex-col gap-1'>
+            {crossGroups.map(({ name, ratio }) => {
+              const ratioText =
+                Math.abs(ratio - 1) < 1e-6 ? '1x' : `${Number(ratio.toFixed(3))}x`;
+              const discount = formatDiscountText(ratio, t);
+              return (
+                <div key={name} className='flex items-center gap-1'>
+                  <Tag color='white' shape='circle' size='small'>
+                    {name}
+                  </Tag>
+                  <Tag color='orange' shape='circle' size='small'>
+                    {ratioText}
+                  </Tag>
+                  {discount && discount !== t('原价') && (
+                    <span
+                      className='text-xs'
+                      style={{ color: 'var(--semi-color-text-2)' }}
+                    >
+                      {discount}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      // 单分组(或无交集时退回 _user_effective_ratio):保持原渲染
       const ratio = Number(record._user_effective_ratio);
       if (!ratio || ratio <= 0) return <span className='text-gray-400'>-</span>;
       const text = formatDiscountText(ratio, t);
