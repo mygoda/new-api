@@ -40,11 +40,12 @@ func GetUserGroups(c *gin.Context) {
 			}
 		}
 	} else {
-		// 普通用户只能看到自己所在的分组
-		if userGroup != "" {
-			usableGroups[userGroup] = map[string]interface{}{
-				"ratio": ratio_setting.GetGroupRatio(userGroup),
-				"desc":  setting.GetUsableGroupDescription(userGroup),
+		// 普通用户可见分组 = UserUsableGroups 全局白名单 + GroupSpecialUsableGroup 个性化叠加
+		// （与 middleware/auth.go token.group 校验、controller/pricing.go 模型市场可见性保持一致）
+		for groupName := range service.GetUserUsableGroups(userGroup) {
+			usableGroups[groupName] = map[string]interface{}{
+				"ratio": ratio_setting.GetGroupRatio(groupName),
+				"desc":  setting.GetUsableGroupDescription(groupName),
 			}
 		}
 	}
