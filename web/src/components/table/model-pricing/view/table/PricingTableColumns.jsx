@@ -329,7 +329,6 @@ export const getPricingTableColumns = ({
             {crossGroups.map(({ name, ratio }) => {
               const ratioText =
                 Math.abs(ratio - 1) < 1e-6 ? '1x' : `${Number(ratio.toFixed(3))}x`;
-              const discount = formatDiscountText(ratio, t);
               return (
                 <div key={name} className='flex items-center gap-1'>
                   <Tag color='white' shape='circle' size='small'>
@@ -338,14 +337,6 @@ export const getPricingTableColumns = ({
                   <Tag color='orange' shape='circle' size='small'>
                     {ratioText}
                   </Tag>
-                  {discount && discount !== t('原价') && (
-                    <span
-                      className='text-xs'
-                      style={{ color: 'var(--semi-color-text-2)' }}
-                    >
-                      {discount}
-                    </span>
-                  )}
                 </div>
               );
             })}
