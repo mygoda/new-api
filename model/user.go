@@ -56,6 +56,7 @@ type User struct {
 	DealerRemark     string         `json:"dealer_remark,omitempty" gorm:"type:varchar(255);column:dealer_remark"`
 	CreatedBy        int            `json:"created_by" gorm:"type:int;default:0;column:created_by;index"`
 	AllowedChannels  string         `json:"allowed_channels" gorm:"type:text;column:allowed_channels"` // 渠道白名单，逗号分隔渠道ID（如 "3,7,12"），空字符串=不限制
+	ExtraGroups      string         `json:"extra_groups" gorm:"type:text;column:extra_groups"`         // 用户级额外可用分组，JSON 数组如 ["vip","svip"]，空=只用全局 UserUsableGroups
 
 	CreatedByUsername string `json:"created_by_username,omitempty" gorm:"-:all"`
 }
@@ -72,6 +73,7 @@ func (user *User) ToBaseUser() *UserBase {
 		UserRatio:       user.UserRatio,
 		UserModelRatios: user.UserModelRatios,
 		AllowedChannels: user.AllowedChannels,
+		ExtraGroups:     user.ExtraGroups,
 	}
 	return cache
 }
@@ -87,6 +89,30 @@ func (user *User) GetUserModelRatiosMap() map[string]float64 {
 		return nil
 	}
 	return m
+}
+
+// GetExtraGroupsList 把 ExtraGroups(JSON 数组字符串)解析成 []string,
+// 无效或空时返回 nil。
+func (user *User) GetExtraGroupsList() []string {
+	return ParseExtraGroups(user.ExtraGroups)
+}
+
+// ParseExtraGroups 把 JSON 数组字符串解析成 []string,无效或空返回 nil。
+func ParseExtraGroups(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	var list []string
+	if err := common.UnmarshalJsonStr(raw, &list); err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(list))
+	for _, g := range list {
+		if g != "" {
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 func (user *User) GetAccessToken() string {
@@ -775,6 +801,7 @@ func (user *User) Edit(updatePassword bool) error {
 		"user_ratio":        newUser.UserRatio,
 		"user_model_ratios": newUser.UserModelRatios,
 		"allowed_channels":  newUser.AllowedChannels,
+		"extra_groups":      newUser.ExtraGroups,
 	}
 	if updatePassword {
 		updates["password"] = newUser.Password
@@ -1081,6 +1108,14 @@ func GetUserGroup(id int, fromDB bool) (group string, err error) {
 	}
 
 	return group, nil
+}
+
+// GetUserExtraGroups 读取 users.extra_groups 原始 JSON 字符串。
+// 直接查 DB(无独立缓存),给 controller/group.go 等"非热路径"使用;
+// 热路径(middleware/auth.go)应该走 UserBase 缓存的 ExtraGroups。
+func GetUserExtraGroups(id int) (extraGroups string, err error) {
+	err = DB.Model(&User{}).Where("id = ?", id).Select("extra_groups").Find(&extraGroups).Error
+	return extraGroups, err
 }
 
 // GetUserSetting gets setting from Redis first, falls back to DB if needed

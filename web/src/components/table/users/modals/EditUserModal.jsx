@@ -94,6 +94,7 @@ const EditUserModal = (props) => {
     user_ratio: 0,
     user_model_ratios: '',
     allowed_channels: [],
+    extra_groups: [],
   });
 
   const fetchGroups = async () => {
@@ -139,6 +140,19 @@ const EditUserModal = (props) => {
             .map((s) => parseInt(s.trim(), 10))
             .filter((n) => !isNaN(n) && n > 0)
         : [];
+      // 后端 extra_groups 是 JSON 数组字符串，前端 Form.Select 多选用数组。
+      if (typeof data.extra_groups === 'string') {
+        try {
+          const parsed = data.extra_groups ? JSON.parse(data.extra_groups) : [];
+          data.extra_groups = Array.isArray(parsed)
+            ? parsed.filter((g) => typeof g === 'string' && g)
+            : [];
+        } catch (e) {
+          data.extra_groups = [];
+        }
+      } else if (!Array.isArray(data.extra_groups)) {
+        data.extra_groups = [];
+      }
       formApiRef.current?.setValues({ ...getInitValues(), ...data });
       setUserModelRatios(data.user_model_ratios || '');
     } else {
@@ -184,6 +198,15 @@ const EditUserModal = (props) => {
         .join(',');
     } else if (typeof payload.allowed_channels !== 'string') {
       payload.allowed_channels = '';
+    }
+    // extra_groups: 数组 → JSON 字符串，空数组 = "" (后端解析为 nil)
+    if (Array.isArray(payload.extra_groups)) {
+      const cleaned = payload.extra_groups
+        .map((g) => (typeof g === 'string' ? g.trim() : ''))
+        .filter((g) => g);
+      payload.extra_groups = cleaned.length ? JSON.stringify(cleaned) : '';
+    } else if (typeof payload.extra_groups !== 'string') {
+      payload.extra_groups = '';
     }
     if (userId) {
       payload.id = parseInt(userId);
@@ -433,6 +456,22 @@ const EditUserModal = (props) => {
                           style={{ width: '100%' }}
                           extraText={t(
                             '仅允许该用户使用所选渠道；留空则按原分组逻辑选渠道。',
+                          )}
+                        />
+                      </Col>
+
+                      <Col span={24}>
+                        <Form.Select
+                          field='extra_groups'
+                          label={t('额外可用分组')}
+                          placeholder={t('在全局白名单之外，额外授予该用户的分组')}
+                          multiple
+                          filter
+                          showClear
+                          optionList={groupOptions}
+                          style={{ width: '100%' }}
+                          extraText={t(
+                            '与全局「用户可选分组」叠加；若与全局重复后端会自动去重，不会重复计算。',
                           )}
                         />
                       </Col>

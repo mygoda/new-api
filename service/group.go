@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 )
@@ -39,6 +40,51 @@ func GetUserUsableGroups(userGroup string) map[string]string {
 func GroupInUserUsableGroups(userGroup, groupName string) bool {
 	_, ok := GetUserUsableGroups(userGroup)[groupName]
 	return ok
+}
+
+// GetUserUsableGroupsWithExtra 在 GetUserUsableGroups 之上叠加用户级 extra groups。
+// extraGroupsRaw 是 users.extra_groups 字段(JSON 数组字符串如 ["vip","svip"]),
+// 解析失败或为空时退化为 GetUserUsableGroups 的结果。
+// 只接受真实存在(GroupRatio 中已定义)的分组,避免脏数据进入可用列表。
+func GetUserUsableGroupsWithExtra(userGroup string, extraGroupsRaw string) map[string]string {
+	groups := GetUserUsableGroups(userGroup)
+	for _, name := range parseExtraGroupsJSON(extraGroupsRaw) {
+		if !ratio_setting.ContainsGroupRatio(name) {
+			continue
+		}
+		if _, exists := groups[name]; exists {
+			continue
+		}
+		groups[name] = setting.GetUsableGroupDescription(name)
+	}
+	return groups
+}
+
+// parseExtraGroupsJSON 解析 users.extra_groups JSON 数组字符串,
+// 兼容空串/无效 JSON,返回去重去空的分组名列表。
+func parseExtraGroupsJSON(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var list []string
+	if err := common.UnmarshalJsonStr(raw, &list); err != nil {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(list))
+	out := make([]string, 0, len(list))
+	for _, g := range list {
+		g = strings.TrimSpace(g)
+		if g == "" {
+			continue
+		}
+		if _, ok := seen[g]; ok {
+			continue
+		}
+		seen[g] = struct{}{}
+		out = append(out, g)
+	}
+	return out
 }
 
 // GetUserAutoGroup 根据用户分组获取自动分组设置

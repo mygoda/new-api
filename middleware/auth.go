@@ -357,8 +357,9 @@ func TokenAuth() func(c *gin.Context) {
 		userGroup := userCache.Group
 		tokenGroup := token.Group
 		if tokenGroup != "" {
-			// check common.UserUsableGroups[userGroup]
-			if _, ok := service.GetUserUsableGroups(userGroup)[tokenGroup]; !ok {
+			// 校验 token.group 必须在用户可用分组集合内
+			// 集合 = UserUsableGroups + GroupSpecialUsableGroup + users.extra_groups
+			if _, ok := service.GetUserUsableGroupsWithExtra(userGroup, userCache.ExtraGroups)[tokenGroup]; !ok {
 				abortWithOpenAiMessage(c, http.StatusForbidden, fmt.Sprintf("无权访问 %s 分组", tokenGroup))
 				return
 			}

@@ -68,11 +68,22 @@ const AddUserModal = (props) => {
     remark: '',
     group: 'default',
     role: 1,
+    extra_groups: [],
   });
 
   const submit = async (values) => {
     setLoading(true);
-    const res = await API.post(`/api/user/`, values);
+    const payload = { ...values };
+    // extra_groups: 数组 → JSON 字符串
+    if (Array.isArray(payload.extra_groups)) {
+      const cleaned = payload.extra_groups
+        .map((g) => (typeof g === 'string' ? g.trim() : ''))
+        .filter((g) => g);
+      payload.extra_groups = cleaned.length ? JSON.stringify(cleaned) : '';
+    } else if (typeof payload.extra_groups !== 'string') {
+      payload.extra_groups = '';
+    }
+    const res = await API.post(`/api/user/`, payload);
     const { success, message } = res.data;
     if (success) {
       showSuccess(t('用户账户创建成功！'));
@@ -210,6 +221,21 @@ const AddUserModal = (props) => {
                       allowAdditions
                       search
                       rules={[{ required: true, message: t('请选择分组') }]}
+                    />
+                  </Col>
+                  <Col span={24}>
+                    <Form.Select
+                      field='extra_groups'
+                      label={t('额外可用分组')}
+                      placeholder={t('在全局白名单之外，额外授予该用户的分组')}
+                      multiple
+                      filter
+                      showClear
+                      optionList={groupOptions}
+                      style={{ width: '100%' }}
+                      extraText={t(
+                        '与全局「用户可选分组」叠加；若与全局重复后端会自动去重，不会重复计算。',
+                      )}
                     />
                   </Col>
                   <Col span={24}>

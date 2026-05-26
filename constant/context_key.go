@@ -80,4 +80,7 @@ const (
 
 	/* per-user channel whitelist (comma-separated channel ids, "" = no restriction) */
 	ContextKeyUserAllowedChannels ContextKey = "user_allowed_channels"
+
+	/* per-user extra usable groups (JSON array string, e.g. ["vip","svip"], "" = none) */
+	ContextKeyUserExtraGroups ContextKey = "user_extra_groups"
 )

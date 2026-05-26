@@ -41,8 +41,10 @@ func GetUserGroups(c *gin.Context) {
 		}
 	} else {
 		// 普通用户可见分组 = UserUsableGroups 全局白名单 + GroupSpecialUsableGroup 个性化叠加
-		// （与 middleware/auth.go token.group 校验、controller/pricing.go 模型市场可见性保持一致）
-		for groupName := range service.GetUserUsableGroups(userGroup) {
+		// + users.extra_groups 用户级追加(JSON 数组)。
+		// 与 middleware/auth.go token.group 校验、controller/pricing.go 模型市场可见性保持一致。
+		extraRaw, _ := model.GetUserExtraGroups(userId)
+		for groupName := range service.GetUserUsableGroupsWithExtra(userGroup, extraRaw) {
 			usableGroups[groupName] = map[string]interface{}{
 				"ratio": ratio_setting.GetGroupRatio(groupName),
 				"desc":  setting.GetUsableGroupDescription(groupName),

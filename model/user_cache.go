@@ -25,6 +25,7 @@ type UserBase struct {
 	UserRatio       float64 `json:"user_ratio"`
 	UserModelRatios string  `json:"user_model_ratios"`
 	AllowedChannels string  `json:"allowed_channels"`
+	ExtraGroups     string  `json:"extra_groups"`
 }
 
 func (user *UserBase) WriteContext(c *gin.Context) {
@@ -37,6 +38,7 @@ func (user *UserBase) WriteContext(c *gin.Context) {
 	common.SetContextKey(c, constant.ContextKeyUserRatio, user.UserRatio)
 	common.SetContextKey(c, constant.ContextKeyUserModelRatios, user.UserModelRatios)
 	common.SetContextKey(c, constant.ContextKeyUserAllowedChannels, user.AllowedChannels)
+	common.SetContextKey(c, constant.ContextKeyUserExtraGroups, user.ExtraGroups)
 }
 
 func (user *UserBase) GetSetting() dto.UserSetting {

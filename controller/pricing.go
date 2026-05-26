@@ -16,11 +16,13 @@ func GetPricing(c *gin.Context) {
 	groupRatio := map[string]float64{}
 
 	var group string
+	var extraGroupsRaw string
 	var userRole int
 	if exists {
 		user, err := model.GetUserCache(userId.(int))
 		if err == nil {
 			group = user.Group
+			extraGroupsRaw = user.ExtraGroups
 		}
 		if role, ok := c.Get("role"); ok {
 			userRole, _ = role.(int)
@@ -32,10 +34,10 @@ func GetPricing(c *gin.Context) {
 		for s, f := range ratio_setting.GetGroupRatioCopy() {
 			groupRatio[s] = f
 		}
-		usableGroup = service.GetUserUsableGroups(group)
+		usableGroup = service.GetUserUsableGroupsWithExtra(group, extraGroupsRaw)
 	} else if exists && group != "" {
-		// 已登录普通用户：只显示用户可用分组
-		usableGroup = service.GetUserUsableGroups(group)
+		// 已登录普通用户：UserUsableGroups + GroupSpecialUsableGroup + users.extra_groups
+		usableGroup = service.GetUserUsableGroupsWithExtra(group, extraGroupsRaw)
 		for g := range usableGroup {
 			ratio, ok := ratio_setting.GetGroupGroupRatio(group, g)
 			if ok {
