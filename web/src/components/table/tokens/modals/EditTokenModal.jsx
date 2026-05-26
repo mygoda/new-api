@@ -372,47 +372,48 @@ const EditTokenModal = (props) => {
                       showClear
                     />
                   </Col>
-                  {/* 令牌分组:仅管理员可见 + 可编辑。普通用户隐藏整个 Col,
-                      保留 form state 中的 group(默认值=用户自己的分组),
-                      由 fetchUserSelfGroup 拉过来填进 initValues。*/}
+                  {/* 令牌分组下拉对所有用户开放,选项来自 /api/user/self/groups
+                      (后端 GetUserGroups 已按角色返回合法集合,
+                      普通用户 = UserUsableGroups + GroupSpecialUsableGroup + users.extra_groups)。
+                      运行时 middleware/auth.go 仍会再校验 token.group 是否在该用户的可用集合内,
+                      因此前端开放下拉无安全风险。 */}
+                  <Col span={24}>
+                    {groups.length > 0 ? (
+                      <Form.Select
+                        field='group'
+                        label={t('令牌分组')}
+                        placeholder={t('令牌分组,默认为用户的分组')}
+                        optionList={groups}
+                        renderOptionItem={renderGroupOption}
+                        showClear
+                        style={{ width: '100%' }}
+                      />
+                    ) : (
+                      <Form.Select
+                        placeholder={t('管理员未设置用户可选分组')}
+                        disabled
+                        label={t('令牌分组')}
+                        style={{ width: '100%' }}
+                      />
+                    )}
+                  </Col>
+                  {/* 跨分组重试保留仅管理员可见(仅在 group=='auto' 显示) */}
                   {isAdmin() && (
-                    <>
-                      <Col span={24}>
-                        {groups.length > 0 ? (
-                          <Form.Select
-                            field='group'
-                            label={t('令牌分组')}
-                            placeholder={t('令牌分组,默认为用户的分组')}
-                            optionList={groups}
-                            renderOptionItem={renderGroupOption}
-                            showClear
-                            style={{ width: '100%' }}
-                          />
-                        ) : (
-                          <Form.Select
-                            placeholder={t('管理员未设置用户可选分组')}
-                            disabled
-                            label={t('令牌分组')}
-                            style={{ width: '100%' }}
-                          />
+                    <Col
+                      span={24}
+                      style={{
+                        display: values.group === 'auto' ? 'block' : 'none',
+                      }}
+                    >
+                      <Form.Switch
+                        field='cross_group_retry'
+                        label={t('跨分组重试')}
+                        size='default'
+                        extraText={t(
+                          '开启后,当前分组渠道失败时会按顺序尝试下一个分组的渠道',
                         )}
-                      </Col>
-                      <Col
-                        span={24}
-                        style={{
-                          display: values.group === 'auto' ? 'block' : 'none',
-                        }}
-                      >
-                        <Form.Switch
-                          field='cross_group_retry'
-                          label={t('跨分组重试')}
-                          size='default'
-                          extraText={t(
-                            '开启后,当前分组渠道失败时会按顺序尝试下一个分组的渠道',
-                          )}
-                        />
-                      </Col>
-                    </>
+                      />
+                    </Col>
                   )}
                   <Col xs={24} sm={24} md={24} lg={10} xl={10}>
                     <Form.DatePicker
