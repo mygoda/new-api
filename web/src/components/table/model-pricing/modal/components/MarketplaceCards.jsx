@@ -24,6 +24,7 @@ import {
   Database,
   Image as ImageIcon,
   Mouse,
+  Users,
 } from 'lucide-react';
 import MarkdownRenderer from '../../../../common/markdown/MarkdownRenderer';
 
@@ -398,6 +399,50 @@ const ModelSpecifications = ({ modelData, t }) => {
   );
 };
 
+// === 支持分组卡 ===
+// 展示本模型可用的用户分组：模型 enable_groups 与用户可用分组(usableGroup)的交集
+// 与列表「折扣列」一致，按分组倍率升序排列，并展示各分组倍率
+const ModelGroups = ({ modelData, usableGroup, groupRatio, t }) => {
+  const enableGroups = Array.isArray(modelData?.enable_groups)
+    ? modelData.enable_groups
+    : [];
+  const usable = usableGroup || {};
+  const groups = enableGroups
+    .filter((g) => g && g !== 'auto' && usable[g] !== undefined)
+    .map((g) => ({ name: g, ratio: Number(groupRatio?.[g]) || 1 }))
+    .sort((a, b) => a.ratio - b.ratio);
+
+  if (groups.length === 0) return null;
+
+  return (
+    <Card className='!rounded-2xl shadow-sm border-0 mb-6'>
+      <div className='flex items-center mb-4'>
+        <Avatar size='small' color='light-blue' className='mr-2 shadow-md'>
+          <Users size={16} />
+        </Avatar>
+        <div>
+          <Text className='text-lg font-medium'>{t('支持分组')}</Text>
+          <div className='text-xs text-gray-600'>
+            {t('本模型可用的用户分组')}
+          </div>
+        </div>
+      </div>
+      <Space wrap>
+        {groups.map(({ name, ratio }) => (
+          <div key={name} className='flex items-center gap-1'>
+            <Tag color='white' shape='circle' size='large'>
+              {name}
+            </Tag>
+            <Tag color='orange' shape='circle' size='large'>
+              {ratio}x
+            </Tag>
+          </div>
+        ))}
+      </Space>
+    </Card>
+  );
+};
+
 // === 详细介绍 markdown 卡 ===
 const ModelLongDescription = ({ longDescription, t }) => {
   if (!longDescription) return null;
@@ -424,5 +469,6 @@ export {
   ModelPricingSummary,
   ModelConditionalPricing,
   ModelSpecifications,
+  ModelGroups,
   ModelLongDescription,
 };

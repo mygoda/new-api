@@ -30,6 +30,7 @@ import {
   ModelPricingSummary,
   ModelConditionalPricing,
   ModelSpecifications,
+  ModelGroups,
   ModelLongDescription,
 } from './components/MarketplaceCards';
 
@@ -44,6 +45,8 @@ const MarketplaceDetailSideSheet = ({
   modelData,
   vendorsMap,
   endpointMap,
+  usableGroup,
+  groupRatio,
   t,
 }) => {
   const isMobile = useIsMobile();
@@ -91,6 +94,12 @@ const MarketplaceDetailSideSheet = ({
             />
             <ModelPricingSummary modelData={modelData} t={t} />
             <ModelConditionalPricing modelData={modelData} t={t} />
+            <ModelGroups
+              modelData={modelData}
+              usableGroup={usableGroup}
+              groupRatio={groupRatio}
+              t={t}
+            />
             <ModelSpecifications modelData={modelData} t={t} />
             <ModelLongDescription
               longDescription={modelData.long_description}
