@@ -21,7 +21,6 @@ import ModelFilterInfo from '../../components/creation/ModelFilterInfo';
 
 import { normalize, validate } from '../../services/creation/normalizer';
 import {
-  createCloudAsset,
   upsertCloudAssetByTaskId,
   updateCloudAsset,
   listCloudAssets,
@@ -494,34 +493,9 @@ const ImageTab = () => {
           return next;
         });
 
-        // 同步写云作品库:同步图无 task_id,N 张图各写一条 success 记录。
-        // 失败静默(本地 localStorage 仍可用),拿到云端 id 后回填 asset.cloudId。
-        created.forEach((a) => {
-          createCloudAsset({
-            modality: a.modality,
-            modelName: a.modelName,
-            prompt: a.prompt,
-            params: a.params,
-            assetUrl: a.assetUrl,
-            status: 'success',
-            taskId: '',
-          })
-            .then((cloudAsset) => {
-              if (cloudAsset?.id) {
-                setAssets((prev) =>
-                  prev.map((it) =>
-                    it.id === a.id ? { ...it, cloudId: cloudAsset.id } : it,
-                  ),
-                );
-              }
-            })
-            .catch((err) => {
-              console.warn(
-                '[creation] image cloud create failed',
-                err?.message,
-              );
-            });
-        });
+        // 同步图的作品落库由服务端完成(唯一落库方):
+        // 后端在生成成功后写入 creation_assets(gpt-image 等 b64 模型会先存对象存储再落短 URL),
+        // 即便客户端断连也不丢图。前端只保留本地即时展示,不再重复落库。
 
         Toast.success(t('生成成功'));
       }

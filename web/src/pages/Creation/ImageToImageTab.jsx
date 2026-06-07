@@ -25,7 +25,6 @@ import ModelFilterInfo from '../../components/creation/ModelFilterInfo';
 
 import { normalize, validate } from '../../services/creation/normalizer';
 import {
-  createCloudAsset,
   updateCloudAsset,
   listCloudAssets,
 } from '../../services/creation/cloudGallery';
@@ -377,30 +376,7 @@ const ImageToImageTab = () => {
         return next;
       });
 
-      // 同步写云作品库:图生图同步出图,每张图直接 createCloudAsset。
-      created.forEach((a) => {
-        createCloudAsset({
-          modality: a.modality,
-          modelName: a.modelName,
-          prompt: a.prompt,
-          params: a.params,
-          assetUrl: a.assetUrl,
-          status: 'success',
-          taskId: '',
-        })
-          .then((cloudAsset) => {
-            if (cloudAsset?.id) {
-              setAssets((prev) =>
-                prev.map((it) =>
-                  it.id === a.id ? { ...it, cloudId: cloudAsset.id } : it,
-                ),
-              );
-            }
-          })
-          .catch((err) => {
-            console.warn('[creation] i2i cloud create failed', err?.message);
-          });
-      });
+      // 图生图同步出图的作品落库由服务端完成(唯一落库方),前端不再重复落库。
       Toast.success(t('生成成功'));
     } catch (e) {
       const msg =

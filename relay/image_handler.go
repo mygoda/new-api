@@ -154,8 +154,8 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 
 	service.PostTextConsumeQuota(c, info, usage.(*dto.Usage), logContent)
 
-	// 客户端断连兜底:若上面写响应时客户端已断开(前端拿不到图、无法自行落库),
-	// 由服务端把生成的图片兜底落库为创作资产,避免已付费的图丢失、创作中心不显示。
-	service.SaveCreationImageAssetOnDisconnect(c, info, request, imageN, quality)
+	// 创作中心同步图由服务端落库为创作资产(唯一落库方):
+	// 即便客户端断连也不丢图;gpt-image 等只返回 base64 的模型由服务端存储后落库短 URL。
+	service.SaveCreationImageAsset(c, info, request, imageN, quality)
 	return nil
 }
