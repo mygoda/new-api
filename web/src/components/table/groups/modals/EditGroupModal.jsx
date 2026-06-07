@@ -26,8 +26,31 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
   const [channels, setChannels] = useState([]);
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [showChannels, setShowChannels] = useState(false);
+  const [allChannels, setAllChannels] = useState([]);
 
   const isEdit = !!editingGroup;
+
+  const channelOptions = allChannels.map((ch) => ({
+    label: `#${ch.id} ${ch.name}`,
+    value: ch.id,
+  }));
+
+  const loadAllChannels = async () => {
+    try {
+      const res = await API.get('/api/group/all_channels');
+      if (res.data.success) {
+        setAllChannels(res.data.data || []);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (visible) {
+      loadAllChannels();
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (visible && editingGroup) {
@@ -36,6 +59,8 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
         description: editingGroup.description || '',
         ratio: editingGroup.ratio ?? 1,
         is_auto: editingGroup.is_auto || false,
+        channel_ids: [],
+        fallback_channel_id: editingGroup.fallback_channel_id || undefined,
       });
       loadChannels(editingGroup.name);
     } else if (visible) {
@@ -44,6 +69,8 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
         description: '',
         ratio: 1,
         is_auto: false,
+        channel_ids: [],
+        fallback_channel_id: undefined,
       });
       setChannels([]);
       setShowChannels(false);
@@ -57,7 +84,12 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
         `/api/group/${encodeURIComponent(name)}/channels`,
       );
       if (res.data.success) {
-        setChannels(res.data.data || []);
+        const list = res.data.data || [];
+        setChannels(list);
+        formApiRef.current?.setValue(
+          'channel_ids',
+          list.map((ch) => ch.id),
+        );
       }
     } catch {
       // ignore
@@ -97,6 +129,8 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
           description: values.description,
           ratio: values.ratio,
           is_auto: values.is_auto,
+          channel_ids: values.channel_ids || [],
+          fallback_channel_id: values.fallback_channel_id ?? 0,
         });
       } else {
         res = await API.post('/api/group/', {
@@ -104,6 +138,8 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
           description: values.description,
           ratio: values.ratio,
           is_auto: values.is_auto,
+          channel_ids: values.channel_ids || [],
+          fallback_channel_id: values.fallback_channel_id ?? 0,
         });
       }
       const { success, message } = res.data;
@@ -238,6 +274,28 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
           />
 
           <Form.Switch field='is_auto' label={t('加入自动分组')} />
+
+          <Form.Select
+            field='channel_ids'
+            label={t('包含渠道')}
+            placeholder={t('选择要加入该分组的渠道')}
+            multiple
+            filter
+            style={{ width: '100%' }}
+            optionList={channelOptions}
+            extraText={t('选中的渠道会被加入该分组，取消选中则从该分组移除（会同步修改渠道的分组设置）')}
+          />
+
+          <Form.Select
+            field='fallback_channel_id'
+            label={t('兜底渠道')}
+            placeholder={t('该分组所有渠道重试失败后，最后请求的兜底渠道')}
+            showClear
+            filter
+            style={{ width: '100%' }}
+            optionList={channelOptions}
+            extraText={t('可选任意渠道（不要求属于该分组）。仅在该分组全部渠道重试失败后尝试一次。')}
+          />
 
           {isEdit && (
             <div style={{ marginTop: 16 }}>

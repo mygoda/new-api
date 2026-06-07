@@ -4,6 +4,7 @@ import (
 	"errors"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -30,11 +31,97 @@ func validateGroupName(name string) error {
 	return nil
 }
 
+// syncGroupChannels 将分组的成员渠道全量同步为 channelIds：
+// 不在目标集合里的旧成员会被移除该分组，新增成员会被加入该分组。
+// 通过改写每个渠道的 group（逗号分隔）字段并重建 abilities 实现。
+func syncGroupChannels(groupName string, channelIds []int) error {
+	target := make(map[int]struct{}, len(channelIds))
+	for _, id := range channelIds {
+		if id > 0 {
+			target[id] = struct{}{}
+		}
+	}
+
+	current, err := model.GetChannelsByGroup(groupName)
+	if err != nil {
+		return err
+	}
+	currentSet := make(map[int]struct{}, len(current))
+	changed := false
+
+	// 移除：当前是成员但不在目标集合
+	for _, ch := range current {
+		currentSet[ch.Id] = struct{}{}
+		if _, ok := target[ch.Id]; ok {
+			continue
+		}
+		groups := ch.GetGroups()
+		filtered := make([]string, 0, len(groups))
+		for _, g := range groups {
+			if g != groupName {
+				filtered = append(filtered, g)
+			}
+		}
+		if err := model.SetChannelGroup(ch.Id, strings.Join(filtered, ",")); err != nil {
+			return err
+		}
+		changed = true
+	}
+
+	// 新增：在目标集合但当前不是成员
+	for id := range target {
+		if _, ok := currentSet[id]; ok {
+			continue
+		}
+		ch, err := model.GetChannelById(id, true)
+		if err != nil {
+			return errors.New("渠道 " + strconv.Itoa(id) + " 不存在")
+		}
+		groups := ch.GetGroups()
+		exists := false
+		for _, g := range groups {
+			if g == groupName {
+				exists = true
+				break
+			}
+		}
+		if exists {
+			continue
+		}
+		groups = append(groups, groupName)
+		if err := model.SetChannelGroup(id, strings.Join(groups, ",")); err != nil {
+			return err
+		}
+		changed = true
+	}
+
+	if changed {
+		model.InitChannelCache()
+	}
+	return nil
+}
+
+// setGroupFallback 设置或清除某个分组的兜底渠道。channelId <= 0 表示清除。
+func setGroupFallback(groupName string, channelId int) error {
+	fbMap := setting.GetGroupFallbackCopy()
+	if channelId <= 0 {
+		delete(fbMap, groupName)
+	} else {
+		fbMap[groupName] = channelId
+	}
+	fbJSON, err := common.Marshal(fbMap)
+	if err != nil {
+		return err
+	}
+	return model.UpdateOption("GroupFallback", string(fbJSON))
+}
+
 // ListAllGroups returns all groups with their full details.
 func ListAllGroups() ([]*dto.GroupDetail, error) {
 	ratioMap := ratio_setting.GetGroupRatioCopy()
 	descMap := setting.GetUserUsableGroupsCopy()
 	autoGroups := setting.GetAutoGroups()
+	fallbackMap := setting.GetGroupFallbackCopy()
 
 	autoSet := make(map[string]bool)
 	for _, g := range autoGroups {
@@ -48,12 +135,13 @@ func ListAllGroups() ([]*dto.GroupDetail, error) {
 		userCount, _ := model.CountUsersByGroup(name)
 
 		groups = append(groups, &dto.GroupDetail{
-			Name:         name,
-			Description:  desc,
-			Ratio:        ratio,
-			IsAuto:       autoSet[name],
-			ChannelCount: channelCount,
-			UserCount:    userCount,
+			Name:              name,
+			Description:       desc,
+			Ratio:             ratio,
+			IsAuto:            autoSet[name],
+			ChannelCount:      channelCount,
+			UserCount:         userCount,
+			FallbackChannelId: fallbackMap[name],
 		})
 	}
 	return groups, nil
@@ -102,6 +190,20 @@ func CreateGroup(req *dto.CreateGroupRequest) error {
 			return err
 		}
 		if err := model.UpdateOption("AutoGroups", string(autoJSON)); err != nil {
+			return err
+		}
+	}
+
+	// 4. 关联渠道（把该分组写入选中渠道的 group 字段）
+	if len(req.ChannelIds) > 0 {
+		if err := syncGroupChannels(req.Name, req.ChannelIds); err != nil {
+			return err
+		}
+	}
+
+	// 5. 兜底渠道
+	if req.FallbackChannelId != nil {
+		if err := setGroupFallback(req.Name, *req.FallbackChannelId); err != nil {
 			return err
 		}
 	}
@@ -178,6 +280,20 @@ func UpdateGroup(req *dto.UpdateGroupRequest) error {
 		}
 	}
 
+	// 4. 同步关联渠道（非 nil 表示全量覆盖该分组成员）
+	if req.ChannelIds != nil {
+		if err := syncGroupChannels(req.Name, *req.ChannelIds); err != nil {
+			return err
+		}
+	}
+
+	// 5. 兜底渠道
+	if req.FallbackChannelId != nil {
+		if err := setGroupFallback(req.Name, *req.FallbackChannelId); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -234,6 +350,19 @@ func DeleteGroup(name string, force bool) error {
 	}
 	if err := model.UpdateOption("AutoGroups", string(autoJSON)); err != nil {
 		return err
+	}
+
+	// 3.1 Remove from GroupFallback (both as a group with a fallback, and as a fallback target)
+	fbMap := setting.GetGroupFallbackCopy()
+	fbChanged := false
+	if _, ok := fbMap[name]; ok {
+		delete(fbMap, name)
+		fbChanged = true
+	}
+	if fbChanged {
+		if fbJSON, err := common.Marshal(fbMap); err == nil {
+			_ = model.UpdateOption("GroupFallback", string(fbJSON))
+		}
 	}
 
 	// 4. Remove from GroupGroupRatio (both as outer key and from inner maps)

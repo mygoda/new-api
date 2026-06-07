@@ -387,6 +387,7 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			groupRoute.GET("/", controller.GetGroups)
 			groupRoute.GET("/list", controller.GetGroupList)
+			groupRoute.GET("/all_channels", controller.GetAllChannelsForGroupHandler)
 			groupRoute.POST("/", controller.CreateGroupHandler)
 			groupRoute.PUT("/", controller.UpdateGroupHandler)
 			groupRoute.DELETE("/:name", controller.DeleteGroupHandler)

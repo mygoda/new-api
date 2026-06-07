@@ -205,41 +205,42 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 
 		addUsedChannel(c, channel.Id)
-		bodyStorage, bodyErr := common.GetBodyStorage(c)
-		if bodyErr != nil {
-			// Ensure consistent 413 for oversized bodies even when error occurs later (e.g., retry path)
-			if common.IsRequestBodyTooLargeError(bodyErr) || errors.Is(bodyErr, common.ErrRequestBodyTooLarge) {
-				newAPIError = types.NewErrorWithStatusCode(bodyErr, types.ErrorCodeReadRequestBodyFailed, http.StatusRequestEntityTooLarge, types.ErrOptionWithSkipRetry())
-			} else {
-				newAPIError = types.NewErrorWithStatusCode(bodyErr, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
-			}
-			break
-		}
-		c.Request.Body = io.NopCloser(bodyStorage)
 
-		switch relayFormat {
-		case types.RelayFormatOpenAIRealtime:
-			newAPIError = relay.WssHelper(c, relayInfo)
-		case types.RelayFormatClaude:
-			newAPIError = relay.ClaudeHelper(c, relayInfo)
-		case types.RelayFormatGemini:
-			newAPIError = geminiRelayHandler(c, relayInfo)
-		default:
-			newAPIError = relayHandler(c, relayInfo)
-		}
-
+		var fatal bool
+		newAPIError, fatal = attemptRelay(c, relayInfo, relayFormat)
 		if newAPIError == nil {
 			relayInfo.LastError = nil
 			return
 		}
-
-		newAPIError = service.NormalizeViolationFeeError(newAPIError)
 		relayInfo.LastError = newAPIError
+		if fatal {
+			break
+		}
 
 		processChannelError(c, *types.NewChannelErrorWithModel(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan(), relayInfo.OriginModelName), newAPIError)
 
 		if !shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry()) {
 			break
+		}
+	}
+
+	// 兜底渠道：当前分组所有渠道都重试失败后，最后再请求一次该分组配置的兜底渠道（仅尝试一次）。
+	if newAPIError != nil && shouldRetry(c, newAPIError, 1) {
+		if fbChannel, ok := getFallbackChannel(c, relayInfo); ok && !channelAlreadyUsed(c, fbChannel.Id) {
+			logger.LogInfo(c, fmt.Sprintf("分组 %s 所有渠道失败，尝试兜底渠道 #%d", relayInfo.TokenGroup, fbChannel.Id))
+			addUsedChannel(c, fbChannel.Id)
+			relayInfo.RetryIndex++
+
+			var fatal bool
+			newAPIError, fatal = attemptRelay(c, relayInfo, relayFormat)
+			if newAPIError == nil {
+				relayInfo.LastError = nil
+				return
+			}
+			relayInfo.LastError = newAPIError
+			if !fatal {
+				processChannelError(c, *types.NewChannelErrorWithModel(fbChannel.Id, fbChannel.Type, fbChannel.Name, fbChannel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), fbChannel.GetAutoBan(), relayInfo.OriginModelName), newAPIError)
+			}
 		}
 	}
 
@@ -261,6 +262,82 @@ func addUsedChannel(c *gin.Context, channelId int) {
 	useChannel := c.GetStringSlice("use_channel")
 	useChannel = append(useChannel, fmt.Sprintf("%d", channelId))
 	c.Set("use_channel", useChannel)
+}
+
+// channelAlreadyUsed 判断该渠道在本次请求的重试链路里是否已经被使用过。
+func channelAlreadyUsed(c *gin.Context, channelId int) bool {
+	idStr := fmt.Sprintf("%d", channelId)
+	for _, used := range c.GetStringSlice("use_channel") {
+		if used == idStr {
+			return true
+		}
+	}
+	return false
+}
+
+// attemptRelay 执行单次转发：重置请求体 -> 按协议分发 -> 归一化违规计费错误。
+// 返回 (apiErr, fatal)。fatal=true 表示请求体读取失败等不可重试错误，调用方应直接结束、不再走渠道错误处理。
+func attemptRelay(c *gin.Context, relayInfo *relaycommon.RelayInfo, relayFormat types.RelayFormat) (*types.NewAPIError, bool) {
+	bodyStorage, bodyErr := common.GetBodyStorage(c)
+	if bodyErr != nil {
+		// Ensure consistent 413 for oversized bodies even when error occurs later (e.g., retry path)
+		if common.IsRequestBodyTooLargeError(bodyErr) || errors.Is(bodyErr, common.ErrRequestBodyTooLarge) {
+			return types.NewErrorWithStatusCode(bodyErr, types.ErrorCodeReadRequestBodyFailed, http.StatusRequestEntityTooLarge, types.ErrOptionWithSkipRetry()), true
+		}
+		return types.NewErrorWithStatusCode(bodyErr, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry()), true
+	}
+	c.Request.Body = io.NopCloser(bodyStorage)
+
+	var apiErr *types.NewAPIError
+	switch relayFormat {
+	case types.RelayFormatOpenAIRealtime:
+		apiErr = relay.WssHelper(c, relayInfo)
+	case types.RelayFormatClaude:
+		apiErr = relay.ClaudeHelper(c, relayInfo)
+	case types.RelayFormatGemini:
+		apiErr = geminiRelayHandler(c, relayInfo)
+	default:
+		apiErr = relayHandler(c, relayInfo)
+	}
+	if apiErr == nil {
+		return nil, false
+	}
+	return service.NormalizeViolationFeeError(apiErr), false
+}
+
+// getFallbackChannel 返回当前请求所用分组配置的兜底渠道并完成上下文装配。
+// 当 TokenGroup 为 "auto" 时，使用本次已解析出的实际分组查找兜底配置。
+func getFallbackChannel(c *gin.Context, info *relaycommon.RelayInfo) (*model.Channel, bool) {
+	// 指定渠道（specific_channel_id）模式不走兜底
+	if _, ok := c.Get("specific_channel_id"); ok {
+		return nil, false
+	}
+	group := info.TokenGroup
+	if group == "auto" {
+		if v, exists := common.GetContextKey(c, constant.ContextKeyAutoGroup); exists {
+			if g, ok := v.(string); ok && g != "" {
+				group = g
+			}
+		}
+	}
+	channelId, ok := setting.GetGroupFallbackChannel(group)
+	if !ok {
+		return nil, false
+	}
+	channel, err := model.GetChannelById(channelId, true)
+	if err != nil {
+		logger.LogError(c, fmt.Sprintf("兜底渠道 #%d 获取失败: %s", channelId, err.Error()))
+		return nil, false
+	}
+	if channel.Status != common.ChannelStatusEnabled {
+		logger.LogError(c, fmt.Sprintf("兜底渠道 #%d 未启用，跳过兜底", channelId))
+		return nil, false
+	}
+	if newAPIError := middleware.SetupContextForSelectedChannel(c, channel, info.OriginModelName); newAPIError != nil {
+		logger.LogError(c, fmt.Sprintf("兜底渠道 #%d 装配失败: %s", channelId, newAPIError.Error()))
+		return nil, false
+	}
+	return channel, true
 }
 
 func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
@@ -606,6 +683,29 @@ func RelayTask(c *gin.Context) {
 		task.Action = relayInfo.Action
 		if insertErr := task.Insert(); insertErr != nil {
 			common.SysError("insert task error: " + insertErr.Error())
+		}
+	}
+
+	// ── 失败：在提交链路里已经选好渠道的前提下，也落一条 FAILURE 任务 ──
+	// 避免用户在「创作中心」看不到任何记录、误以为任务凭空消失。Quota 仍由
+	// 上面的 defer 走 Refund，task.Quota 写 0，不会重复计费。Poller 已在
+	// model/task.go 里跳过 FAILURE 行，不会反复轮询。
+	if taskErr != nil && relayInfo.ChannelId > 0 {
+		failTask := model.InitTask(relay.GetTaskPlatform(c), relayInfo)
+		failTask.PrivateData.BillingSource = relayInfo.BillingSource
+		failTask.PrivateData.SubscriptionId = relayInfo.SubscriptionId
+		failTask.PrivateData.TokenId = relayInfo.TokenId
+		failTask.Status = model.TaskStatusFailure
+		failTask.Progress = "100%"
+		failTask.FailReason = taskErr.Message
+		failTask.StartTime = time.Now().Unix()
+		failTask.FinishTime = time.Now().Unix()
+		failTask.Quota = 0
+		if relayInfo.Action != "" {
+			failTask.Action = relayInfo.Action
+		}
+		if insertErr := failTask.Insert(); insertErr != nil {
+			common.SysError("insert failure task error: " + insertErr.Error())
 		}
 	}
 

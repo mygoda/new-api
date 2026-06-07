@@ -112,6 +112,26 @@ func DeleteGroupHandler(c *gin.Context) {
 	common.ApiSuccess(c, nil)
 }
 
+// GetAllChannelsForGroupHandler returns a lightweight list of all channels for the
+// group channel/fallback selectors (id, name, type, status). Keys are not exposed.
+func GetAllChannelsForGroupHandler(c *gin.Context) {
+	channels, err := model.GetAllChannels(0, 0, true, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	result := make([]dto.GroupChannelInfo, 0, len(channels))
+	for _, ch := range channels {
+		result = append(result, dto.GroupChannelInfo{
+			Id:     ch.Id,
+			Name:   ch.Name,
+			Type:   ch.Type,
+			Status: ch.Status,
+		})
+	}
+	common.ApiSuccess(c, result)
+}
+
 // GetGroupChannelsHandler returns channels belonging to the specified group, with group-specific weights.
 func GetGroupChannelsHandler(c *gin.Context) {
 	name := c.Param("name")

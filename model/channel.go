@@ -260,6 +260,20 @@ func (channel *Channel) SaveWithoutKey() error {
 	return DB.Omit("key").Save(channel).Error
 }
 
+// SetChannelGroup 仅更新某个渠道的 group 列（逗号分隔的分组列表）并重建其 abilities。
+// 用 GORM 字段名 "Group" 让 GORM 自行处理保留字 group 的列名引用，跨库安全。
+func SetChannelGroup(channelId int, group string) error {
+	channel, err := GetChannelById(channelId, true)
+	if err != nil {
+		return err
+	}
+	channel.Group = group
+	if err := DB.Model(channel).Select("Group").Updates(channel).Error; err != nil {
+		return err
+	}
+	return channel.UpdateAbilities(nil)
+}
+
 func GetAllChannels(startIdx int, num int, selectAll bool, idSort bool) ([]*Channel, error) {
 	var channels []*Channel
 	var err error
