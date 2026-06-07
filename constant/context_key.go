@@ -74,6 +74,10 @@ const (
 
 	ContextKeyResponseContent ContextKey = "doris_response_content"
 
+	// ContextKeyClientDisconnected 标记向客户端写响应时发生了断连（broken pipe / connection reset）。
+	// 用于创作中心在前端没收到响应时做服务端兜底落库。
+	ContextKeyClientDisconnected ContextKey = "client_disconnected"
+
 	/* per-user pricing overrides */
 	ContextKeyUserRatio       ContextKey = "user_ratio"
 	ContextKeyUserModelRatios ContextKey = "user_model_ratios"

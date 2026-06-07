@@ -64,6 +64,7 @@ func IOCopyBytesGracefully(c *gin.Context, src *http.Response, data []byte) {
 	_, err := io.Copy(c.Writer, body)
 	if err != nil {
 		if isClientDisconnectError(err) {
+			common.SetContextKey(c, constant.ContextKeyClientDisconnected, true)
 			logger.LogWarn(c, fmt.Sprintf("client disconnected during response: %s", err.Error()))
 		} else {
 			logger.LogError(c, fmt.Sprintf("failed to copy response body: %s", err.Error()))

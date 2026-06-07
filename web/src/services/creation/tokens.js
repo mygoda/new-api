@@ -39,8 +39,10 @@ export function saveActiveToken(token) {
 // 没有 active token 时返回空对象，由调用方决定是否阻塞用户。
 export function tokenAuthHeader() {
   const tk = loadActiveToken();
-  if (!tk?.key) return {};
-  return { Authorization: `Bearer ${tk.key}` };
+  // X-NewAPI-Creation 标记这是创作中心发起的 relay 请求,
+  // 供后端在客户端断连时做服务端兜底落库(创作资产)。
+  if (!tk?.key) return { 'X-NewAPI-Creation': '1' };
+  return { Authorization: `Bearer ${tk.key}`, 'X-NewAPI-Creation': '1' };
 }
 
 export async function listTokens(page = 1, size = 50) {
