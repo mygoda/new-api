@@ -9,7 +9,23 @@ import (
 )
 
 func GetUserUsableGroups(userGroup string) map[string]string {
-	groupsCopy := setting.GetUserUsableGroupsCopy()
+	// 基底:GroupRatio 中存在的所有真实分组中,GroupGlobalVisible 标记为 true 的子集。
+	// GroupGlobalVisible 缺省视为 true(setting/group_global_visible.go),从而保证升级前的老分组
+	// 默认仍然全局可见,无需任何一次性数据迁移代码。描述继续从 UserUsableGroups 取,缺省回退到分组名。
+	ratioMap := ratio_setting.GetGroupRatioCopy()
+	descMap := setting.GetUserUsableGroupsCopy()
+	groupsCopy := make(map[string]string, len(ratioMap))
+	for name := range ratioMap {
+		if !setting.IsGroupGlobalVisible(name) {
+			continue
+		}
+		desc, ok := descMap[name]
+		if !ok || desc == "" {
+			desc = name
+		}
+		groupsCopy[name] = desc
+	}
+
 	if userGroup != "" {
 		specialSettings, b := ratio_setting.GetGroupRatioSetting().GroupSpecialUsableGroup.Get(userGroup)
 		if b {

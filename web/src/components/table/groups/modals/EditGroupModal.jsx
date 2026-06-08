@@ -59,6 +59,7 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
         description: editingGroup.description || '',
         ratio: editingGroup.ratio ?? 1,
         is_auto: editingGroup.is_auto || false,
+        is_global: editingGroup.is_global !== false,
         channel_ids: [],
         fallback_channel_id: editingGroup.fallback_channel_id || undefined,
       });
@@ -69,6 +70,7 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
         description: '',
         ratio: 1,
         is_auto: false,
+        is_global: true,
         channel_ids: [],
         fallback_channel_id: undefined,
       });
@@ -129,6 +131,7 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
           description: values.description,
           ratio: values.ratio,
           is_auto: values.is_auto,
+          is_global: values.is_global,
           channel_ids: values.channel_ids || [],
           fallback_channel_id: values.fallback_channel_id ?? 0,
         });
@@ -138,6 +141,7 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
           description: values.description,
           ratio: values.ratio,
           is_auto: values.is_auto,
+          is_global: values.is_global,
           channel_ids: values.channel_ids || [],
           fallback_channel_id: values.fallback_channel_id ?? 0,
         });
@@ -274,6 +278,15 @@ const EditGroupModal = ({ visible, editingGroup, handleClose, refresh }) => {
           />
 
           <Form.Switch field='is_auto' label={t('加入自动分组')} />
+
+          <Form.Switch
+            field='is_global'
+            label={t('全局可见')}
+            disabled={isEdit && editingGroup?.name === 'default'}
+            extraText={t(
+              '开启:所有普通用户均可看到此分组。关闭:仅管理员和被显式分配此分组(用户的额外分组)的用户可见。default 分组始终全局可见。',
+            )}
+          />
 
           <Form.Select
             field='channel_ids'

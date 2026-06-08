@@ -116,6 +116,18 @@ func setGroupFallback(groupName string, channelId int) error {
 	return model.UpdateOption("GroupFallback", string(fbJSON))
 }
 
+// setGroupGlobalVisible 持久化某个分组的全局可见性。
+// 通过 UpdateOption 写入数据库的同时,内存 map 会经由 model.UpdateOption 回调同步。
+func setGroupGlobalVisible(groupName string, visible bool) error {
+	visMap := setting.GetGroupGlobalVisibleCopy()
+	visMap[groupName] = visible
+	visJSON, err := common.Marshal(visMap)
+	if err != nil {
+		return err
+	}
+	return model.UpdateOption("GroupGlobalVisible", string(visJSON))
+}
+
 // ListAllGroups returns all groups with their full details.
 func ListAllGroups() ([]*dto.GroupDetail, error) {
 	ratioMap := ratio_setting.GetGroupRatioCopy()
@@ -139,6 +151,7 @@ func ListAllGroups() ([]*dto.GroupDetail, error) {
 			Description:       desc,
 			Ratio:             ratio,
 			IsAuto:            autoSet[name],
+			IsGlobal:          setting.IsGroupGlobalVisible(name),
 			ChannelCount:      channelCount,
 			UserCount:         userCount,
 			FallbackChannelId: fallbackMap[name],
@@ -206,6 +219,18 @@ func CreateGroup(req *dto.CreateGroupRequest) error {
 		if err := setGroupFallback(req.Name, *req.FallbackChannelId); err != nil {
 			return err
 		}
+	}
+
+	// 6. 全局可见性。nil 视为 true(默认全局可见);default 强制 true。
+	isGlobal := true
+	if req.IsGlobal != nil {
+		isGlobal = *req.IsGlobal
+	}
+	if req.Name == "default" {
+		isGlobal = true
+	}
+	if err := setGroupGlobalVisible(req.Name, isGlobal); err != nil {
+		return err
 	}
 
 	return nil
@@ -294,6 +319,16 @@ func UpdateGroup(req *dto.UpdateGroupRequest) error {
 		}
 	}
 
+	// 6. 全局可见性。nil 表示不变;default 分组不允许改为非全局。
+	if req.IsGlobal != nil {
+		if req.Name == "default" && !*req.IsGlobal {
+			return errors.New("'default' 分组必须保持全局可见")
+		}
+		if err := setGroupGlobalVisible(req.Name, *req.IsGlobal); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -362,6 +397,15 @@ func DeleteGroup(name string, force bool) error {
 	if fbChanged {
 		if fbJSON, err := common.Marshal(fbMap); err == nil {
 			_ = model.UpdateOption("GroupFallback", string(fbJSON))
+		}
+	}
+
+	// 3.2 Remove from GroupGlobalVisible
+	visMap := setting.GetGroupGlobalVisibleCopy()
+	if _, ok := visMap[name]; ok {
+		delete(visMap, name)
+		if visJSON, err := common.Marshal(visMap); err == nil {
+			_ = model.UpdateOption("GroupGlobalVisible", string(visJSON))
 		}
 	}
 

@@ -52,6 +52,17 @@ export const getGroupsColumns = ({ t, onEdit, onDelete }) => {
         ),
     },
     {
+      title: t('全局可见'),
+      dataIndex: 'is_global',
+      key: 'is_global',
+      render: (value) =>
+        value !== false ? (
+          <Tag color='green'>{t('全局')}</Tag>
+        ) : (
+          <Tag color='grey'>{t('私有')}</Tag>
+        ),
+    },
+    {
       title: t('操作'),
       key: 'actions',
       render: (_, record) => (

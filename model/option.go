@@ -146,6 +146,7 @@ func InitOptionMap() {
 	common.OptionMap["Chats"] = setting.Chats2JsonString()
 	common.OptionMap["AutoGroups"] = setting.AutoGroups2JsonString()
 	common.OptionMap["GroupFallback"] = setting.GroupFallback2JsonString()
+	common.OptionMap["GroupGlobalVisible"] = setting.GroupGlobalVisible2JsonString()
 	common.OptionMap["DefaultUseAutoGroup"] = strconv.FormatBool(setting.DefaultUseAutoGroup)
 	common.OptionMap["PayMethods"] = operation_setting.PayMethods2JsonString()
 	common.OptionMap["GitHubClientId"] = ""
@@ -455,6 +456,8 @@ func updateOptionMap(key string, value string) (err error) {
 		err = setting.UpdateAutoGroupsByJsonString(value)
 	case "GroupFallback":
 		err = setting.UpdateGroupFallbackByJsonString(value)
+	case "GroupGlobalVisible":
+		err = setting.UpdateGroupGlobalVisibleByJsonString(value)
 	case "CustomCallbackAddress":
 		operation_setting.CustomCallbackAddress = value
 	case "EpayId":
