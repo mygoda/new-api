@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/samber/lo"
 
@@ -287,6 +288,10 @@ func GetAndValidateTextRequest(c *gin.Context, relayMode int) (*dto.GeneralOpenA
 			return nil, errors.New("field prompt is required")
 		}
 	case relayconstant.RelayModeChatCompletions:
+		// 纯图像模型（如 gpt-image 系列）不应从 /v1/chat/completions 调用，提前拦截并指引正确接口。
+		if model_setting.IsImageOnlyModel(textRequest.Model) {
+			return nil, fmt.Errorf("模型 %q 为图像模型，不支持 /v1/chat/completions 接口，请改用 /v1/images/edits（图像编辑）或 /v1/images/generations（图像生成）", textRequest.Model)
+		}
 		// For FIM (Fill-in-the-middle) requests with prefix/suffix, messages is optional
 		// It will be filled by provider-specific adaptors if needed (e.g., SiliconFlow)。Or it is allowed by model vendor(s) (e.g., DeepSeek)
 		if len(textRequest.Messages) == 0 && textRequest.Prefix == nil && textRequest.Suffix == nil {

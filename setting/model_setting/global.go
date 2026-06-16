@@ -37,6 +37,9 @@ type GlobalSettings struct {
 	ThinkingModelBlacklist           []string                         `json:"thinking_model_blacklist"`
 	ForceAnthropicKeywords           []string                         `json:"force_anthropic_keywords"`
 	ChatCompletionsToResponsesPolicy ChatCompletionsToResponsesPolicy `json:"chat_completions_to_responses_policy"`
+	// ImageOnlyModelKeywords 命中这些关键词（子串匹配，忽略大小写）的模型被视为「纯图像模型」，
+	// 仅允许走 /v1/images/edits 或 /v1/images/generations，禁止从 /v1/chat/completions 调用。
+	ImageOnlyModelKeywords []string `json:"image_only_model_keywords"`
 }
 
 // 默认配置
@@ -55,6 +58,11 @@ var defaultOpenaiSettings = GlobalSettings{
 	ChatCompletionsToResponsesPolicy: ChatCompletionsToResponsesPolicy{
 		Enabled:     false,
 		AllChannels: true,
+	},
+	// 默认只拦截 OpenAI 的 gpt-image 系列（gpt-image-1/2/2-sp/pro 等），
+	// 这些是纯图像生成/编辑模型，本身没有 chat/completions 接口。
+	ImageOnlyModelKeywords: []string{
+		"gpt-image",
 	},
 }
 
@@ -93,6 +101,25 @@ func IsForceAnthropicModel(modelName string) bool {
 	m := strings.ToLower(modelName)
 	for _, keyword := range globalSettings.ForceAnthropicKeywords {
 		if keyword != "" && strings.Contains(m, strings.ToLower(keyword)) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsImageOnlyModel 判断模型是否为「纯图像模型」（命中 ImageOnlyModelKeywords 关键词列表，
+// 子串匹配、忽略大小写）。命中的模型只能走图像接口，不允许从 /v1/chat/completions 调用。
+func IsImageOnlyModel(modelName string) bool {
+	if len(globalSettings.ImageOnlyModelKeywords) == 0 {
+		return false
+	}
+	m := strings.ToLower(strings.TrimSpace(modelName))
+	if m == "" {
+		return false
+	}
+	for _, keyword := range globalSettings.ImageOnlyModelKeywords {
+		kw := strings.ToLower(strings.TrimSpace(keyword))
+		if kw != "" && strings.Contains(m, kw) {
 			return true
 		}
 	}
