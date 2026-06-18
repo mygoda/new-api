@@ -113,8 +113,13 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		cacheRatio, _ = ratio_setting.GetCacheRatio(info.OriginModelName)
 		cacheCreationRatio, _ = ratio_setting.GetCreateCacheRatio(info.OriginModelName)
 		cacheCreationRatio5m = cacheCreationRatio
-		// 固定1h和5min缓存写入价格的比例
-		cacheCreationRatio1h = cacheCreationRatio * claudeCacheCreation1hMultiplier
+		// 1h 缓存写入价格：优先用模型管理里独立配置的 1h 倍率;
+		// 未配置时回退到固定比例(5m × ClaudeCacheCreation1hMultiplier),保持向后兼容。
+		if r1h, ok := ratio_setting.GetCreateCacheRatio1h(info.OriginModelName); ok {
+			cacheCreationRatio1h = r1h
+		} else {
+			cacheCreationRatio1h = cacheCreationRatio * claudeCacheCreation1hMultiplier
+		}
 		imageRatio, _ = ratio_setting.GetImageRatio(info.OriginModelName)
 		audioRatio = ratio_setting.GetAudioRatio(info.OriginModelName)
 		audioCompletionRatio = ratio_setting.GetAudioCompletionRatio(info.OriginModelName)

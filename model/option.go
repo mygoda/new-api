@@ -172,6 +172,7 @@ func InitOptionMap() {
 	common.OptionMap["ModelPrice"] = ratio_setting.ModelPrice2JSONString()
 	common.OptionMap["CacheRatio"] = ratio_setting.CacheRatio2JSONString()
 	common.OptionMap["CreateCacheRatio"] = ratio_setting.CreateCacheRatio2JSONString()
+	common.OptionMap["CreateCacheRatio1h"] = ratio_setting.CreateCacheRatio1h2JSONString()
 	common.OptionMap["GroupRatio"] = ratio_setting.GroupRatio2JSONString()
 	common.OptionMap["GroupGroupRatio"] = ratio_setting.GroupGroupRatio2JSONString()
 	common.OptionMap["UserUsableGroups"] = setting.UserUsableGroups2JSONString()
@@ -281,6 +282,7 @@ func syncRatioMapsToOptionMap() {
 	common.OptionMap["CompletionRatio"] = ratio_setting.CompletionRatio2JSONString()
 	common.OptionMap["CacheRatio"] = ratio_setting.CacheRatio2JSONString()
 	common.OptionMap["CreateCacheRatio"] = ratio_setting.CreateCacheRatio2JSONString()
+	common.OptionMap["CreateCacheRatio1h"] = ratio_setting.CreateCacheRatio1h2JSONString()
 	common.OptionMap["ImageRatio"] = ratio_setting.ImageRatio2JSONString()
 	common.OptionMap["AudioRatio"] = ratio_setting.AudioRatio2JSONString()
 	common.OptionMap["AudioCompletionRatio"] = ratio_setting.AudioCompletionRatio2JSONString()
@@ -602,6 +604,8 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateCacheRatioByJSONString(value)
 	case "CreateCacheRatio":
 		err = ratio_setting.UpdateCreateCacheRatioByJSONString(value)
+	case "CreateCacheRatio1h":
+		err = ratio_setting.UpdateCreateCacheRatio1hByJSONString(value)
 	case "ImageRatio":
 		err = ratio_setting.UpdateImageRatioByJSONString(value)
 	case "AudioRatio":

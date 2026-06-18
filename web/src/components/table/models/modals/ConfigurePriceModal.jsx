@@ -42,6 +42,7 @@ const PRICING_OPTION_KEYS = [
   'CompletionRatio',
   'CacheRatio',
   'CreateCacheRatio',
+  'CreateCacheRatio1h',
   'ImageRatio',
   'AudioRatio',
   'AudioCompletionRatio',
@@ -89,6 +90,11 @@ const fillDerivedPricesFromBase = (model, nextInputPrice) => {
       hasValue(model.rawRatios.createCacheRatio)
         ? formatNumber(baseNumber * Number(model.rawRatios.createCacheRatio))
         : model.createCachePrice,
+    createCache1hPrice:
+      !hasValue(model.createCache1hPrice) &&
+      hasValue(model.rawRatios.createCacheRatio1h)
+        ? formatNumber(baseNumber * Number(model.rawRatios.createCacheRatio1h))
+        : model.createCache1hPrice,
     imagePrice:
       !hasValue(model.imagePrice) && hasValue(model.rawRatios.imageRatio)
         ? formatNumber(baseNumber * Number(model.rawRatios.imageRatio))
@@ -117,6 +123,7 @@ const buildSourceMaps = (options) => ({
   CompletionRatioMeta: parseOptionJSON(options.CompletionRatioMeta),
   CacheRatio: parseOptionJSON(options.CacheRatio),
   CreateCacheRatio: parseOptionJSON(options.CreateCacheRatio),
+  CreateCacheRatio1h: parseOptionJSON(options.CreateCacheRatio1h),
   ImageRatio: parseOptionJSON(options.ImageRatio),
   AudioRatio: parseOptionJSON(options.AudioRatio),
   AudioCompletionRatio: parseOptionJSON(options.AudioCompletionRatio),
@@ -637,6 +644,30 @@ export default function ConfigurePriceModal({
                     !isOptionalFieldEnabled('createCachePrice')
                       ? t('当前未启用，需要时再打开即可。')
                       : ''
+                  }
+                />
+                <PriceInput
+                  label={t('1h 缓存创建价格（可选）')}
+                  value={modelState.createCache1hPrice}
+                  placeholder={t('输入 $/1M tokens')}
+                  onChange={(value) =>
+                    handleNumericFieldChange('createCache1hPrice', value)
+                  }
+                  headerAction={
+                    <Switch
+                      size='small'
+                      checked={isOptionalFieldEnabled('createCache1hPrice')}
+                      onChange={(checked) =>
+                        handleOptionalFieldToggle('createCache1hPrice', checked)
+                      }
+                    />
+                  }
+                  hidden={!isOptionalFieldEnabled('createCache1hPrice')}
+                  disabled={!hasValue(modelState.inputPrice)}
+                  extraText={
+                    !isOptionalFieldEnabled('createCache1hPrice')
+                      ? t('不填则按 5min 缓存创建价格的 1.6 倍自动计算。')
+                      : t('Claude 1h 缓存写入价格；留空则 = 5min 价 × 1.6。')
                   }
                 />
               </Card>
