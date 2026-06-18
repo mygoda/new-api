@@ -86,7 +86,7 @@ func UploadCreationVolcAsset(c *gin.Context) {
 
 	// 3. 用 model name 路由到渠道
 	allowedChannels := model.ParseAllowedChannels(common.GetContextKeyString(c, constant.ContextKeyUserAllowedChannels))
-	channel, err := model.GetRandomSatisfiedChannel(group, modelName, 0, allowedChannels)
+	channel, err := model.GetRandomSatisfiedChannel(group, modelName, 0, allowedChannels, nil)
 	if err != nil || channel == nil {
 		respondJSONError(c, http.StatusBadGateway, "no_channel",
 			fmt.Sprintf("找不到能服务 %s 的渠道:%v", modelName, err))

@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -197,6 +198,10 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
 		relayInfo.RetryIndex = retryParam.GetRetry()
+		// 重试时优先选未尝试过的渠道:用本次已用渠道集合作为排除集(开关可关闭以回退原行为)。
+		if operation_setting.ShouldPreferUntriedChannel() {
+			retryParam.ExcludedChannels = usedChannelSet(c)
+		}
 		channel, channelErr := getChannel(c, relayInfo, retryParam)
 		if channelErr != nil {
 			logger.LogError(c, channelErr.Error())
@@ -273,6 +278,22 @@ func channelAlreadyUsed(c *gin.Context, channelId int) bool {
 		}
 	}
 	return false
+}
+
+// usedChannelSet 把本次请求已尝试过的渠道(use_channel)解析为 map[int]struct{},
+// 供重试时作为排除集传入渠道选择,实现「优先换未试渠道」。
+func usedChannelSet(c *gin.Context) map[int]struct{} {
+	used := c.GetStringSlice("use_channel")
+	if len(used) == 0 {
+		return nil
+	}
+	set := make(map[int]struct{}, len(used))
+	for _, idStr := range used {
+		if id, err := strconv.Atoi(idStr); err == nil {
+			set[id] = struct{}{}
+		}
+	}
+	return set
 }
 
 // attemptRelay 执行单次转发：重置请求体 -> 按协议分发 -> 归一化违规计费错误。

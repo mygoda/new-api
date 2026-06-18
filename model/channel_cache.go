@@ -104,10 +104,10 @@ func SyncChannelCache(frequency int) {
 	}
 }
 
-func GetRandomSatisfiedChannel(group string, model string, retry int, allowedChannels map[int]struct{}) (*Channel, error) {
+func GetRandomSatisfiedChannel(group string, model string, retry int, allowedChannels map[int]struct{}, excludedChannels map[int]struct{}) (*Channel, error) {
 	// if memory cache is disabled, get channel directly from database
 	if !common.MemoryCacheEnabled {
-		return GetChannel(group, model, retry, allowedChannels)
+		return GetChannel(group, model, retry, allowedChannels, excludedChannels)
 	}
 
 	channelSyncLock.RLock()
@@ -132,6 +132,21 @@ func GetRandomSatisfiedChannel(group string, model string, retry int, allowedCha
 			}
 		}
 		cachedAbilities = filtered
+	}
+
+	// 重试时排除本次请求已尝试过的渠道(优先换渠道)。
+	// 关键：若排除后已无候选,则保留排除前的列表(回退到允许重试同渠道),
+	// 以免单渠道模型/全部渠道已试过时直接无渠道可用——保留瞬时错误的恢复能力。
+	if len(excludedChannels) > 0 {
+		filtered := make([]CachedAbility, 0, len(cachedAbilities))
+		for _, ca := range cachedAbilities {
+			if _, used := excludedChannels[ca.ChannelId]; !used {
+				filtered = append(filtered, ca)
+			}
+		}
+		if len(filtered) > 0 {
+			cachedAbilities = filtered
+		}
 	}
 
 	if len(cachedAbilities) == 0 {

@@ -21,6 +21,9 @@ type RetryParam struct {
 	// nil 表示该用户没有设置白名单，行为与历史完全一致；非空时仅在这些 channel_id 内选渠道。
 	// 由 middleware/distributor.go 解析一次后透传，避免每次重试重复 split。
 	AllowedChannels map[int]struct{}
+	// ExcludedChannels 是本次请求已尝试过的渠道集合(重试时优先排除)。
+	// 由 controller 在每次重试前从 use_channel 填充;为空表示不排除(首次请求或开关关闭)。
+	ExcludedChannels map[int]struct{}
 }
 
 func (p *RetryParam) GetRetry() int {
@@ -119,7 +122,7 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			}
 			logger.LogDebug(param.Ctx, "Auto selecting group: %s, priorityRetry: %d", autoGroup, priorityRetry)
 
-			channel, _ = model.GetRandomSatisfiedChannel(autoGroup, param.ModelName, priorityRetry, param.AllowedChannels)
+			channel, _ = model.GetRandomSatisfiedChannel(autoGroup, param.ModelName, priorityRetry, param.AllowedChannels, param.ExcludedChannels)
 			if channel == nil {
 				// Current group has no available channel for this model, try next group
 				// 当前分组没有该模型的可用渠道，尝试下一个分组
@@ -157,7 +160,7 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			break
 		}
 	} else {
-		channel, err = model.GetRandomSatisfiedChannel(param.TokenGroup, param.ModelName, param.GetRetry(), param.AllowedChannels)
+		channel, err = model.GetRandomSatisfiedChannel(param.TokenGroup, param.ModelName, param.GetRetry(), param.AllowedChannels, param.ExcludedChannels)
 		if err != nil {
 			return nil, param.TokenGroup, err
 		}
