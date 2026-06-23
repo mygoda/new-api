@@ -145,9 +145,10 @@ const Home = () => {
 
       <CapabilitiesSection featured={dashboard?.featured_models} />
 
+      {/* ponytail: 促销 / 创作中心模块按运营要求暂时关闭，需要时取消注释即可
       <PricingDealsSection items={dashboard?.pricing_deals} />
-
       <CreationPromoSection />
+      */}
 
       <QuickStartSection serverAddress={serverAddress} />
 

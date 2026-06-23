@@ -23,7 +23,7 @@ import {
  */
 
 const WECHAT_ID = 'fly14827490';
-const QR_PATH = '/contact-wechat-qr.jpg';
+const QR_PATH = '/contact-wechat-qr.jpg?v=2';
 
 const FLOW_STEPS = [
   {
