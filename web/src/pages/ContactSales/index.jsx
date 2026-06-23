@@ -22,7 +22,7 @@ import {
  * 入口:首页 BottomCTASection 的「联系商务」按钮。
  */
 
-const WECHAT_ID = 'DREAM';
+const WECHAT_ID = 'fly14827490';
 const QR_PATH = '/contact-wechat-qr.jpg';
 
 const FLOW_STEPS = [
