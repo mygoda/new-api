@@ -30,6 +30,7 @@ type Log struct {
 	Quota            int    `json:"quota" gorm:"default:0"`
 	PromptTokens     int    `json:"prompt_tokens" gorm:"default:0"`
 	CompletionTokens int    `json:"completion_tokens" gorm:"default:0"`
+	CacheTokens      int    `json:"cache_tokens" gorm:"default:0"` // 命中缓存的输入token数, 缓存命中率 = cache_tokens / prompt_tokens
 	UseTime          int    `json:"use_time" gorm:"default:0"`
 	IsStream         bool   `json:"is_stream"`
 	ChannelId        int    `json:"channel" gorm:"index;index:idx_logs_channel_type_created_at,priority:1"`
@@ -176,6 +177,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		Content:          params.Content,
 		PromptTokens:     params.PromptTokens,
 		CompletionTokens: params.CompletionTokens,
+		CacheTokens:      otherInt(params.Other, "cache_tokens"),
 		TokenName:        params.TokenName,
 		ModelName:        params.ModelName,
 		Quota:            params.Quota,
@@ -438,6 +440,107 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	}
 
 	return stat, nil
+}
+
+// otherInt extracts an integer from the legacy `other` map. The value is an int
+// when set in-process (GenerateTextOtherInfo) and a float64 once round-tripped
+// through JSON, so both are handled.
+func otherInt(m map[string]interface{}, key string) int {
+	if m == nil {
+		return 0
+	}
+	switch v := m[key].(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	default:
+		return 0
+	}
+}
+
+// SumCacheHitTokens returns total cached(hit) prompt tokens and total prompt
+// tokens for consume logs in the window. Cache hit rate = cacheHit / prompt.
+// Empty filter args are ignored. COALESCE keeps it cross-DB (SQLite/MySQL/PG).
+func SumCacheHitTokens(startTimestamp, endTimestamp int64, modelName, username, group string, channel int) (cacheHit int64, prompt int64, err error) {
+	var r struct {
+		CacheHit int64
+		Prompt   int64
+	}
+	tx := LOG_DB.Table("logs").
+		Select("COALESCE(SUM(cache_tokens),0) as cache_hit, COALESCE(SUM(prompt_tokens),0) as prompt").
+		Where("type = ?", LogTypeConsume)
+	if startTimestamp != 0 {
+		tx = tx.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		tx = tx.Where("created_at <= ?", endTimestamp)
+	}
+	if modelName != "" {
+		tx = tx.Where("model_name = ?", modelName)
+	}
+	if username != "" {
+		tx = tx.Where("username = ?", username)
+	}
+	if group != "" {
+		tx = tx.Where(logGroupCol+" = ?", group)
+	}
+	if channel != 0 {
+		tx = tx.Where("channel_id = ?", channel)
+	}
+	err = tx.Scan(&r).Error
+	return r.CacheHit, r.Prompt, err
+}
+
+// backfillLogCacheTokens copies the per-request cache_tokens value out of the
+// legacy `other` JSON blob into the new cache_tokens column. Idempotent: only
+// touches consume rows still at 0 that actually carry a cache_tokens entry.
+// ponytail: per-row UPDATE in batches — fine for a one-time background backfill;
+// if log tables are huge and this drags, switch to DB-specific JSON_EXTRACT.
+func backfillLogCacheTokens() {
+	if !LOG_DB.Migrator().HasColumn(&Log{}, "cache_tokens") {
+		return
+	}
+	const where = "type = ? AND cache_tokens = 0 AND other LIKE ?"
+	var pending int64
+	if err := LOG_DB.Model(&Log{}).Where(where, LogTypeConsume, "%cache_tokens%").Count(&pending).Error; err != nil {
+		common.SysLog("backfill cache_tokens count failed: " + err.Error())
+		return
+	}
+	if pending == 0 {
+		return
+	}
+	common.SysLog(fmt.Sprintf("backfilling cache_tokens for ~%d log rows ...", pending))
+	gopool.Go(func() {
+		var batch []Log
+		updated := 0
+		err := LOG_DB.Model(&Log{}).Select("id", "other").
+			Where(where, LogTypeConsume, "%cache_tokens%").
+			FindInBatches(&batch, 2000, func(tx *gorm.DB, _ int) error {
+				for _, l := range batch {
+					m, e := common.StrToMap(l.Other)
+					if e != nil {
+						continue
+					}
+					ct := otherInt(m, "cache_tokens")
+					if ct <= 0 {
+						continue
+					}
+					if e := LOG_DB.Model(&Log{}).Where("id = ?", l.Id).Update("cache_tokens", ct).Error; e != nil {
+						return e
+					}
+					updated++
+				}
+				return nil
+			}).Error
+		if err != nil {
+			common.SysLog("backfill cache_tokens failed: " + err.Error())
+			return
+		}
+		common.SysLog(fmt.Sprintf("backfill cache_tokens done, %d rows updated", updated))
+	})
 }
 
 func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string) (token int) {

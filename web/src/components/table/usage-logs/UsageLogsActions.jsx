@@ -80,6 +80,18 @@ const LogsActions = ({
           >
             TPM: {stat.tpm}
           </Tag>
+          <Tag
+            color='light-blue'
+            style={{
+              border: 'none',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+              fontWeight: 500,
+              padding: 13,
+            }}
+            className='!rounded-lg'
+          >
+            {t('缓存命中率')}: {((stat.cache_hit_rate || 0) * 100).toFixed(1)}%
+          </Tag>
         </Space>
       </Skeleton>
 

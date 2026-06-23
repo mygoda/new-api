@@ -377,6 +377,7 @@ func migrateLOGDB() error {
 	if err = LOG_DB.AutoMigrate(&Log{}); err != nil {
 		return err
 	}
+	backfillLogCacheTokens()
 	return nil
 }
 
