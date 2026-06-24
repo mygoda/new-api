@@ -24,7 +24,6 @@ import {
   processModelsData,
   processGroupsData,
   showError,
-  isAdmin,
 } from '../../helpers';
 import { API_ENDPOINTS } from '../../constants/playground.constants';
 
@@ -77,18 +76,10 @@ export const useDataLoader = (
           userState?.user?.group ||
           JSON.parse(localStorage.getItem('user'))?.group;
 
-        let groupOptions;
-        if (isAdmin()) {
-          // 管理员可见所有可用分组
-          groupOptions = processGroupsData(data, userGroup);
-        } else {
-          // 非管理员仅可见自己所属分组
-          const filteredData = {};
-          if (userGroup && data[userGroup]) {
-            filteredData[userGroup] = data[userGroup];
-          }
-          groupOptions = processGroupsData(filteredData, userGroup);
-        }
+        // /api/user/groups 后端已按 用户分组 + extra_groups + 全局可见 完成鉴权过滤
+        // (管理员返回全部)，前端直接全用，不能再砍成只剩 userGroup，
+        // 否则靠 extra_groups 单独授权的分组在 playground 里看不到。
+        const groupOptions = processGroupsData(data, userGroup);
         setGroups(groupOptions);
 
         const hasCurrentGroup = groupOptions.some(
