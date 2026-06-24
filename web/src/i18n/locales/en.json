@@ -3583,6 +3583,8 @@
     "缓存 {{tokens}} tokens / 1M tokens * {{symbol}}{{price}} (倍率: {{ratio}})": "Cache {{tokens}} tokens / 1M tokens * {{symbol}}{{price}} (ratio: {{ratio}})",
     "缓存 Token 读 / 写": "Cache Tokens Read / Write",
     "缓存读取 Token": "Cache Read Tokens",
+    "搜索分组名称或描述": "Search group name or description",
+    "第 {{start}} - {{end}} 条，共 {{total}} 条": "{{start}} - {{end}} of {{total}}",
     "缓存 Tokens": "Cache Tokens",
     "缓存: {{cacheRatio}}": "Cache: {{cacheRatio}}",
     "缓存价格：{{symbol}}{{price}} * {{cacheRatio}} = {{symbol}}{{total}} / 1M tokens (缓存倍率: {{cacheRatio}})": "Cache price: {{symbol}}{{price}} * {{cacheRatio}} = {{symbol}}{{total}} / 1M tokens (Cache ratio: {{cacheRatio}})",

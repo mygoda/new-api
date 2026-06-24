@@ -14,7 +14,17 @@ const GroupsTable = ({ groups, loading, t, onEdit, onDelete }) => {
       dataSource={groups}
       loading={loading}
       rowKey='name'
-      pagination={false}
+      pagination={{
+        pageSize: 10,
+        showSizeChanger: true,
+        pageSizeOpts: [10, 20, 50, 100],
+        formatPageText: (page) =>
+          t('第 {{start}} - {{end}} 条，共 {{total}} 条', {
+            start: page.currentStart,
+            end: page.currentEnd,
+            total: page.total,
+          }),
+      }}
       size='middle'
       empty={t('暂无数据')}
     />
