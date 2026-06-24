@@ -106,19 +106,10 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 		return nil, err // Return nil and error if DB lookup fails
 	}
 
-	// Create cache object from user data
-	userCache = &UserBase{
-		Id:              user.Id,
-		Group:           user.Group,
-		Quota:           user.Quota,
-		Status:          user.Status,
-		Username:        user.Username,
-		Setting:         user.Setting,
-		Email:           user.Email,
-		UserRatio:       user.UserRatio,
-		UserModelRatios: user.UserModelRatios,
-		AllowedChannels: user.AllowedChannels,
-	}
+	// Create cache object from user data. Reuse ToBaseUser() so this stays in
+	// sync with the Redis-cached shape — a hand-copied struct here previously
+	// dropped ExtraGroups, breaking extra_groups-based group access.
+	userCache = user.ToBaseUser()
 
 	return userCache, nil
 }
