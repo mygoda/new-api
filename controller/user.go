@@ -594,17 +594,20 @@ func GetUserModels(c *gin.Context) {
 			models = model.GetEnabledModels()
 		}
 	} else {
+		// 普通用户：可用分组集合需叠加用户级 extra_groups，与 /api/user/groups、
+		// /api/pricing、relay 鉴权(auth.go)口径保持一致，否则靠 extra_groups 单独
+		// 授权的不可见分组在控制台模型选择器里会被误判为"无权访问该分组"。
+		usableGroups := service.GetUserUsableGroupsWithExtra(user.Group, user.ExtraGroups)
 		if filterGroup := c.Query("group"); filterGroup != "" {
 			// 按指定分组过滤
-			if !service.GroupInUserUsableGroups(user.Group, filterGroup) {
+			if _, ok := usableGroups[filterGroup]; !ok {
 				common.ApiErrorMsg(c, "无权访问该分组")
 				return
 			}
 			models = model.GetGroupEnabledModels(filterGroup)
 		} else {
 			// 返回所有可用分组的模型并集
-			groups := service.GetUserUsableGroups(user.Group)
-			for group := range groups {
+			for group := range usableGroups {
 				for _, g := range model.GetGroupEnabledModels(group) {
 					if !common.StringsContains(models, g) {
 						models = append(models, g)
