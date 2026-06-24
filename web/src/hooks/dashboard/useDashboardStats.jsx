@@ -142,37 +142,49 @@ export const useDashboardStats = (
 
       const hasCacheData =
         isAdminUser &&
-        dorisEnabled &&
         cacheStats &&
-        ((cacheStats.cacheTokens || 0) +
-          (cacheStats.cacheCreationTokens || 0) +
-          (cacheStats.promptTokens || 0) >
-          0);
+        (dorisEnabled
+          ? (cacheStats.cacheTokens || 0) +
+              (cacheStats.cacheCreationTokens || 0) +
+              (cacheStats.promptTokens || 0) >
+            0
+          : true);
       if (hasCacheData) {
         const hitRatePct = ((cacheStats.hitRate || 0) * 100).toFixed(2) + '%';
-        const read = (cacheStats.cacheTokens || 0).toLocaleString();
-        const write = (cacheStats.cacheCreationTokens || 0).toLocaleString();
+        const items = [];
+        if (dorisEnabled) {
+          const read = (cacheStats.cacheTokens || 0).toLocaleString();
+          const write = (cacheStats.cacheCreationTokens || 0).toLocaleString();
+          items.push({
+            title: t('缓存 Token 读 / 写'),
+            value: `${read} / ${write}`,
+            icon: <IconSaveStroked />,
+            avatarColor: 'teal',
+            trendData: [],
+            trendColor: '#14b8a6',
+          });
+        } else {
+          items.push({
+            title: t('缓存读取 Token'),
+            value: (cacheStats.cacheTokens || 0).toLocaleString(),
+            icon: <IconSaveStroked />,
+            avatarColor: 'teal',
+            trendData: [],
+            trendColor: '#14b8a6',
+          });
+        }
+        items.push({
+          title: t('缓存命中率'),
+          value: hitRatePct,
+          icon: <IconPercentage />,
+          avatarColor: 'green',
+          trendData: [],
+          trendColor: '#10b981',
+        });
         groups.push({
           title: createSectionTitle(Database, t('缓存命中')),
           color: 'bg-teal-50',
-          items: [
-            {
-              title: t('缓存 Token 读 / 写'),
-              value: `${read} / ${write}`,
-              icon: <IconSaveStroked />,
-              avatarColor: 'teal',
-              trendData: [],
-              trendColor: '#14b8a6',
-            },
-            {
-              title: t('缓存命中率'),
-              value: hitRatePct,
-              icon: <IconPercentage />,
-              avatarColor: 'green',
-              trendData: [],
-              trendColor: '#10b981',
-            },
-          ],
+          items,
         });
       }
 

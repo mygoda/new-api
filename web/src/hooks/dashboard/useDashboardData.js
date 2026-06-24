@@ -228,11 +228,35 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
 
   const loadCacheStats = useCallback(async () => {
     if (!dorisEnabled) {
-      setCacheStats({
-        cacheTokens: 0, cacheCreationTokens: 0,
-        cacheCreation5m: 0, cacheCreation1h: 0,
-        promptTokens: 0, totalInput: 0, hitRate: 0,
-      });
+      // 无 Doris：从 logs 表的统计接口取缓存命中率(cache_tokens 真列)
+      try {
+        const { start_timestamp, end_timestamp, username } = inputs;
+        const localStart = Date.parse(start_timestamp) / 1000;
+        const localEnd = Date.parse(end_timestamp) / 1000;
+        const base = isAdminUser ? '/api/log/stat' : '/api/log/self/stat';
+        const params = new URLSearchParams({
+          type: '0',
+          start_timestamp: String(localStart),
+          end_timestamp: String(localEnd),
+        });
+        if (isAdminUser && username) params.set('username', username);
+        const res = await API.get(`${base}?${params.toString()}`);
+        const { success, data } = res.data || {};
+        const cacheTokens = (success && data && data.cache_hit_tokens) || 0;
+        setCacheStats({
+          cacheTokens,
+          cacheCreationTokens: 0, cacheCreation5m: 0, cacheCreation1h: 0,
+          promptTokens: 0, totalInput: cacheTokens,
+          hitRate: (success && data && data.cache_hit_rate) || 0,
+        });
+      } catch (err) {
+        console.error(err);
+        setCacheStats({
+          cacheTokens: 0, cacheCreationTokens: 0,
+          cacheCreation5m: 0, cacheCreation1h: 0,
+          promptTokens: 0, totalInput: 0, hitRate: 0,
+        });
+      }
       setCacheTrend([]);
       return;
     }
