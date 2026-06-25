@@ -26,6 +26,7 @@ type UserBase struct {
 	UserModelRatios string  `json:"user_model_ratios"`
 	AllowedChannels string  `json:"allowed_channels"`
 	ExtraGroups     string  `json:"extra_groups"`
+	HideGroupRatio  bool    `json:"hide_group_ratio"`
 }
 
 func (user *UserBase) WriteContext(c *gin.Context) {

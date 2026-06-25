@@ -57,6 +57,7 @@ type User struct {
 	CreatedBy        int            `json:"created_by" gorm:"type:int;default:0;column:created_by;index"`
 	AllowedChannels  string         `json:"allowed_channels" gorm:"type:text;column:allowed_channels"` // 渠道白名单，逗号分隔渠道ID（如 "3,7,12"），空字符串=不限制
 	ExtraGroups      string         `json:"extra_groups" gorm:"type:text;column:extra_groups"`         // 用户级额外可用分组，JSON 数组如 ["vip","svip"]，空=只用全局 UserUsableGroups
+	HideGroupRatio   bool           `json:"hide_group_ratio" gorm:"default:false;column:hide_group_ratio"` // true=该用户在前端只看到默认倍率1.0（不暴露真实分组倍率），仅显示遮蔽，不影响实际计费
 
 	CreatedByUsername string `json:"created_by_username,omitempty" gorm:"-:all"`
 }
@@ -74,6 +75,7 @@ func (user *User) ToBaseUser() *UserBase {
 		UserModelRatios: user.UserModelRatios,
 		AllowedChannels: user.AllowedChannels,
 		ExtraGroups:     user.ExtraGroups,
+		HideGroupRatio:  user.HideGroupRatio,
 	}
 	return cache
 }
@@ -802,6 +804,7 @@ func (user *User) Edit(updatePassword bool) error {
 		"user_model_ratios": newUser.UserModelRatios,
 		"allowed_channels":  newUser.AllowedChannels,
 		"extra_groups":      newUser.ExtraGroups,
+		"hide_group_ratio":  newUser.HideGroupRatio,
 	}
 	if updatePassword {
 		updates["password"] = newUser.Password
@@ -1116,6 +1119,12 @@ func GetUserGroup(id int, fromDB bool) (group string, err error) {
 func GetUserExtraGroups(id int) (extraGroups string, err error) {
 	err = DB.Model(&User{}).Where("id = ?", id).Select("extra_groups").Find(&extraGroups).Error
 	return extraGroups, err
+}
+
+// GetUserHideGroupRatio 直读 DB 返回用户是否被设为"隐藏真实倍率"。
+func GetUserHideGroupRatio(id int) (hide bool, err error) {
+	err = DB.Model(&User{}).Where("id = ?", id).Select("hide_group_ratio").Find(&hide).Error
+	return hide, err
 }
 
 // GetUserSetting gets setting from Redis first, falls back to DB if needed

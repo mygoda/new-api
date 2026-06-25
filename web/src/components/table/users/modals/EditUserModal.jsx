@@ -95,6 +95,7 @@ const EditUserModal = (props) => {
     user_model_ratios: '',
     allowed_channels: [],
     extra_groups: [],
+    hide_group_ratio: false,
   });
 
   const fetchGroups = async () => {
@@ -472,6 +473,16 @@ const EditUserModal = (props) => {
                           style={{ width: '100%' }}
                           extraText={t(
                             '与全局「用户可选分组」叠加；若与全局重复后端会自动去重，不会重复计算。',
+                          )}
+                        />
+                      </Col>
+
+                      <Col span={24}>
+                        <Form.Switch
+                          field='hide_group_ratio'
+                          label={t('隐藏真实倍率')}
+                          extraText={t(
+                            '开启后该用户在前端只看到默认倍率 1.0，不暴露真实分组倍率；仅影响展示，不改变实际计费。管理员始终看真实值。',
                           )}
                         />
                       </Col>

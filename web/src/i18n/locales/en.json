@@ -3584,6 +3584,8 @@
     "缓存 Token 读 / 写": "Cache Tokens Read / Write",
     "缓存读取 Token": "Cache Read Tokens",
     "搜索分组名称或描述": "Search group name or description",
+    "隐藏真实倍率": "Hide actual ratio",
+    "开启后该用户在前端只看到默认倍率 1.0，不暴露真实分组倍率；仅影响展示，不改变实际计费。管理员始终看真实值。": "When enabled, this user only sees the default ratio 1.0 in the frontend instead of the real group ratio. Display only — actual billing is unchanged. Admins always see the real value.",
     "第 {{start}} - {{end}} 条，共 {{total}} 条": "{{start}} - {{end}} of {{total}}",
     "缓存 Tokens": "Cache Tokens",
     "缓存: {{cacheRatio}}": "Cache: {{cacheRatio}}",

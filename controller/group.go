@@ -44,9 +44,15 @@ func GetUserGroups(c *gin.Context) {
 		// + users.extra_groups 用户级追加(JSON 数组)。
 		// 与 middleware/auth.go token.group 校验、controller/pricing.go 模型市场可见性保持一致。
 		extraRaw, _ := model.GetUserExtraGroups(userId)
+		hideRatio, _ := model.GetUserHideGroupRatio(userId)
 		for groupName := range service.GetUserUsableGroupsWithExtra(userGroup, extraRaw) {
+			ratio := ratio_setting.GetGroupRatio(groupName)
+			if hideRatio {
+				// 该用户被设为隐藏真实倍率：只展示默认 1.0（不影响实际计费）
+				ratio = 1.0
+			}
 			usableGroups[groupName] = map[string]interface{}{
-				"ratio": ratio_setting.GetGroupRatio(groupName),
+				"ratio": ratio,
 				"desc":  setting.GetUsableGroupDescription(groupName),
 			}
 		}

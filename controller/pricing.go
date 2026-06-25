@@ -18,11 +18,13 @@ func GetPricing(c *gin.Context) {
 	var group string
 	var extraGroupsRaw string
 	var userRole int
+	var hideGroupRatio bool
 	if exists {
 		user, err := model.GetUserCache(userId.(int))
 		if err == nil {
 			group = user.Group
 			extraGroupsRaw = user.ExtraGroups
+			hideGroupRatio = user.HideGroupRatio
 		}
 		if role, ok := c.Get("role"); ok {
 			userRole, _ = role.(int)
@@ -50,6 +52,14 @@ func GetPricing(c *gin.Context) {
 		// 未登录用户：只显示 default 分组
 		usableGroup["default"] = "默认分组"
 		groupRatio["default"] = ratio_setting.GetGroupRatio("default")
+	}
+
+	// 该用户被设为隐藏真实倍率：对非管理员把所有分组倍率遮蔽为 1.0（仅展示，
+	// 实际计费仍用真实倍率）。管理员不受影响，始终看真实值。
+	if hideGroupRatio && userRole < common.RoleAdminUser {
+		for g := range groupRatio {
+			groupRatio[g] = 1.0
+		}
 	}
 
 	c.JSON(200, gin.H{
