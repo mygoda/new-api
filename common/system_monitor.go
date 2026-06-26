@@ -53,9 +53,11 @@ func updateSystemStatus() {
 	var status SystemStatus
 
 	// CPU
-	// 注意：cpu.Percent(0, false) 返回自上次调用以来的 CPU 使用率
-	// 如果是第一次调用，可能会返回错误或不准确的值，但在循环中会逐渐正常
-	percents, err := cpu.Percent(0, false)
+	// 用阻塞式 1 秒采样取真实均值。不要用 cpu.Percent(0,...)：interval=0 返回的是
+	// 自上次 cpu.Percent 调用以来的占用率，而 gopsutil 的"上次"是包级全局状态，
+	// 与其他调用方(如 common/pprof.go)共享。两者交叉调用时 interval=0 会在极短窗口
+	// 内采样，瞬间算出接近 100% 的假值，从而在整机空载时误触发 503 过载保护。
+	percents, err := cpu.Percent(time.Second, false)
 	if err == nil && len(percents) > 0 {
 		status.CPUUsage = percents[0]
 	}
