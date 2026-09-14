@@ -258,41 +258,6 @@ func modelMatchesCapability(m model.Model, cap string) bool {
 	return false
 }
 
-// domesticModelKeywords 是国产大模型的品牌/厂商关键词(小写)。
-// 首页仅展示命中其中任一关键词的模型,海外模型(OpenAI/Claude/Gemini 等)不上首页。
-// 关键词只用足够辨识的长词,避免 "yi"/"wan" 这类短词误伤。
-var domesticModelKeywords = []string{
-	"deepseek", "qwen", "qwq", "qvq", "tongyi", "通义", "千问", "阿里", "alibaba", "bailian", "百炼",
-	"glm", "chatglm", "zhipu", "智谱", "cogview", "cogvideo",
-	"moonshot", "kimi", "月之暗面",
-	"ernie", "wenxin", "文心", "百度", "baidu",
-	"spark", "星火", "讯飞", "iflytek", "xunfei",
-	"doubao", "豆包", "字节", "bytedance", "volc", "火山", "seedream", "seedance",
-	"hunyuan", "混元", "腾讯", "tencent",
-	"minimax", "abab", "hailuo", "海螺",
-	"阶跃", "step-", "stepfun",
-	"零一", "01-ai", "01ai", "lingyi", "万物",
-	"sensechat", "sensenova", "商汤", "sensetime",
-	"skywork", "天工", "昆仑",
-	"baichuan", "百川",
-	"minicpm", "面壁",
-	"internlm", "书生",
-	"kling", "可灵", "快手", "kuaishou",
-	"vidu", "生数",
-	"pixverse", "bailing", "蚂蚁",
-}
-
-// isDomesticModel 按厂商名与模型名的关键词判定是否为国产模型。
-func isDomesticModel(vendorName, modelName string) bool {
-	hay := strings.ToLower(vendorName + " " + modelName)
-	for _, kw := range domesticModelKeywords {
-		if strings.Contains(hay, kw) {
-			return true
-		}
-	}
-	return false
-}
-
 // loadModelPriceLookup 返回一个 model_name → 单价(元/1K tokens) 的查找闭包。
 // 优先取 ModelPrice(固定价),否则用 ModelRatio × 0.002 反推估算。
 // 如果都没配则返回 0(前端按价格未配置展示)。
