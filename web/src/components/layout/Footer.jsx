@@ -193,6 +193,14 @@ const FooterBar = () => {
             <Typography.Text className='text-sm !text-semi-color-text-1'>
               © {currentYear} {systemName}. {t('版权所有')}
             </Typography.Text>
+            <a
+              href='https://beian.miit.gov.cn/'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='text-sm !text-semi-color-text-1 hover:!text-semi-color-primary'
+            >
+              粤ICP备2026047011号-1
+            </a>
           </div>
 
           <div className='text-sm'>

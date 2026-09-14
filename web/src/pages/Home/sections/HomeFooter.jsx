@@ -46,6 +46,14 @@ export default function HomeFooter({ data }) {
         </div>
         <div className='mt-10 pt-8 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs'>
           <div>{copyright}</div>
+          <a
+            href='https://beian.miit.gov.cn/'
+            target='_blank'
+            rel='noreferrer'
+            className='hover:text-white transition'
+          >
+            粤ICP备2026047011号-1
+          </a>
         </div>
       </div>
     </footer>
