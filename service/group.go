@@ -1,6 +1,8 @@
 package service
 
 import (
+	"errors"
+	"sort"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -101,6 +103,71 @@ func parseExtraGroupsJSON(raw string) []string {
 		out = append(out, g)
 	}
 	return out
+}
+
+// ResolveProviderGroups 把 OpenRouter 风格 provider 对象的路由字段解析成一个有序、去重、
+// 且都在用户可用分组集合内的候选分组列表，供跨组选择引擎逐个尝试。语义见 provider 文档。
+// 返回空列表时返回 error（调用方转 400）。
+func ResolveProviderGroups(userGroup string, order, only, ignore, avoid []string, allowFallbacks bool) ([]string, error) {
+	usable := GetUserUsableGroups(userGroup)
+
+	exclude := make(map[string]struct{})
+	for _, g := range ignore {
+		exclude[g] = struct{}{}
+	}
+	for _, g := range avoid {
+		exclude[g] = struct{}{}
+	}
+
+	// 候选全集：only 给了则限定为 only∩usable，否则为全部 usable；再剔除 exclude。
+	universe := make(map[string]struct{})
+	if len(only) > 0 {
+		for _, g := range only {
+			if _, ok := usable[g]; ok {
+				if _, bad := exclude[g]; !bad {
+					universe[g] = struct{}{}
+				}
+			}
+		}
+	} else {
+		for g := range usable {
+			if _, bad := exclude[g]; !bad {
+				universe[g] = struct{}{}
+			}
+		}
+	}
+
+	out := make([]string, 0, len(universe))
+	seen := make(map[string]struct{})
+	// 1. order 里的分组排最前（只保留在候选全集内的）
+	for _, g := range order {
+		if _, ok := universe[g]; !ok {
+			continue
+		}
+		if _, dup := seen[g]; dup {
+			continue
+		}
+		out = append(out, g)
+		seen[g] = struct{}{}
+	}
+	// 2. 是否追加候选全集里剩余分组：
+	//    - only 给了：only 本身就是允许边界，剩余的始终追加；
+	//    - 否则（全集=全部 usable）：仅当 allowFallbacks 才追加，否则只用 order 指定的。
+	if len(only) > 0 || allowFallbacks {
+		rest := make([]string, 0, len(universe))
+		for g := range universe {
+			if _, dup := seen[g]; !dup {
+				rest = append(rest, g)
+			}
+		}
+		sort.Strings(rest) // 名字序，保证确定性
+		out = append(out, rest...)
+	}
+
+	if len(out) == 0 {
+		return nil, errors.New("no usable group matches provider selection")
+	}
+	return out, nil
 }
 
 // GetUserAutoGroup 根据用户分组获取自动分组设置

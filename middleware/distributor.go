@@ -23,8 +23,9 @@ import (
 )
 
 type ModelRequest struct {
-	Model string `json:"model"`
-	Group string `json:"group,omitempty"`
+	Model    string               `json:"model"`
+	Group    string               `json:"group,omitempty"`
+	Provider *dto.ProviderRouting `json:"provider,omitempty"` // OpenRouter 风格分组路由，仅分发用，不转发上游
 }
 
 func Distribute() func(c *gin.Context) {
@@ -297,6 +298,7 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			return nil, false, err
 		}
 		modelRequest.Model = req.Model
+		modelRequest.Provider = req.Provider
 	}
 	if strings.HasPrefix(c.Request.URL.Path, "/v1/realtime") {
 		//wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01
@@ -361,16 +363,27 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 		modelRequest.Model = ratio_setting.WithCompactModelSuffix(modelRequest.Model)
 	}
 
-	// OpenRouter 风格：model 写成 "分组/模型" 时，前缀显式指定用哪个分组，剥离后按干净模型名走全链路。
-	// 仅对"默认走 default 分组"的 key 开启：default 相当于公共入口 key，可借前缀跨到账号可用的其它分组；
-	// 非 default 分组的 key 忽略前缀（前缀当普通模型名），从而锁死在自己分组内。
+	// OpenRouter 风格路由，仅对"默认走 default 分组"的 key 开启（default 相当于公共入口 key，
+	// 可跨到账号可用的其它分组）；非 default 分组的 key 忽略，从而锁死在自己分组内。
 	// playground 自己管理分组，跳过。
-	// ponytail: 分组名若和上游 provider 名撞车（如分组就叫 "openai"）会被优先当分组，撞车就给分组换名。
 	if !strings.HasPrefix(c.Request.URL.Path, "/pg/chat/completions") &&
 		common.GetContextKeyString(c, constant.ContextKeyUsingGroup) == "default" {
-		if idx := strings.Index(modelRequest.Model, "/"); idx > 0 {
+		userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
+		if p := modelRequest.Provider; p != nil {
+			// provider 对象：解析成有序候选分组列表，交给跨组引擎；不再解析 model 前缀。
+			allowFallbacks := true
+			if p.AllowFallbacks != nil {
+				allowFallbacks = *p.AllowFallbacks
+			}
+			groups, gErr := service.ResolveProviderGroups(userGroup, p.Order, p.Only, p.Ignore, p.Avoid, allowFallbacks)
+			if gErr != nil {
+				return nil, false, gErr
+			}
+			common.SetContextKey(c, constant.ContextKeyProviderGroups, groups)
+		} else if idx := strings.Index(modelRequest.Model, "/"); idx > 0 {
+			// "分组/模型" 前缀：前缀精确等于用户可用分组名才生效，否则原样透传。
+			// ponytail: 分组名若和上游 provider 名撞车（如分组就叫 "openai"）会被优先当分组，撞车就给分组换名。
 			prefix := modelRequest.Model[:idx]
-			userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
 			if service.GroupInUserUsableGroups(userGroup, prefix) {
 				modelRequest.Model = modelRequest.Model[idx+1:]
 				common.SetContextKey(c, constant.ContextKeyUsingGroup, prefix)

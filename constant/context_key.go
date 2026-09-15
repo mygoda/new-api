@@ -43,6 +43,9 @@ const (
 	ContextKeyAutoGroup           ContextKey = "auto_group"
 	ContextKeyAutoGroupIndex      ContextKey = "auto_group_index"
 	ContextKeyAutoGroupRetryIndex ContextKey = "auto_group_retry_index"
+	// ContextKeyProviderGroups 存放 OpenRouter 风格 provider 对象解析出的有序候选分组列表（[]string）。
+	// 存在时优先于 auto 分组驱动跨组选择。
+	ContextKeyProviderGroups ContextKey = "provider_groups"
 
 	/* user related keys */
 	ContextKeyUserId      ContextKey = "id"

@@ -333,6 +333,10 @@ func getFallbackChannel(c *gin.Context, info *relaycommon.RelayInfo) (*model.Cha
 	if _, ok := c.Get("specific_channel_id"); ok {
 		return nil, false
 	}
+	// provider 模式是调用方显式控制分组，不再触发 admin 的 per-group 兜底渠道
+	if _, ok := common.GetContextKey(c, constant.ContextKeyProviderGroups); ok {
+		return nil, false
+	}
 	group := info.TokenGroup
 	if group == "auto" {
 		if v, exists := common.GetContextKey(c, constant.ContextKeyAutoGroup); exists {

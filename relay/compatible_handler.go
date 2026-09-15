@@ -19,6 +19,8 @@ import (
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/samber/lo"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 
 	"github.com/gin-gonic/gin"
 )
@@ -105,7 +107,16 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 				println("requestBody: ", string(debugBytes))
 			}
 		}
-		requestBody = common.ReaderOnly(storage)
+		// provider 是 new-api 内部分组路由字段，passthrough 模式（跳过了 RemoveDisabledFields）
+		// 必须显式删掉，避免透传给上游。仅在存在时重写，否则保持原始字节。
+		if rawBytes, bErr := storage.Bytes(); bErr == nil && gjson.GetBytes(rawBytes, "provider").Exists() {
+			if cleaned, dErr := sjson.DeleteBytes(rawBytes, "provider"); dErr == nil {
+				requestBody = bytes.NewReader(cleaned)
+			}
+		}
+		if requestBody == nil {
+			requestBody = common.ReaderOnly(storage)
+		}
 	} else {
 		convertedRequest, err := adaptor.ConvertOpenAIRequest(c, info, request)
 		if err != nil {

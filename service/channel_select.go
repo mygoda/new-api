@@ -93,16 +93,24 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 	selectGroup := param.TokenGroup
 	userGroup := common.GetContextKeyString(param.Ctx, constant.ContextKeyUserGroup)
 
-	if param.TokenGroup == "auto" {
+	// 分组列表来源：provider 显式列表 > auto 分组 > 单分组直选。
+	var autoGroups []string
+	crossGroupRetry := common.GetContextKeyBool(param.Ctx, constant.ContextKeyTokenCrossGroupRetry)
+	if pg, ok := getContextGroupList(param.Ctx, constant.ContextKeyProviderGroups); ok && len(pg) > 0 {
+		// provider 模式：调用方给的有序分组列表，沿列表逐组回退
+		autoGroups = pg
+		crossGroupRetry = true
+	} else if param.TokenGroup == "auto" {
 		if len(setting.GetAutoGroups()) == 0 {
 			return nil, selectGroup, errors.New("auto groups is not enabled")
 		}
-		autoGroups := GetUserAutoGroup(userGroup)
+		autoGroups = GetUserAutoGroup(userGroup)
+	}
 
+	if len(autoGroups) > 0 {
 		// startGroupIndex: the group index to start searching from
 		// startGroupIndex: 开始搜索的分组索引
 		startGroupIndex := 0
-		crossGroupRetry := common.GetContextKeyBool(param.Ctx, constant.ContextKeyTokenCrossGroupRetry)
 
 		if lastGroupIndex, exists := common.GetContextKey(param.Ctx, constant.ContextKeyAutoGroupIndex); exists {
 			if idx, ok := lastGroupIndex.(int); ok {
@@ -166,4 +174,14 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 		}
 	}
 	return channel, selectGroup, nil
+}
+
+// getContextGroupList 从 gin 上下文里读出一个 []string 分组列表（provider 模式用）。
+func getContextGroupList(c *gin.Context, key constant.ContextKey) ([]string, bool) {
+	v, ok := common.GetContextKey(c, key)
+	if !ok {
+		return nil, false
+	}
+	list, ok := v.([]string)
+	return list, ok
 }
