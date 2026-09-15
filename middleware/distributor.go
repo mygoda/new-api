@@ -362,10 +362,12 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 	}
 
 	// OpenRouter 风格：model 写成 "分组/模型" 时，前缀显式指定用哪个分组，剥离后按干净模型名走全链路。
-	// 只有前缀精确等于用户可用分组名才生效；否则原样透传（含合法的 provider/model 名与无前缀默认）。
+	// 仅对"默认走 default 分组"的 key 开启：default 相当于公共入口 key，可借前缀跨到账号可用的其它分组；
+	// 非 default 分组的 key 忽略前缀（前缀当普通模型名），从而锁死在自己分组内。
 	// playground 自己管理分组，跳过。
 	// ponytail: 分组名若和上游 provider 名撞车（如分组就叫 "openai"）会被优先当分组，撞车就给分组换名。
-	if !strings.HasPrefix(c.Request.URL.Path, "/pg/chat/completions") {
+	if !strings.HasPrefix(c.Request.URL.Path, "/pg/chat/completions") &&
+		common.GetContextKeyString(c, constant.ContextKeyUsingGroup) == "default" {
 		if idx := strings.Index(modelRequest.Model, "/"); idx > 0 {
 			prefix := modelRequest.Model[:idx]
 			userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
