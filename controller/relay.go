@@ -482,6 +482,12 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		modelName := c.GetString("original_model")
 		tokenId := c.GetInt("token_id")
 		userGroup := c.GetString("group")
+		// 实际命中的分组（auto / provider 模式下由选路引擎写入），优先用它，使错误日志与计费/消费日志一致
+		if ag, ok := common.GetContextKey(c, constant.ContextKeyAutoGroup); ok {
+			if s, k := ag.(string); k && s != "" {
+				userGroup = s
+			}
+		}
 		channelId := c.GetInt("channel_id")
 		other := make(map[string]interface{})
 		if c.Request != nil && c.Request.URL != nil {
