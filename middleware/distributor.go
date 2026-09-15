@@ -360,6 +360,22 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 	if strings.HasPrefix(c.Request.URL.Path, "/v1/responses/compact") && modelRequest.Model != "" {
 		modelRequest.Model = ratio_setting.WithCompactModelSuffix(modelRequest.Model)
 	}
+
+	// OpenRouter 风格：model 写成 "分组/模型" 时，前缀显式指定用哪个分组，剥离后按干净模型名走全链路。
+	// 只有前缀精确等于用户可用分组名才生效；否则原样透传（含合法的 provider/model 名与无前缀默认）。
+	// playground 自己管理分组，跳过。
+	// ponytail: 分组名若和上游 provider 名撞车（如分组就叫 "openai"）会被优先当分组，撞车就给分组换名。
+	if !strings.HasPrefix(c.Request.URL.Path, "/pg/chat/completions") {
+		if idx := strings.Index(modelRequest.Model, "/"); idx > 0 {
+			prefix := modelRequest.Model[:idx]
+			userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
+			if service.GroupInUserUsableGroups(userGroup, prefix) {
+				modelRequest.Model = modelRequest.Model[idx+1:]
+				common.SetContextKey(c, constant.ContextKeyUsingGroup, prefix)
+			}
+		}
+	}
+
 	return &modelRequest, shouldSelectChannel, nil
 }
 
