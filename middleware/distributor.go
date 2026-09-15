@@ -101,7 +101,11 @@ func Distribute() func(c *gin.Context) {
 					}
 				}
 
-				if preferredChannelID, found := service.GetPreferredChannelByAffinity(c, modelRequest.Model, usingGroup); found {
+				// provider 模式（provider 对象指定分组列表）下跳过渠道亲和：亲和用的是 usingGroup(=default)，
+				// 会把分组钉死成 default 绕过 provider 指定的分组。让 CacheGetRandomSatisfiedChannel 按序选。
+				// ponytail: 牺牲 provider 请求的渠道粘性(性能优化)，换取路由正确；需要粘性再按 auto 分支扩展。
+				_, providerMode := common.GetContextKey(c, constant.ContextKeyProviderGroups)
+				if preferredChannelID, found := service.GetPreferredChannelByAffinity(c, modelRequest.Model, usingGroup); found && !providerMode {
 					preferred, err := model.CacheGetChannel(preferredChannelID)
 					if err == nil && preferred != nil {
 						if preferred.Status != common.ChannelStatusEnabled {
