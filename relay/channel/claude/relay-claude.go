@@ -638,6 +638,7 @@ type ClaudeResponseInfo struct {
 	ResponseText strings.Builder
 	Usage        *dto.Usage
 	Done         bool
+	toolFilter   *claudeTextToolFilter // 流式文本工具调用转换器（懒初始化）
 }
 
 func cacheCreationTokensForOpenAIUsage(usage *dto.Usage) int {
@@ -844,7 +845,14 @@ func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 				data = patchClaudeMessageDeltaUsageData(data, buildMessageDeltaPatchUsage(&claudeResponse, claudeInfo))
 			}
 		}
-		helper.ClaudeChunkData(c, claudeResponse, data)
+		// 逆向/中转上游可能把工具调用吐成文本 <invoke>，经 filter 转成结构化 tool_use 事件后再下发。
+		// 正常文本几乎零改动（仅末尾疑似标记前缀时短暂 hold）。
+		if claudeInfo.toolFilter == nil {
+			claudeInfo.toolFilter = &claudeTextToolFilter{}
+		}
+		for _, e := range claudeInfo.toolFilter.process(&claudeResponse, data) {
+			helper.ClaudeChunkData(c, dto.ClaudeResponse{Type: e.event}, e.data)
+		}
 	} else if info.RelayFormat == types.RelayFormatOpenAI {
 		response := StreamResponseClaude2OpenAI(&claudeResponse)
 
@@ -953,6 +961,12 @@ func HandleClaudeResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 		}
 	case types.RelayFormatClaude:
 		responseData = data
+		// 逆向/中转上游可能把工具调用吐成文本 <invoke>，转成结构化 tool_use 后再回传。
+		if convertClaudeTextToolCalls(&claudeResponse) {
+			if b, mErr := common.Marshal(&claudeResponse); mErr == nil {
+				responseData = b
+			}
+		}
 	}
 
 	if claudeResponse.Usage != nil && claudeResponse.Usage.ServerToolUse != nil && claudeResponse.Usage.ServerToolUse.WebSearchRequests > 0 {
