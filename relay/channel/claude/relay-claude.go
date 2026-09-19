@@ -639,6 +639,7 @@ type ClaudeResponseInfo struct {
 	Usage        *dto.Usage
 	Done         bool
 	toolFilter   *claudeTextToolFilter // 流式文本工具调用转换器（懒初始化）
+	toolConvLogged bool                // 是否已打过转换触发日志（避免重复）
 }
 
 func cacheCreationTokensForOpenAIUsage(usage *dto.Usage) int {
@@ -853,6 +854,10 @@ func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 		for _, e := range claudeInfo.toolFilter.process(&claudeResponse, data) {
 			helper.ClaudeChunkData(c, dto.ClaudeResponse{Type: e.event}, e.data)
 		}
+		if claudeInfo.toolFilter.converted && !claudeInfo.toolConvLogged {
+			claudeInfo.toolConvLogged = true
+			logger.LogInfo(c, fmt.Sprintf("[text-tool-convert] stream: upstream returned text-format tool call, converted to structured tool_use; tools=%v", claudeInfo.toolFilter.convertedNames))
+		}
 	} else if info.RelayFormat == types.RelayFormatOpenAI {
 		response := StreamResponseClaude2OpenAI(&claudeResponse)
 
@@ -963,6 +968,7 @@ func HandleClaudeResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 		responseData = data
 		// 逆向/中转上游可能把工具调用吐成文本 <invoke>，转成结构化 tool_use 后再回传。
 		if convertClaudeTextToolCalls(&claudeResponse) {
+			logger.LogInfo(c, "[text-tool-convert] non-stream: upstream returned text-format tool call, converted to structured tool_use")
 			if b, mErr := common.Marshal(&claudeResponse); mErr == nil {
 				responseData = b
 			}

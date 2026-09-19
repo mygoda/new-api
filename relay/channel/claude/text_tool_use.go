@@ -119,6 +119,7 @@ type claudeTextToolFilter struct {
 	tail      string          // 当前 text 块里尚未下发的尾巴
 	capBuf    strings.Builder // 捕获中的工具调用 XML
 	converted bool            // 是否已转换出 tool_use（用于把 message_delta 的 stop_reason 改成 tool_use）
+	convertedNames []string   // 已转换出的工具名（用于日志）
 	curIndex  int             // 当前 text 块的 index
 	nextIndex int             // 下一个合成 tool_use 块要用的 index
 }
@@ -208,6 +209,7 @@ func (f *claudeTextToolFilter) process(resp *dto.ClaudeResponse, raw string) []c
 			idx := f.nextIndex
 			f.nextIndex++
 			emits = append(emits, toolUseStartEmit(idx, b), inputJsonDeltaEmit(idx, b.Input), claudeEmit{"content_block_stop", stopData(idx)})
+			f.convertedNames = append(f.convertedNames, b.Name)
 		}
 		f.converted = true
 		return emits
